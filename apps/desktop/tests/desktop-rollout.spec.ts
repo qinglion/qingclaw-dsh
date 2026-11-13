@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { teo } from 'tencentcloud-sdk-nodejs-teo'
-import { readDesktopPublishConfig } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-config.ts'
+import { desktopPublishDestination, readDesktopPublishConfig } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-config.ts'
 import { createDesktopUploadPlan } from '../scripts/desktop-upload-plan.ts'
 import { desktopBuildRecordFilename, desktopWebsiteInstallerUrl } from '@deepseek-ai/dsh-desktop-publisher/desktop-auto-update-environment.mjs'
 import { dump, load } from 'js-yaml'
@@ -145,20 +145,25 @@ it('requires initial publication evidence and prepares approval without installe
     const env = { RUNNER_NAME: 'runner', GITHUB_REPOSITORY: 'owner/repo', DSH_PACKAGING_CONFIG_DIR: config,
       DESKTOP_PUBLISH_ROUTE: JSON.stringify(route), DESKTOP_ROLLOUT_PERCENTAGE: '30', DESKTOP_UPLOAD_WEBSITE: 'false' }
     await expect(prepareDesktopRolloutCi(env)).rejects.toThrow(/initial COS/u)
+    const selected = await readDesktopPublishConfig(config, 'production')
     const record = await createDesktopPublicationRecord(join(f.root, 'upload-records'), {
       repository: 'owner/repo', runId: '42', attempt: '1',
-      destination: `bucket-123/${f.plan.upload.publicUrl}nightly`, actor: 'operator',
+      destination: desktopPublishDestination(selected, `${f.plan.upload.publicUrl}nightly`), actor: 'operator',
       operation: 'publish', reason: 'fixture', stagingPercentage: 10,
     })
     await record.record({ type: 'feeds-complete' })
     const context = await prepareDesktopRolloutCi(env)
     expect(context.target).toBe(30)
+    const configPath = join(config, 'publishing/production.json')
+    await writeFile(configPath, JSON.stringify({ ...selected,
+      storage: { provider: 'aliyun-oss', region: 'oss-cn-hangzhou' }, cache: { provider: 'none' } }))
+    await expect(prepareDesktopRolloutCi(env)).rejects.toThrow(/initial COS or OSS/u)
+    await writeFile(configPath, JSON.stringify(selected))
     expect((await prepareDesktopRolloutCi({ ...env, DESKTOP_ROLLOUT_PERCENTAGE: '100' })).approval).not.toBe(context.approval)
     await expect(prepareDesktopRolloutCi({ ...env, DESKTOP_ROLLOUT_PERCENTAGE: '' })).rejects.toThrow(/select a percentage/u)
     await expect(prepareDesktopRolloutCi({ ...env, DESKTOP_ROLLOUT_PERCENTAGE: 'NaN' })).rejects.toThrow(/integer/u)
     await expect(prepareDesktopRolloutCi({ ...env, RUNNER_NAME: 'other' })).rejects.toThrow(/original machine/u)
     await expect(prepareDesktopRolloutCi({ ...env, DESKTOP_UPLOAD_WEBSITE: 'true' })).rejects.toThrow(/edgeOneZoneId/u)
-    const configPath = join(config, 'publishing/production.json')
     const settings = await readDesktopPublishConfig(config, 'production')
     await writeFile(configPath, JSON.stringify({ ...settings, edgeOneZoneId: 'zone-example' }))
     const websiteEnv = { ...env, DESKTOP_ROLLOUT_PERCENTAGE: '', DESKTOP_UPLOAD_WEBSITE: 'true' }
@@ -217,9 +222,10 @@ it.each(['apply', 'changed-approval', 'replaced-feed', 'website'] as const)('che
       edgeOneZoneId: 'zone-fixture', bucket: 'bucket-123', origin: 'https://download.example.com', credentialsFile,
       githubApp: { clientId: 'app', privateKeyFile: join(f.root, 'absent-key') },
     }))
+    const selected = await readDesktopPublishConfig(config, 'production')
     const record = await createDesktopPublicationRecord(join(f.root, 'upload-records'), {
       repository: 'owner/repo', runId: '42', attempt: '1', actor: 'operator',
-      destination: `bucket-123/${f.plan.upload.publicUrl}nightly`, operation: 'publish', reason: 'fixture',
+      destination: desktopPublishDestination(selected, `${f.plan.upload.publicUrl}nightly`), operation: 'publish', reason: 'fixture',
     })
     await record.record({ type: 'feeds-complete' })
     const env = { RUNNER_NAME: 'runner', GITHUB_REPOSITORY: 'owner/repo', DSH_PACKAGING_CONFIG_DIR: config,
@@ -379,7 +385,9 @@ it.each(['missing-yaml', 'wrong-approval', 'not-uploaded', 'wrong-zone', 'not-se
       await rm(join(f.directory, f.filename))
       const directory = join(f.root, 'upload-records', 'website-99-mac-arm64')
       await mkdir(directory, { recursive: true })
-      const approval = websitePublisher.websiteApproval(await readRetainedDesktopManifest(join(f.root, 'releases'), '42', '1'), 'bucket-123')
+      const approval = websitePublisher.websiteApproval(
+        await readRetainedDesktopManifest(join(f.root, 'releases'), '42', '1'),
+        await readDesktopPublishConfig(config, 'production'))
       const publicUrl = desktopWebsiteInstallerUrl('https://download.example.com', 'mac-arm64')
       await writeFile(join(directory, 'state.json'), JSON.stringify({ approval,
         upload: scenario === 'not-uploaded' ? 'pending' : 'uploaded', purgeAttempt: '1',

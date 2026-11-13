@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { createDesktopCos } from '@deepseek-ai/dsh-desktop-publisher/desktop-cos.ts'
-import { desktopPublishCos } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-cos.ts'
+import { desktopPublishCos, desktopPublishCosWriter } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-cos.ts'
 import { answer, cosError, startCosLoopback } from './cos-loopback.ts'
 import { prepareWebsiteInstaller, uploadWebsiteInstaller } from '@deepseek-ai/dsh-desktop-publisher/desktop-website-installer.ts'
 import type { DesktopRetainedManifest } from '@deepseek-ai/dsh-desktop-publisher/desktop-release-store.ts'
@@ -88,15 +88,16 @@ it.each(['absent', 'missing-header', 'wrong-header', 'header-not-retained'] as c
       return client
     }
     const transport = desktopPublishCos(installer.plan, credentials, createClient)
-    await expect(uploadWebsiteInstaller(installer, credentials, transport, async (event) => {
+    const writer = desktopPublishCosWriter(installer.plan, credentials, createClient)
+    await expect(uploadWebsiteInstaller(installer, transport, writer, async (event) => {
       if (event === 'uploaded') throw new Error('audit unavailable')
-    }, { createClient })).rejects.toThrow(initial === 'header-not-retained' ? 'remote download filename unconfirmed' : 'audit unavailable')
+    })).rejects.toThrow(initial === 'header-not-retained' ? 'remote download filename unconfirmed' : 'audit unavailable')
     if (initial === 'header-not-retained') {
       expect(server.requests.filter(request => request.method === 'PUT')).toHaveLength(1)
       return
     }
     const events: string[] = []
-    expect(await uploadWebsiteInstaller(installer, credentials, transport, async (event) => { events.push(event) }, { createClient })).toBe('present')
+    expect(await uploadWebsiteInstaller(installer, transport, writer, async (event) => { events.push(event) })).toBe('present')
     expect(events).toEqual(['uploaded'])
     expect(stored).toEqual(f.bytes)
     expect(server.requests.filter(request => request.method === 'PUT')).toHaveLength(1)
@@ -107,9 +108,9 @@ it('does not replace changed bytes when recovering an already completed publicat
   const f = await fixture()
   const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
   try {
-    await expect(uploadWebsiteInstaller(installer, { secretId: 'fixture-id', secretKey: 'fixture-key' },
-      { read: async () => ({ size: 1, sha512: 'different' }) }, async () => { throw new Error('unexpected write intent') },
-      { createClient: () => { throw new Error('unexpected PUT') }, previouslyUploaded: true })).rejects.toThrow('recorded upload no longer matches')
+    await expect(uploadWebsiteInstaller(installer,
+      { read: async () => ({ size: 1, sha512: 'different' }) }, { put: async () => { throw new Error('unexpected PUT') } },
+      async () => { throw new Error('unexpected write intent') }, { previouslyUploaded: true })).rejects.toThrow('recorded upload no longer matches')
   } finally { await installer.handle.close() }
 })
 

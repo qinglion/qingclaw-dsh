@@ -1,8 +1,14 @@
 {
-  "bucket": "replace-with-bucket-1250000000",
-  "edgeOneZoneId": "zone-replacewithproductionzone",
+  "bucket": "qinglion",
   "origin": "https://download.qingclaw.com",
-  "credentialsFile": "C:/absolute/path/to/packaging/secrets/cos-production.json",
+  "credentialsFile": "C:/absolute/path/to/packaging/secrets/oss-production.json",
+  "storage": {
+    "provider": "aliyun-oss",
+    "region": "oss-cn-hangzhou"
+  },
+  "cache": {
+    "provider": "none"
+  },
   "windows": {
     "certificateThumbprint": "0000000000000000000000000000000000000000"
   },

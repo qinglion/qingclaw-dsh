@@ -1,14 +1,20 @@
-/** Publish a retained package selected by the preparation job; --check never reads secrets or contacts COS. */
+/** Publish a retained package selected by the preparation job; --check never reads secrets or contacts storage. */
 import { createHash } from 'node:crypto'
 import { appendFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
-import { readDesktopPublishConfig, readDesktopUploadCredentials, requireDesktopEdgeOneZoneId } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-config.ts'
+import {
+  desktopPublishDestination,
+  desktopPublishPolicy,
+  readDesktopPublishConfig,
+  readDesktopUploadCredentials,
+  requireDesktopWebsiteCache,
+} from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-config.ts'
 import { desktopReleasesRoot } from './retain-desktop-ci.ts'
 import { retainedDesktopPath, verifyRetainedDesktopRelease } from '@deepseek-ai/dsh-desktop-publisher/desktop-release-store.ts'
 import { verifyRetainedDesktopSignatures } from './verify-retained-desktop.ts'
 import { createDesktopUploadPlan } from './desktop-upload-plan.ts'
-import { desktopPublishCos } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-cos.ts'
+import { createDesktopPublishStorage } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-storage.ts'
 import { createDesktopPublicationRecord, wasDesktopAttemptPublished, withDesktopChannelLock } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-record.ts'
 import { publishDesktopRelease } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish.ts'
 import { desktopPublicationFailure } from '@deepseek-ai/dsh-desktop-publisher/desktop-publication-failure.ts'
@@ -58,7 +64,8 @@ export async function prepareDesktopPublication(env: NodeJS.ProcessEnv, verifySi
     packagedProductVersion: source.productVersion, environment: { ...environment, DSH_DESKTOP_UPDATE_CHANNEL: source.channel } })
   if (plan.version !== source.version || plan.commit !== source.commit || plan.dirty !== false) throw new Error('desktop publish: completion record differs from retained source or has uncommitted changes')
   await verifySignatures(directory, manifest, config)
-  const approval = createHash('sha256').update(JSON.stringify({ manifest, plan })).digest('hex')
+  const approval = createHash('sha256').update(JSON.stringify({ manifest, plan,
+    policy: desktopPublishPolicy(config) })).digest('hex')
   if (env.DESKTOP_APPROVED_PACKAGE && env.DESKTOP_APPROVED_PACKAGE !== approval) throw new Error('desktop publish: package or destination changed after approval')
   return { route, manifest, config, plan, root, approval, stagingPercentage }
 }
@@ -71,19 +78,20 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
     const env = process.env
     const { route, manifest, config, plan, root, approval, stagingPercentage } = await prepareDesktopPublication(env)
     if (mode === '--publish' && !env.DESKTOP_APPROVED_PACKAGE) throw new Error('desktop publish: approved package digest is required')
-    if (env.DESKTOP_UPLOAD_WEBSITE === 'true' && route.preset === 'production') requireDesktopEdgeOneZoneId(config)
+    if (env.DESKTOP_UPLOAD_WEBSITE === 'true' && route.preset === 'production') requireDesktopWebsiteCache(config)
     if (mode === '--check') {
-      if (env.GITHUB_OUTPUT) await appendFile(env.GITHUB_OUTPUT, `website-destination=${createHash('sha256').update(`${config.bucket}/${plan.target}`).digest('hex')}\nwebsite-approval=${websiteApproval(manifest, config.bucket)}\napproval=${approval}\nlabel=${plan.version} → ${manifest.source.channel} / ${plan.target} / ${plan.environment}\n`)
+      if (env.GITHUB_OUTPUT) await appendFile(env.GITHUB_OUTPUT, `website-destination=${createHash('sha256').update(desktopPublishDestination(config, `website:${plan.target}`)).digest('hex')}\nwebsite-approval=${websiteApproval(manifest, config)}\napproval=${approval}\nlabel=${plan.version} → ${manifest.source.channel} / ${plan.target} / ${plan.environment}\n`)
       if (env.GITHUB_STEP_SUMMARY && !env.DESKTOP_APPROVED_PACKAGE) await appendFile(env.GITHUB_STEP_SUMMARY,
         await desktopPublicationSummary(manifest.source, plan, approval, env.DESKTOP_UPLOAD_WEBSITE === 'true'))
       if (env.GITHUB_OUTPUT && config.githubApp) await appendFile(env.GITHUB_OUTPUT,
         `app-client-id=${config.githubApp.clientId}\napp-key-file=${config.githubApp.privateKeyFile}\n`)
-      process.stdout.write(`desktop publish: verified ${plan.target} ${plan.version}; no credentials read or COS requests made\n`)
+      process.stdout.write(`desktop publish: verified ${plan.target} ${plan.version}; no credentials read or object-store requests made\n`)
     } else {
       if (plan.environment === 'production' && !env.DESKTOP_TAG_TOKEN) throw new Error('desktop publish: GitHub App token is required before production upload')
       phase = 'upload credential loading'
       const credentials = await readDesktopUploadCredentials(config)
-      const destination = `${plan.bucket}/${plan.publicUrl}${manifest.source.channel}`
+      const storage = createDesktopPublishStorage(plan, config, credentials)
+      const destination = desktopPublishDestination(config, `${plan.publicUrl}${manifest.source.channel}`)
       const recordsRoot = join(dirname(root), 'upload-records')
       phase = 'channel lock and publication journal acquisition'
       await withDesktopChannelLock(join(dirname(root), 'publish-locks'), destination, async () => {
@@ -113,7 +121,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
               return { status: 'complete' as const }
             })()
             : await publishDesktopRelease(plan, {
-              transport: desktopPublishCos(plan, credentials), record: event => journal.record(event),
+              transport: storage.transport, record: event => journal.record(event),
               tag,
             })
           status = result.status

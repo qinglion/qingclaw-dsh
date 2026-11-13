@@ -1,4 +1,8 @@
+import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, it } from 'vitest'
+import type COS from 'cos-nodejs-sdk-v5'
 import { createDesktopCos } from '@deepseek-ai/dsh-desktop-publisher/desktop-cos.ts'
 import { desktopPublishCos } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-cos.ts'
 import { desktopArtifactDigest } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish.ts'
@@ -41,6 +45,36 @@ it.each([true, false])('preserves download headers and verified bytes with overw
     expect(server.requests.map(request => request.method)).toEqual(['GET', 'PUT', 'GET'])
     expect(server.requests.every(request => !request.path.includes('versioning'))).toBe(true)
   } finally { await server.close() }
+})
+
+it.runIf(process.platform !== 'win32')('uploads from the verified open handle when its path is replaced', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'desktop-cos-handle-'))
+  try {
+    const binary = join(root, 'setup.exe')
+    const replacement = join(root, 'replacement.exe')
+    await writeFile(binary, 'verified-binary')
+    await writeFile(replacement, 'replacement-bytes')
+    const artifact = { path: binary, filename: 'setup.exe', key: 'qingclaw-desktop/bin/setup.exe',
+      contentType: 'application/octet-stream', channelMetadata: false }
+    const plan: DesktopUploadPlan = { environment: 'production', target: 'win-x64', version: '1.2.3',
+      commit: 'a'.repeat(40), dirty: false, bucket: 'fixture-1250000000', publicUrl: 'https://download.example.com/feed/',
+      secretIdEnvName: 'unused', secretKeyEnvName: 'unused', artifacts: [artifact] }
+    let uploaded = Buffer.alloc(0)
+    const transport = desktopPublishCos(plan, { secretId: 'fixture-id', secretKey: 'fixture-secret' }, (credentials) => {
+      const client = createDesktopCos(credentials)
+      Object.defineProperty(client, 'putObject', { value: async (params: COS.PutObjectParams) => {
+        await rename(replacement, binary)
+        const chunks: Buffer[] = []
+        for await (const bytes of params.Body as unknown as AsyncIterable<Buffer | Uint8Array | string>) chunks.push(Buffer.from(bytes))
+        uploaded = Buffer.concat(chunks)
+        return {}
+      } })
+      return client
+    })
+    await transport.put(artifact, await desktopArtifactDigest(artifact), true)
+    expect(uploaded.toString()).toBe('verified-binary')
+    expect(await readFile(binary, 'utf8')).toBe('replacement-bytes')
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 it('propagates an oversized channel stream error through the SDK and closes the request', async () => {

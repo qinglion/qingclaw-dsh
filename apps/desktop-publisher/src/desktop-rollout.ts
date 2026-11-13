@@ -82,7 +82,7 @@ export async function prepareDesktopRollout(directory: string, manifest: Desktop
 /**
  * Verify current remote metadata against the package, allowing only a different rollout percentage.
  * @param plan Approved package identity and channel destination.
- * @param remote Current COS metadata object.
+ * @param remote Current object-store metadata object.
  * @returns Parsed metadata and effective percentage (100 when absent).
  */
 export function verifyDesktopRolloutFeed(plan: DesktopRolloutPlan, remote: DesktopRemoteObject | null) {
@@ -101,7 +101,7 @@ export function verifyDesktopRolloutFeed(plan: DesktopRolloutPlan, remote: Deskt
  * Update a published feed under the existing channel lock, or verify it for website-only publication.
  * @param plan Metadata-only plan approved for the selected original package.
  * @param target Target percentage; undefined only verifies current publication.
- * @param operations COS transport and durable audit sink; no binary reads or writes are issued.
+ * @param operations Object-store transport and durable audit sink; no binary reads or writes are issued.
  * @returns Current and requested percentage; identical requests perform no write.
  */
 export async function rolloutDesktopRelease(plan: DesktopRolloutPlan, target: number | undefined,

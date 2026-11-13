@@ -20,7 +20,7 @@ Publish completed Desktop installers and update feeds to the selected download s
 - [Upload credentials](#credentials)
 - [Upload audit and recovery](#audit-and-recovery)
 
-For retained self-hosted builds, use the [CI publication workflow](ci/README.md), which keeps installers on their original machine and supports resumable publication. The commands below remain the existing manually authorized local uploader: they retain checkout-local audit records and use the operator's Git identity. They do not share the CI publisher's locks, approval or tag-only recovery. Do not run both writers against one channel concurrently. Both use the same upload-plan validation; separate orchestration preserves existing manual commands while adding immutable-attempt recovery for CI. Consolidating or retiring the manual commands is separate work.
+For retained self-hosted builds, use the [CI publication workflow](ci/README.md), which keeps installers on their original machine and supports resumable publication. The commands and environment variables in the remaining sections below describe the existing COS-only, manually authorized local uploader: they retain checkout-local audit records and use the operator's Git identity. They do not share the CI publisher's locks, approval or tag-only recovery. Do not run both writers against one channel concurrently. Both use the same upload-plan validation; separate orchestration preserves existing manual commands while adding immutable-attempt recovery for CI. Consolidating or retiring the manual commands is separate work.
 
 <a id="prerequisites"></a>
 
@@ -35,14 +35,14 @@ Publication requires completed release artifacts and explicit operator authoriza
 The minimum QingClaw deployment keeps the generic updater already embedded in Desktop and gives it a QingClaw-owned HTTPS origin:
 
 ```text
-QingClaw Desktop -> https://download.qingclaw.com -> EdgeOne -> private Tencent COS bucket
+QingClaw Desktop -> https://download.qingclaw.com -> Alibaba Cloud OSS custom domain
 ```
 
-The production templates reserve `https://download.qingclaw.com` as the canonical origin. Create that DNS/CDN route before packaging a production installer; an installer permanently records its selected feed origin. The bucket is not public directly. EdgeOne must present a valid certificate for the download hostname and route the complete `qingclaw-desktop/` and `desktop/` object prefixes to the configured COS bucket. Keep update feed YAML uncached or on a short validated TTL, cache versioned binaries as immutable, and purge the fixed `desktop/qingclaw-latest-*` objects after replacement.
+The QingClaw production templates reserve `https://download.qingclaw.com` as the canonical origin and select the existing Hangzhou OSS bucket `qinglion` with `cache.provider=none`. Bind the hostname and its certificate directly to that bucket before packaging a production installer; an installer permanently records its selected feed origin. Because `qinglion` is bucket-level public-read, store only non-sensitive release objects there; restrict the runner RAM identity's writes to `qingclaw-desktop/*` and `desktop/*`. Keep bucket versioning disabled because immutable binaries rely on `x-oss-forbid-overwrite`. A direct OSS origin exposes updated feed YAML and fixed `desktop/qingclaw-latest-*` objects without a separate cache-purge job. A CDN can be added later without changing installed clients as long as the hostname and object layout remain stable.
 
-The current publisher intentionally supports Tencent COS writes and EdgeOne fixed-URL purges. Aliyun OSS, Qiniu Kodo, and GitHub Releases are not interchangeable configuration values: selecting one requires a new transport with the same read-before-write, no-overwrite, checksum, audit, rollout, and cache-purge guarantees. Alibaba Cloud AI Gateway is the model/API gateway and is not the binary update origin. A later storage migration can preserve installed clients by retaining `download.qingclaw.com` and the object layout while changing only the CDN origin behind it.
+The retained-build CI publisher supports both the legacy Tencent COS/EdgeOne configuration and native Alibaba Cloud OSS. OSS uses V4 signing, single-attempt streamed writes, remote SHA-512 reconciliation, and the same immutable-object, audit and rollout state machine. Its credential file contains `accessKeyId` and `accessKeySecret`; the checked-in templates select `storage.provider=aliyun-oss`, region `oss-cn-hangzhou`, and `cache.provider=none`. In this first phase, the older local `pnpm upload:*` commands, remote version discovery, and installed-update qualification tools remain COS-only; use the retained-build CI publisher for OSS. Alibaba Cloud AI Gateway carries model/API traffic and is not the binary update origin.
 
-No cloud or signing secret belongs in the repository. The runner reads COS credentials, the GitHub App key, macOS Developer ID/notarization material, and the Windows code-signing certificate from files or platform stores outside Git. The checked-in examples contain only public destinations and placeholder identifiers.
+No cloud or signing secret belongs in the repository. The runner reads OSS or COS credentials, the GitHub App key, macOS Developer ID/notarization material, and the Windows code-signing certificate from files or platform stores outside Git. The checked-in examples contain only public destinations and placeholder identifiers.
 
 <a id="upload-updates"></a>
 

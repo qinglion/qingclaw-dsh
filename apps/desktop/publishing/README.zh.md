@@ -20,7 +20,7 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 - [上传凭据](#credentials)
 - [上传审计与恢复](#audit-and-recovery)
 
-自托管留存构建使用 [CI 发布工作流](ci/README.zh.md)，在原机器保留安装包并支持恢复发布。 以下命令继续作为现有人工授权的本地上传器使用：它们保留 checkout 内的审计记录，并使用操作员的 Git 身份，不共享 CI 发布器的锁、审批或仅补 tag 恢复机制。不要让两种上传器并发写入同一频道。两者复用相同的上传计划校验；分开编排可保留现有手动命令，同时为 CI 增加不可变 attempt 恢复能力。统一或退役手动命令属于独立工作。
+自托管留存构建使用 [CI 发布工作流](ci/README.zh.md)，在原机器保留安装包并支持恢复发布。本文后续章节中的命令和环境变量仍描述现有仅支持 COS、需人工授权的本地上传器：它们保留 checkout 内的审计记录，并使用操作员的 Git 身份，不共享 CI 发布器的锁、审批或仅补 tag 恢复机制。不要让两种上传器并发写入同一频道。两者复用相同的上传计划校验；分开编排可保留现有手动命令，同时为 CI 增加不可变 attempt 恢复能力。统一或退役手动命令属于独立工作。
 
 <a id="prerequisites"></a>
 
@@ -35,14 +35,14 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 青狮龙虾的最小生产方案复用 Desktop 已内置的通用更新器，并只向客户端暴露青狮自有 HTTPS 域名：
 
 ```text
-QingClaw Desktop -> https://download.qingclaw.com -> EdgeOne -> private Tencent COS bucket
+QingClaw Desktop -> https://download.qingclaw.com -> Alibaba Cloud OSS custom domain
 ```
 
-生产模板将 `https://download.qingclaw.com` 预留为固定 origin。生产打包前必须先建好该 DNS/CDN 链路，因为安装包会永久记录所选清单 origin。COS bucket 不直接公开；EdgeOne 必须为下载域名提供有效证书，并把完整的 `qingclaw-desktop/` 与 `desktop/` 对象前缀回源到所配置的 COS bucket。更新清单 YAML 应不缓存或采用经过验证的短 TTL，带版本号的二进制按 immutable 缓存，覆盖固定 `desktop/qingclaw-latest-*` 对象后执行缓存刷新。
+青狮龙虾生产模板将 `https://download.qingclaw.com` 预留为固定 origin，并选择现有杭州 OSS bucket `qinglion` 与 `cache.provider=none`。生产打包前必须把该域名及证书直接绑定到 bucket，因为安装包会永久记录所选清单 origin。`qinglion` 当前是 bucket 级 public-read，因此其中只能存放非敏感发布对象；runner 使用的 RAM 身份应严格限制为仅可写入 `qingclaw-desktop/*` 与 `desktop/*`。bucket 必须禁用版本控制，因为不可变二进制依赖 `x-oss-forbid-overwrite`。直连 OSS 时，更新清单 YAML 和固定 `desktop/qingclaw-latest-*` 对象覆盖后立即可见，不需要单独刷新缓存。后续增加 CDN 时，只要保持域名和对象路径不变，已安装客户端无需调整。
 
-当前发布器明确支持腾讯 COS 写入和 EdgeOne 固定 URL 刷新。阿里云 OSS、七牛 Kodo 与 GitHub Releases 不能只改一个配置值就替换；若选择其中之一，需新增具备相同读后写、防覆盖、校验和、审计、灰度与缓存刷新保证的传输层。阿里云 AI 网关承载模型/API 流量，不作为二进制更新源。后续迁移存储时，只要保留 `download.qingclaw.com` 及对象路径结构，就能在不改变已安装客户端的前提下更换 CDN 后端回源。
+留存构建 CI 发布器同时支持既有腾讯 COS/EdgeOne 配置与原生阿里云 OSS。OSS 使用 V4 签名、单次流式写入、远端 SHA-512 对账，并复用不可变对象、审计和放量状态机。凭据文件包含 `accessKeyId` 与 `accessKeySecret`；仓库模板选择 `storage.provider=aliyun-oss`、区域 `oss-cn-hangzhou` 和 `cache.provider=none`。第一阶段中，旧的本地 `pnpm upload:*` 命令、远端版本号发现与已安装更新验收工具仍只支持 COS；OSS 请走留存构建 CI 发布器。阿里云 AI 网关承载模型/API 流量，不作为二进制更新源。
 
-仓库不保存任何云端或签名秘密。runner 从 Git 外部文件或平台证书存储读取 COS 凭据、GitHub App 私钥、macOS Developer ID/公证材料及 Windows 代码签名证书。仓库内示例只包含公开目标和占位标识。
+仓库不保存任何云端或签名秘密。runner 从 Git 外部文件或平台证书存储读取 OSS 或 COS 凭据、GitHub App 私钥、macOS Developer ID/公证材料及 Windows 代码签名证书。仓库内示例只包含公开目标和占位标识。
 
 <a id="upload-updates"></a>
 

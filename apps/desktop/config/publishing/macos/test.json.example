@@ -1,7 +1,14 @@
 {
-  "bucket": "replace-with-bucket-1250000000",
-  "origin": "https://download-test.example.com",
-  "credentialsFile": "/absolute/path/to/packaging/secrets/cos-test.json",
+  "bucket": "qinglion",
+  "origin": "https://download.qingclaw.com",
+  "credentialsFile": "/absolute/path/to/packaging/secrets/oss-test.json",
+  "storage": {
+    "provider": "aliyun-oss",
+    "region": "oss-cn-hangzhou"
+  },
+  "cache": {
+    "provider": "none"
+  },
   "macOS": {
     "signingIdentity": "REPLACE_WITH_DEVELOPER_ID_APPLICATION_IDENTITY",
     "teamId": "XXXXXXXXXX"
