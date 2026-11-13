@@ -148,6 +148,10 @@ describe('desktop upload plan', () => {
         }
       }
     }
+    for (const target of ['mac-arm64', 'mac-x64', 'win-x64'] as const) {
+      const keys = published.filter(item => item.target === target).map(item => item.key)
+      expect(new Set(keys).size).toBe(2)
+    }
     await expect(`${JSON.stringify(published, null, 2)}\n`).toMatchFileSnapshot('./expected/latest-installer-uploads.json')
   })
 

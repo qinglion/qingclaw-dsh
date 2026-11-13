@@ -1,10 +1,37 @@
 /** Cold-start launcher preserves workspace paths without evaluating shell syntax. */
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
-import { developmentLauncher } from '../scripts/development-app.ts'
+import { createDevelopmentAppIcon, developmentLauncher } from '../scripts/development-app.ts'
+
+it('creates a branded multi-resolution icon for the macOS development bundle', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-development-app-icon-'))
+  onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+  const source = join(root, 'icon-macos.png')
+  const bundle = join(root, 'QingClaw Dev.app')
+  mkdirSync(join(bundle, 'Contents', 'Resources'), { recursive: true })
+  writeFileSync(source, 'brand icon')
+  const calls: Array<{ executable: string; args: readonly string[] }> = []
+  const icon = createDevelopmentAppIcon(source, bundle, (executable, args) => {
+    calls.push({ executable, args })
+    const output = executable === '/usr/bin/sips' ? args.at(-1) : args[3]
+    if (output === undefined) throw new Error('icon command has no output')
+    writeFileSync(output, executable === '/usr/bin/sips' ? 'png' : 'icns')
+  })
+
+  expect(icon).toBe('QingClaw.icns')
+  expect(readFileSync(join(bundle, 'Contents', 'Resources', icon), 'utf8')).toBe('icns')
+  const resizeCalls = calls.filter(call => call.executable === '/usr/bin/sips')
+  expect(resizeCalls).toHaveLength(10)
+  expect(resizeCalls.map(call => call.args[1])).toEqual(['16', '32', '32', '64', '128', '256', '256', '512', '512', '1024'])
+  expect(resizeCalls.every(call => call.args[3] === source)).toBe(true)
+  const iconutil = calls.at(-1)
+  expect(iconutil?.executable).toBe('/usr/bin/iconutil')
+  expect(iconutil?.args.slice(0, 4)).toEqual(['--convert', 'icns', '--output', join(bundle, 'Contents', 'Resources', icon)])
+  expect(existsSync(dirname(iconutil!.args[4]!))).toBe(false)
+})
 
 it.skipIf(process.platform === 'win32')('passes literal workspace paths and cold-start settings to Electron', () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-development-app-'))

@@ -257,7 +257,9 @@ export async function createDesktopUploadPlan(
   }
   artifacts.push(channelArtifact)
   const latestFilename = desktopLatestInstallerFilename(targetName)
-  const latestKey = `desktop/${latestFilename}`
+  // Production owns the public website's fixed paths. Keep test replacements under a separate
+  // prefix even when an operator intentionally points both deployments at one bucket.
+  const latestKey = `${update.environment === 'test' ? 'test/desktop' : 'desktop'}/${latestFilename}`
   return {
     environment: update.environment,
     target: targetName,

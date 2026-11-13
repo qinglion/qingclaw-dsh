@@ -101,6 +101,16 @@ export function createElectronBuilderConfig(
     installWindowsNsisBootstrapSigner({ sign: windowsSigner })
   }
   const update = unsigned ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
+  const requestedDeployment = env.DSH_DESKTOP_AUTO_UPDATE_ENV?.trim()
+  if (requestedDeployment !== undefined && requestedDeployment !== ''
+    && requestedDeployment !== 'test' && requestedDeployment !== 'production') {
+    throw new Error('desktop package: DSH_DESKTOP_AUTO_UPDATE_ENV must be test or production')
+  }
+  // Signed builds use the same lane resolved for their update feed. Local unsigned builds have no
+  // feed, so they retain the production service endpoints unless an explicit packaging preset owns them.
+  const qingclawDeployment = requestedDeployment || update?.environment || 'production'
+  const qingclawPlatformOrigin = QINGCLAW_DISTRIBUTION.desktop.services.platformOrigins[qingclawDeployment]
+  const qingclawInferenceOrigin = QINGCLAW_DISTRIBUTION.desktop.services.inferenceOrigin
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   // electron-builder merges extraMetadata into the packaged manifest, so a build version here reaches
   // the artifact names, the update feed, and the installed app.getVersion() the updater compares against.
@@ -116,6 +126,9 @@ export function createElectronBuilderConfig(
     extraMetadata: {
       dshDesktopAppId: appId,
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
+      qingclawDesktopDeployment: qingclawDeployment,
+      qingclawPlatformOrigin,
+      qingclawInferenceOrigin,
       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),
       ...buildVersion === productVersion ? {} : { version: buildVersion },
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },

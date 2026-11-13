@@ -77,6 +77,11 @@ describe('desktop macOS release signature', () => {
     ]))
     expect(config).toMatchObject({
       appId: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
+      extraMetadata: {
+        qingclawDesktopDeployment: 'test',
+        qingclawPlatformOrigin: 'https://beta.qingclaw.com',
+        qingclawInferenceOrigin: 'https://api.qingclaw.com',
+      },
       mac: {
         identity: RELEASE_ENVIRONMENT.DSH_DESKTOP_MACOS_SIGNING_IDENTITY,
         forceCodeSigning: true,
@@ -168,6 +173,11 @@ describe('desktop macOS release signature', () => {
     expect(config.dmg).toMatchObject({ sign: false, writeUpdateInfo: false })
     expect(config.publish).toBeNull()
     expect(config.extraMetadata).not.toHaveProperty('dshMandatoryUpdatePolicy')
+    expect(config.extraMetadata).toMatchObject({
+      qingclawDesktopDeployment: 'production',
+      qingclawPlatformOrigin: 'https://qingclaw.com',
+      qingclawInferenceOrigin: 'https://api.qingclaw.com',
+    })
     await expect(config.afterSign({ electronPlatformName: 'darwin' } as Parameters<typeof config.afterSign>[0])).resolves.toBeUndefined()
     expect(config.artifactBuildCompleted({ file: '/tmp/local-unsigned.dmg' })).toBeUndefined()
   })
@@ -179,10 +189,29 @@ describe('desktop macOS release signature', () => {
     expect(config.publish).toBeNull()
   })
 
+  it('seals beta services into an unsigned build selected by the test preset', async () => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+    const config = createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: 'com.qinglion.qingclaw.test',
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'test',
+      DSH_DESKTOP_UNSIGNED: '1',
+    }, 'darwin', 'arm64')
+    expect(config.extraMetadata).toMatchObject({
+      qingclawDesktopDeployment: 'test',
+      qingclawPlatformOrigin: 'https://beta.qingclaw.com',
+      qingclawInferenceOrigin: 'https://api.qingclaw.com',
+    })
+  })
+
   it('rejects malformed signing modes', async () => {
     const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
     expect(() => createElectronBuilderConfig({ ...RELEASE_ENVIRONMENT, DSH_DESKTOP_UNSIGNED: 'yes' }))
       .toThrow(/must be 0 or 1/u)
+    expect(() => createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
+      DSH_DESKTOP_UNSIGNED: '1',
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'beta',
+    }, 'darwin', 'arm64')).toThrow(/AUTO_UPDATE_ENV must be test or production/u)
   })
 
   it('accepts the configured authority and team', () => {

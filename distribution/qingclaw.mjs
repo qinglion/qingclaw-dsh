@@ -28,6 +28,13 @@ export const QINGCLAW_DISTRIBUTION = deepFreeze({
     protocol: 'qingclaw',
     protocolName: '青狮龙虾',
     artifactPrefix: 'qingclaw',
+    services: {
+      platformOrigins: {
+        test: 'https://beta.qingclaw.com',
+        production: 'https://qingclaw.com',
+      },
+      inferenceOrigin: 'https://api.qingclaw.com',
+    },
     microphoneUsageDescription: '青狮龙虾使用麦克风将语音转换为消息草稿。',
   },
   web: {

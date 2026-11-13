@@ -15,11 +15,11 @@
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-qingclaw-bundle/use-this-package:
-  en: 0fa21bcc962aecb2
-  zh: 3d4a70138566a606
+  en: d61df81e5e85b184
+  zh: f50d421323ef020d
 /deepseek-ai-dsh-qingclaw-bundle/understand-the-implementation:
-  en: c7889ac6c6f485cf
-  zh: d5d82ca5744353be
+  en: 72c995263916fff6
+  zh: 49e34f372bef67a6
 /deepseek-ai-dsh-qingclaw-bundle/further-exploration:
   en: 16f8d9698c006d3b
   zh: e6e8a1cc853862c6
@@ -33,14 +33,14 @@
   en: b90d4dcb2e441081
   zh: bb96953984955fb2
 /deepseek-ai-dsh-qingclaw-bundle/model-experience/qingclaw-distribution-layer/token-effect:
-  en: fc0d964f10eabc9e
-  zh: 6763ceeff1e3fda8
+  en: 6008548037d504d9
+  zh: 716c8d36fc2c6eb8
 /deepseek-ai-dsh-qingclaw-bundle/model-experience/qingclaw-distribution-layer/kv-cache-effect:
   en: e5a8244a459431ce
   zh: 4bc284ea1030b013
 /deepseek-ai-dsh-qingclaw-bundle/known-limitations-and-deferred-work:
-  en: abcd590576315278
-  zh: 74858867efa84b6c
+  en: a08a959adda03fb1
+  zh: 6009b836d38aba0d
 /deepseek-ai-dsh-qingclaw-bundle/known-limitations-and-deferred-work/dev-note:
   en: 05b63bdc5de4ebde
   zh: 319fc1abddd7c8c4

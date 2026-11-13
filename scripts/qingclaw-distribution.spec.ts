@@ -13,6 +13,13 @@ describe('QingClaw distribution identity', () => {
         protocol: 'qingclaw',
         protocolName: '青狮龙虾',
         artifactPrefix: 'qingclaw',
+        services: {
+          platformOrigins: {
+            test: 'https://beta.qingclaw.com',
+            production: 'https://qingclaw.com',
+          },
+          inferenceOrigin: 'https://api.qingclaw.com',
+        },
       },
       web: {
         manifest: { name: '青狮龙虾', shortName: 'QingClaw', themeColor: '#10B981' },
@@ -25,6 +32,8 @@ describe('QingClaw distribution identity', () => {
     expect(Object.isFrozen(QINGCLAW_DISTRIBUTION.runtime)).toBe(true)
     expect(Object.isFrozen(QINGCLAW_DISTRIBUTION.runtime.builtInBundles)).toBe(true)
     expect(Object.isFrozen(QINGCLAW_DISTRIBUTION.desktop)).toBe(true)
+    expect(Object.isFrozen(QINGCLAW_DISTRIBUTION.desktop.services)).toBe(true)
+    expect(Object.isFrozen(QINGCLAW_DISTRIBUTION.desktop.services.platformOrigins)).toBe(true)
     expect(Object.isFrozen(QINGCLAW_DISTRIBUTION.web)).toBe(true)
     expect(Object.isFrozen(QINGCLAW_DISTRIBUTION.web.manifest)).toBe(true)
   })

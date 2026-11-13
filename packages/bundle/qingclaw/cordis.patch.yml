@@ -1,11 +1,17 @@
 # The QingClaw distribution layer follows dsh-web-app. It owns only QingClaw
-# deployment choices: account and inference origins, optional account surfaces,
-# and brand occupants. Upstream roster changes continue to compose beneath it.
+# deployment choices: account origins, the device-grant release boundary, the
+# model gateway origin, optional account surfaces, and brand occupants. Upstream
+# roster changes continue to compose beneath it.
 - id: deepseek-account
   config:
     platformOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
     harnessOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
-    inferenceOrigin: !!js process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com'
+    # This is the release boundary for the long-lived device grant, not the
+    # QingClaw model endpoint. Keep it on Platform so generic account-token
+    # consumers can never release that grant to api.qingclaw.com. The model
+    # provider below owns the gateway origin and exchanges the grant for a
+    # short-lived model JWT first.
+    inferenceOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
     desktopPlatform: !!js "ctx.get('profileContext')?.name === 'desktop' && ['darwin', 'win32'].includes(process.platform) ? process.platform : null"
 
 - id: llm-deepseek-account
@@ -15,12 +21,26 @@
       name: '@qinglion/dsh-llm-qingclaw-account'
       config:
         baseURL: !!js "(process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com').replace(/\\/+$/, '') + '/anthropic'"
+        maxTokens: 8192
 
 - insert:
     - id: qingclaw-workbench
       name: '@qinglion/dsh-qingclaw-workbench'
       config:
         cacheFile: !!js dshPath('cache', 'qingclaw-workbench', 'feed.json')
+
+# The upstream DeepSeek web backends resolve the long-lived account grant; they
+# do not share llm-qingclaw-account's short model-JWT cache. The QingClaw gateway
+# also does not expose /v1/tools/search or /v1/tools/fetch yet. Disable both the
+# direct Search/Fetch API and legacy Messages-search backends instead of ever
+# forwarding a device grant to the gateway. Anonymous HTTP fetch remains active.
+- id: web
+  config:
+    fetchProvider: http
+- id: web-search-deepseek
+  disabled: true
+- id: web-deepseek-api
+  disabled: true
 
 # QingClaw does not ship the DeepSeek Platform notification API. The account
 # service remains available; only its optional notification presentation is off.

@@ -44,12 +44,16 @@ describe('QingClaw distribution bundle', () => {
     expect(Object.keys(accountConfig ?? {}).sort()).toEqual([
       'desktopPlatform', 'harnessOrigin', 'inferenceOrigin', 'platformOrigin',
     ])
+    expect(accountConfig?.inferenceOrigin).toEqual({
+      __jsExpr: "process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'",
+    })
 
     expect(composed.find(row => row.id === 'llm-deepseek-account')?.disabled).toBe(true)
     const model = composed.find(row => row.id === 'llm-qingclaw-account')
     expect(model?.name).toBe('@qinglion/dsh-llm-qingclaw-account')
     const modelConfig = model?.config as Record<string, unknown> | undefined
-    expect(Object.keys(modelConfig ?? {})).toEqual(['baseURL'])
+    expect(Object.keys(modelConfig ?? {}).sort()).toEqual(['baseURL', 'maxTokens'])
+    expect(modelConfig?.maxTokens).toBe(8_192)
 
     const workbench = composed.find(row => row.id === 'qingclaw-workbench')
     expect(workbench?.name).toBe('@qinglion/dsh-qingclaw-workbench')
@@ -58,5 +62,23 @@ describe('QingClaw distribution bundle', () => {
     expect(workbenchConfig?.cacheFile).toEqual({
       __jsExpr: "dshPath('cache', 'qingclaw-workbench', 'feed.json')",
     })
+  })
+
+  it('keeps device sessions away from web backends while preserving anonymous fetch', () => {
+    const composed = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
+
+    expect(composed.find(row => row.id === 'web')?.config).toEqual({ fetchProvider: 'http' })
+    expect(composed.find(row => row.id === 'web-search-deepseek')).toMatchObject({
+      name: '@deepseek-ai/dsh-web-search-deepseek',
+      disabled: true,
+    })
+    expect(composed.find(row => row.id === 'web-deepseek-api')).toMatchObject({
+      name: '@deepseek-ai/dsh-web-deepseek-api',
+      disabled: true,
+    })
+    expect(composed.find(row => row.id === 'web-fetch-http')).toMatchObject({
+      name: '@deepseek-ai/dsh-web-fetch-http',
+    })
+    expect(composed.find(row => row.id === 'web-fetch-http')?.disabled).not.toBe(true)
   })
 })

@@ -11,6 +11,13 @@ export interface QingClawDistribution {
     readonly protocol: 'qingclaw'
     readonly protocolName: '青狮龙虾'
     readonly artifactPrefix: 'qingclaw'
+    readonly services: {
+      readonly platformOrigins: {
+        readonly test: 'https://beta.qingclaw.com'
+        readonly production: 'https://qingclaw.com'
+      }
+      readonly inferenceOrigin: 'https://api.qingclaw.com'
+    }
     readonly microphoneUsageDescription: string
   }
   readonly web: {
