@@ -59,6 +59,24 @@ job 排队时，先对照 job 页面请求的标签与 **Settings → Actions �
 
 每份配置声明 `bucket`、不带路径的 HTTPS `origin`、绝对路径 `credentialsFile`、`storage` 和 `cache`。青狮模板选择 bucket `qinglion`、`{ "provider": "aliyun-oss", "region": "oss-cn-hangzhou" }` 与 `{ "provider": "none" }`；凭据文件只包含 `accessKeyId` 和 `accessKeySecret`。既有 COS 配置可省略 `storage`，继续使用 `secretId`、`secretKey` 与 `edgeOneZoneId`，或改用显式腾讯 EdgeOne 缓存配置。macOS 还需 `macOS.signingIdentity` 和 `macOS.teamId`；Windows 需要 `windows.certificateThumbprint`。production 还需提供 `githubApp.clientId` 和绝对路径 `githubApp.privateKeyFile`。发布器支持长期凭据，不支持 STS 会话凭据。所有 bucket 都必须禁用版本控制；不可变二进制 PUT 会使用对应云厂商的禁止覆盖 header，该保护依赖管理员维持桶配置。OSS RAM 身份只允许写入 `qingclaw-desktop/*` 与 `desktop/*`。
 
+对于共享 bucket `qinglion`，给 RAM 身份绑定的自定义策略不应超出下列对象级权限。发布器只会读取确定对象进行远端对账，并写入发布/升级对象；不需要列举 bucket、删除对象、ACL、域名或证书权限。即使 test 与 production 使用同一个 bucket，也应分别创建 RAM 用户和凭据文件。
+
+```json
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetObject", "oss:PutObject"],
+      "Resource": [
+        "acs:oss:*:*:qinglion/qingclaw-desktop/*",
+        "acs:oss:*:*:qinglion/desktop/*"
+      ]
+    }
+  ]
+}
+```
+
 将仓库变量 `DESKTOP_PUBLISH_RUNNERS` 配置为已注册 runner 名称到唯一标签和目标的 JSON 映射，例如 `{"mini":{"label":"dsh-mini-publish","target":["mac-arm64","mac-x64"]}}`。该标签只能分配给这台 runner。目标可为单个名称或非空列表；上述 Mac 条目允许同一台机器处理两种架构的打包工作流。Windows 使用目标 `win-x64`。留存包的目标必须与所选打包工作流一致。路由 job 检查原构建成功的 job，发布器再检查自身 runner 名称与记录一致。机器之间不需要共享文件系统或局域网连接。
 
 管理员必须创建 `desktop-test` 和 `desktop-production`，分别设置必需审批人并允许 `master` 部署分支。工作流会检查两种环境的审批人配置。test 可允许发起者自行审批。GitHub App 需要安装到本仓库、具有 Contents write 权限，并获准在 `desktop-v*` tag ruleset 下创建发布 tag。审批不会把审批人的 tag 权限传给 App。缺少配置会停止发布，不回退到个人 token。App action 创建短期 token，并在结束后撤销。使用发布账户的文件系统权限保护本机私钥及 COS 凭据文件。token action 需要密钥内容，因此已屏蔽日志的 PEM 在 job 期间也会经过 runner 临时 `GITHUB_OUTPUT` 文件；日志屏蔽不限制本地文件访问。

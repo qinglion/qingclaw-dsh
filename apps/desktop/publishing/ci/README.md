@@ -59,6 +59,24 @@ Start from the [macOS test](../../config/publishing/macos/test.json.example), [m
 
 Each configuration declares `bucket`, HTTPS `origin` without a path, an absolute `credentialsFile`, `storage`, and `cache`. QingClaw templates select bucket `qinglion`, `{ "provider": "aliyun-oss", "region": "oss-cn-hangzhou" }`, and `{ "provider": "none" }`; their credential file contains only `accessKeyId` and `accessKeySecret`. Legacy COS configs may omit `storage`, keep `secretId` and `secretKey`, and use `edgeOneZoneId` or an explicit Tencent EdgeOne cache setting. macOS also requires `macOS.signingIdentity` and `macOS.teamId`; Windows requires `windows.certificateThumbprint`. Production requires `githubApp.clientId` plus an absolute `githubApp.privateKeyFile`. The publisher supports permanent credentials, not STS sessions. Keep every bucket unversioned: immutable binary PUTs use the provider's forbid-overwrite header, whose protection depends on that deployment setting. Restrict the OSS RAM identity to `qingclaw-desktop/*` and `desktop/*`.
 
+For the shared `qinglion` bucket, attach a custom RAM policy no broader than the following resource-scoped object permissions. The publisher reads exact remote objects for reconciliation and writes only release/update objects; it does not need bucket listing, deletion, ACL, domain, or certificate permissions. Use separate RAM users and credential files for test and production even when both target this bucket.
+
+```json
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetObject", "oss:PutObject"],
+      "Resource": [
+        "acs:oss:*:*:qinglion/qingclaw-desktop/*",
+        "acs:oss:*:*:qinglion/desktop/*"
+      ]
+    }
+  ]
+}
+```
+
 Set the repository variable `DESKTOP_PUBLISH_RUNNERS` to a JSON mapping of registered runner names to unique labels and targets, for example `{"mini":{"label":"dsh-mini-publish","target":["mac-arm64","mac-x64"]}}`. Assign that label to exactly that runner. A target may be a single name or a nonempty list; the Mac entry above authorizes both packaging workflows on the same machine. Windows uses target `win-x64`. The retained target must match the selected packaging workflow. The routing job checks the original successful job, and the publisher checks its own runner name against the recorded name. Machines need no shared filesystem or LAN connection to each other.
 
 An administrator must create `desktop-test` and `desktop-production`, each with required reviewers and an allowed `master` deployment branch. The workflow checks reviewers for either deployment. Test can allow self-approval. The GitHub App needs installation access to this repository and Contents write permission, plus permission under the `desktop-v*` tag ruleset to create release tags. Reviewer approval does not transfer the reviewer's tag permissions to the App. Missing configuration stops publication; there is no personal-token fallback. The App action creates and later revokes a short-lived token. Protect the local private key and object-storage credential files with the publishing account's filesystem permissions. The token action accepts key contents, so the masked PEM also passes through the runner's temporary `GITHUB_OUTPUT` file during the job; masking hides logs, not local file access.
