@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <mask id="open-claw" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+      <rect width="100" height="100" fill="#000"/>
+      <g transform="translate(8 5) scale(2.39)" fill="#fff">
+        <path d="M290.107 50.116a18.292 18.292 0 0 0 0 36.582h2.47V72.716a4.309 4.309 0 0 1 0-8.618V50.116Z" transform="translate(-272.027 -49.103)"/>
+        <path d="M282.627 97.034a10.16 10.16 0 0 0-10.146 10.029h20.293a10.16 10.16 0 0 0-10.147-10.029Z" transform="translate(-272.205 -69.409)"/>
+      </g>
+      <rect x="47" y="23" width="45" height="54" rx="21" fill="#fff"/>
+      <circle cx="58" cy="50" r="12" fill="#000"/>
+      <rect x="58" y="43" width="42" height="14" rx="7" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="100" height="100" fill="#4BB6B0" mask="url(#open-claw)"/>
+</svg>
