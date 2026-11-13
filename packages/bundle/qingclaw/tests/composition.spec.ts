@@ -21,6 +21,7 @@ describe('QingClaw distribution bundle', () => {
     }
     expect(manifest.dependencies?.['@qinglion/dsh-llm-qingclaw-account']).toBe('workspace:*')
     expect(manifest.dependencies?.['@qinglion/dsh-qingclaw-workbench']).toBe('workspace:*')
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-client-ui-brand-official']).toBe('workspace:*')
   })
 
   it('owns account origins and brand rows without copying the upstream roster', () => {

@@ -2847,6 +2847,9 @@ importers:
 
   packages/bundle/qingclaw:
     dependencies:
+      '@deepseek-ai/dsh-client-ui-brand-official':
+        specifier: workspace:*
+        version: link:../../client/ui-brand-official
       '@deepseek-ai/dsh-client-ui-brand-qingclaw':
         specifier: workspace:*
         version: link:../../client/ui-brand-qingclaw

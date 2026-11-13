@@ -41,6 +41,7 @@
     }
   },
   "dependencies": {
+    "@deepseek-ai/dsh-client-ui-brand-official": "workspace:*",
     "@deepseek-ai/dsh-client-ui-brand-qingclaw": "workspace:*",
     "@qinglion/dsh-qingclaw-workbench": "workspace:*",
     "@qinglion/dsh-llm-qingclaw-account": "workspace:*"

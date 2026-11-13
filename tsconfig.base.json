@@ -440,6 +440,7 @@
       "@deepseek-ai/dsh-webhook/types": ["./packages/experimental/webhook/src/types.ts"],
       "@deepseek-ai/dsh-qingclaw-bundle": ["./packages/bundle/qingclaw/src"],
       "@qinglion/dsh-llm-qingclaw-account": ["./packages/llm/llm-qingclaw-account/src"],
+      "@qinglion/dsh-qingclaw-workbench": ["./packages/client/qingclaw-workbench/src"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],
