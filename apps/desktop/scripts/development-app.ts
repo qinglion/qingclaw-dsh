@@ -16,6 +16,8 @@ export interface DevelopmentAppOptions {
   readonly rendererPort: number
   readonly hostPort: number
   readonly openDevtools: string
+  readonly platformOrigin?: string
+  readonly inferenceOrigin?: string
 }
 
 function quote(value: string): string { return `'${value.replaceAll("'", "'\\''")}'` }
@@ -72,6 +74,8 @@ export function developmentLauncher(options: DevelopmentAppOptions, bundle: stri
     DSH_DESKTOP_HOST_INSPECT_PORT: String(options.hostPort),
     DSH_DESKTOP_OPEN_DEVTOOLS: options.openDevtools,
     ELECTRON_ENABLE_LOGGING: '1',
+    ...(options.platformOrigin ? { QINGCLAW_PLATFORM_ORIGIN: options.platformOrigin } : {}),
+    ...(options.inferenceOrigin ? { QINGCLAW_INFERENCE_ORIGIN: options.inferenceOrigin } : {}),
   }
   const args = [
     join(bundle, 'Contents', 'MacOS', 'Electron'),
