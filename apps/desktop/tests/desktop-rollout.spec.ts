@@ -31,7 +31,7 @@ async function fixture(target: 'mac-arm64' | 'mac-x64' | 'win-x64' = 'mac-arm64'
     const directory = join(root, 'releases', '42', '1')
     await mkdir(directory, { recursive: true })
     const version = '0.2.2-rc.1'
-    const payload = `deepseek-harness-${version}-${target}.${target === 'win-x64' ? 'exe' : 'zip'}`
+    const payload = `qingclaw-${version}-${target}.${target === 'win-x64' ? 'exe' : 'zip'}`
     const contents = dump({ version, files: [{ url: payload, ...digest('installer') }],
       path: payload, sha512: digest('installer').sha512, releaseDate: '2026-11-04T00:00:00.000Z' })
     const filename = `${channel}${target === 'win-x64' ? '' : '-mac'}.yml`
@@ -42,7 +42,8 @@ async function fixture(target: 'mac-arm64' | 'mac-x64' | 'win-x64' = 'mac-arm64'
     }, files: [{ name: filename, ...digest(contents) }, { name: payload, ...digest('installer') }] }
     await writeFile(join(directory, filename), contents)
     await writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest))
-    const environment = { DSH_DESKTOP_AUTO_UPDATE_ENV: preset, DOWNLOAD_PROD_COS_BUCKET: 'bucket-123',
+    const environment = { DSH_DESKTOP_AUTO_UPDATE_ENV: preset, DOWNLOAD_PROD_ORIGIN: 'https://download.example.com',
+      DOWNLOAD_PROD_COS_BUCKET: 'bucket-123',
       DOWNLOAD_TEST_ORIGIN: 'https://test.example.com', DOWNLOAD_TEST_COS_BUCKET: 'test-123', DOWNLOAD_TEST_RELEASE_ID: 'a'.repeat(32) }
     const plan = await prepareDesktopRollout(directory, manifest, environment)
     return { root, directory, manifest, plan, filename, environment }
@@ -137,7 +138,7 @@ it('requires initial publication evidence and prepares approval without installe
     const config = join(f.root, 'config')
     await mkdir(join(config, 'publishing'), { recursive: true })
     await writeFile(join(config, 'publishing/production.json'), JSON.stringify({
-      bucket: 'bucket-123', origin: 'https://download.deepseek.com', credentialsFile: join(f.root, 'absent-secret'),
+      bucket: 'bucket-123', origin: 'https://download.example.com', credentialsFile: join(f.root, 'absent-secret'),
       githubApp: { clientId: 'app', privateKeyFile: join(f.root, 'absent-key') },
     }))
     const route = { ...f.manifest.source, runnerLabel: 'dsh-runner' }
@@ -213,7 +214,7 @@ it.each(['apply', 'changed-approval', 'replaced-feed', 'website'] as const)('che
     await mkdir(join(config, 'publishing'), { recursive: true })
     await writeFile(credentialsFile, JSON.stringify({ secretId: 'fixture', secretKey: 'fixture' }))
     await writeFile(join(config, 'publishing/production.json'), JSON.stringify({
-      edgeOneZoneId: 'zone-fixture', bucket: 'bucket-123', origin: 'https://download.deepseek.com', credentialsFile,
+      edgeOneZoneId: 'zone-fixture', bucket: 'bucket-123', origin: 'https://download.example.com', credentialsFile,
       githubApp: { clientId: 'app', privateKeyFile: join(f.root, 'absent-key') },
     }))
     const record = await createDesktopPublicationRecord(join(f.root, 'upload-records'), {
@@ -339,7 +340,7 @@ it('runs the real route CLI without gh and emits the selected route and preset',
 it.each(['mac-arm64', 'win-x64'] as const)('accepts %s metadata produced by the original full upload planner', async (target) => {
   const f = await fixture(target)
   try {
-    const base = `deepseek-harness-${f.manifest.source.version}-${target}`
+    const base = `qingclaw-${f.manifest.source.version}-${target}`
     const extension = target === 'win-x64' ? 'exe' : 'zip'
     await writeFile(join(f.directory, `${base}.${extension}`), 'installer')
     await writeFile(join(f.directory, `${base}.${extension}.blockmap`), 'blockmap')
@@ -367,7 +368,7 @@ it.each(['missing-yaml', 'wrong-approval', 'not-uploaded', 'wrong-zone', 'not-se
       await mkdir(join(config, 'publishing'), { recursive: true })
       await writeFile(credentialsFile, JSON.stringify({ secretId: 'fixture-id', secretKey: 'fixture-key' }))
       await writeFile(join(config, 'publishing/production.json'), JSON.stringify({
-        edgeOneZoneId: 'zone-fixture', bucket: 'bucket-123', origin: 'https://download.deepseek.com', credentialsFile,
+        edgeOneZoneId: 'zone-fixture', bucket: 'bucket-123', origin: 'https://download.example.com', credentialsFile,
         githubApp: { clientId: 'app', privateKeyFile: join(f.root, 'absent-key') },
       }))
       if (scenario === 'wrong-zone') {
@@ -379,7 +380,7 @@ it.each(['missing-yaml', 'wrong-approval', 'not-uploaded', 'wrong-zone', 'not-se
       const directory = join(f.root, 'upload-records', 'website-99-mac-arm64')
       await mkdir(directory, { recursive: true })
       const approval = websitePublisher.websiteApproval(await readRetainedDesktopManifest(join(f.root, 'releases'), '42', '1'), 'bucket-123')
-      const publicUrl = desktopWebsiteInstallerUrl('mac-arm64')
+      const publicUrl = desktopWebsiteInstallerUrl('https://download.example.com', 'mac-arm64')
       await writeFile(join(directory, 'state.json'), JSON.stringify({ approval,
         upload: scenario === 'not-uploaded' ? 'pending' : 'uploaded', purgeAttempt: '1',
         purge: { zoneId: 'zone-fixture', publicUrl, submittedAt: '2026-11-04T00:00:00.000Z',

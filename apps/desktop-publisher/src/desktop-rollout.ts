@@ -5,7 +5,11 @@ import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { dump, load } from 'js-yaml'
 import { z } from 'zod'
-import { desktopUpdateMetadataFilename, resolveDesktopUploadConfig } from './desktop-auto-update-environment.mjs'
+import {
+  DESKTOP_ARTIFACT_PREFIX,
+  desktopUpdateMetadataFilename,
+  resolveDesktopUploadConfig,
+} from './desktop-auto-update-environment.mjs'
 import type { DesktopRetainedManifest } from './desktop-release-store.ts'
 import type { DesktopSingleUploadPlan } from './desktop-upload-types.ts'
 import { desktopArtifactDigest, type DesktopPublishOperations, type DesktopRemoteObject } from './desktop-publish.ts'
@@ -54,7 +58,7 @@ export async function prepareDesktopRollout(directory: string, manifest: Desktop
     throw new Error('desktop rollout: retained update metadata differs from manifest')
   }
   const parsed = metadata(contents)
-  const payload = `deepseek-harness-${source.version}-${source.target}.${windows ? 'exe' : 'zip'}`
+  const payload = `${DESKTOP_ARTIFACT_PREFIX}-${source.version}-${source.target}.${windows ? 'exe' : 'zip'}`
   const file = manifest.files.find(entry => entry.name === payload)
   const entry = parsed.files[0]
   if (parsed.version !== source.version || entry.url !== payload || !file

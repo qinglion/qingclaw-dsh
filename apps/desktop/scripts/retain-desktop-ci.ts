@@ -9,6 +9,7 @@ import { retainDesktopRelease, type DesktopRetainedSource } from '@deepseek-ai/d
 import { validateDesktopBuildVersion } from './desktop-build-version.mjs'
 import { desktopPublishRunnersSchema } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-targets.ts'
 import { desktopPublishQualificationError } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-qualification.mjs'
+import { QINGCLAW_DISTRIBUTION } from '../../../distribution/qingclaw.mjs'
 
 export { desktopReleasesRoot } from '@deepseek-ai/dsh-desktop-publisher/desktop-releases-root.ts'
 
@@ -68,7 +69,7 @@ export async function retainDesktopCi(env: NodeJS.ProcessEnv, appRoot = resolve(
   const mode = qualification === 'unsigned' ? 'unsigned-artifacts' : qualification === 'unnotarized' ? 'unnotarized-artifacts' : 'artifacts'
   const artifacts = appRoot === resolve(import.meta.dirname, '..')
     ? join(paths.root, mode) : join(appRoot, '.desktop-build', 'targets', target, mode)
-  const base = `deepseek-harness-${version}-${windows ? 'win-x64' : target}`
+  const base = `${QINGCLAW_DISTRIBUTION.desktop.artifactPrefix}-${version}-${windows ? 'win-x64' : target}`
   const debugSuffix = qualification === 'unnotarized' ? '-unnotarized' : qualification === 'unsigned' ? '-unsigned' : ''
   const names = windows ? [`${base}${debugSuffix}.exe`] : [`${base}${debugSuffix}.dmg`, `${base}${debugSuffix}.zip`]
   if (qualification === 'signed' || qualification === 'notarized') {

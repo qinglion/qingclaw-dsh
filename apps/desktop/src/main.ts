@@ -71,6 +71,7 @@ import { DesktopUpdateOverlays } from './update-overlay.ts'
 import { DesktopQuitConfirmation } from './quit-confirmation.ts'
 import { DesktopTray } from './tray.ts'
 import { DesktopBackgroundNotice } from './background-notice.ts'
+import { QINGCLAW_DESKTOP_DISTRIBUTION } from './distribution.ts'
 
 let focusPrimaryWindow = (): void => {}
 let stopForRecovery = async (): Promise<void> => { await stopOperationReports() }
@@ -386,6 +387,9 @@ async function main(): Promise<void> {
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   const development = !app.isPackaged
+  if (process.platform === 'darwin' && development) {
+    app.dock?.setIcon(join(app.getAppPath(), 'resources', 'icon-macos.png'))
+  }
   const primaryRuntime = development
     ? developmentPrimaryRuntime()
     : join(process.resourcesPath, 'runtime', 'primary-runtime')
@@ -1158,7 +1162,7 @@ async function main(): Promise<void> {
   const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
     : join(process.resourcesPath, 'icon.png')
   app.setAboutPanelOptions({
-    applicationName: 'DeepSeek Harness',
+    applicationName: QINGCLAW_DESKTOP_DISTRIBUTION.productName,
     applicationVersion: app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',
@@ -1485,10 +1489,13 @@ async function main(): Promise<void> {
     window.focus()
   }
 
-  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient('dsh')
+  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') {
+    app.setAsDefaultProtocolClient(QINGCLAW_DESKTOP_DISTRIBUTION.protocol)
+  }
   app.on('open-url', (event, url) => {
     event.preventDefault()
-    if (url === 'dsh://open' || url === 'dsh://open/') focusPrimaryWindow()
+    const open = `${QINGCLAW_DESKTOP_DISTRIBUTION.protocol}://open`
+    if (url === open || url === `${open}/`) focusPrimaryWindow()
   })
 
   app.on('activate', (_event, hasVisibleWindows) => {

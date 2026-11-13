@@ -11,6 +11,7 @@ import type { DesktopRetainedManifest } from '@deepseek-ai/dsh-desktop-publisher
 import type { DesktopPublishRoute } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-route.ts'
 
 const roots: string[] = []
+const productionOrigin = 'https://download.example.com'
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 async function fixture(target: DesktopPublishRoute['target'] = 'mac-arm64') {
   const directory = await mkdtemp(join(tmpdir(), 'website-installer-'))
@@ -18,7 +19,7 @@ async function fixture(target: DesktopPublishRoute['target'] = 'mac-arm64') {
   const bytes = Buffer.from('final installer bytes')
   const route: DesktopPublishRoute = { runId: '12', attempt: '1', commit: 'a'.repeat(40), sourceRef: 'master',
     channel: 'nightly', runnerName: 'mini', runnerLabel: 'dsh-mini', target, preset: 'production' }
-  const filename = `deepseek-harness-0.2.1-rc.5-${target}.${target === 'win-x64' ? 'exe' : 'dmg'}`
+  const filename = `qingclaw-0.2.1-rc.5-${target}.${target === 'win-x64' ? 'exe' : 'dmg'}`
   await writeFile(join(directory, filename), bytes)
   const manifest: DesktopRetainedManifest = { schemaVersion: 1, source: {
     runId: route.runId, attempt: route.attempt, commit: route.commit, sourceRef: route.sourceRef,
@@ -32,7 +33,7 @@ it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('accepts only the final %s
   const f = await fixture(target)
   f.manifest = { ...f.manifest, files: [...f.manifest.files,
     { name: 'missing-update.zip', size: 1, sha512: 'unused' }, { name: 'nightly.yml', size: 1, sha512: 'unused' }] }
-  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123')
+  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
   try {
     expect(installer.plan.version).toBe('0.2.1-rc.5')
     expect(installer.plan.artifacts).toHaveLength(1)
@@ -43,7 +44,7 @@ it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('accepts only the final %s
 it('rejects changed installer bytes', async () => {
   const f = await fixture()
   await writeFile(join(f.directory, f.manifest.files[0]!.name), 'wrong bytes')
-  await expect(prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123')).rejects.toThrow('differs from build manifest')
+  await expect(prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)).rejects.toThrow('differs from build manifest')
 })
 
 it.each(['preset', 'qualification', 'attempt', 'commit', 'target', 'repository', 'runId', 'runnerName', 'sourceRef', 'channel'] as const)('rejects mismatched %s even when file bytes match', async (field) => {
@@ -59,12 +60,12 @@ it.each(['preset', 'qualification', 'attempt', 'commit', 'target', 'repository',
   if (field === 'runnerName') source.runnerName = 'other'
   if (field === 'sourceRef') source.sourceRef = 'dsh-v0.2.1'
   if (field === 'channel') source.channel = 'stable'
-  await expect(prepareWebsiteInstaller(f.directory, { ...f.manifest, source }, f.route, 'owner/repo', 'production-123')).rejects.toThrow('identity or production qualification mismatch')
+  await expect(prepareWebsiteInstaller(f.directory, { ...f.manifest, source }, f.route, 'owner/repo', 'production-123', productionOrigin)).rejects.toThrow('identity or production qualification mismatch')
 })
 
 it.each(['absent', 'missing-header', 'wrong-header', 'header-not-retained'] as const)('reconciles %s after audit failure without repeating the fixed-object PUT', async (initial) => {
   const f = await fixture()
-  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123')
+  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
   let stored: Buffer | undefined = initial === 'absent' ? undefined : f.bytes
   const disposition = `attachment; filename="${f.manifest.files[0]!.name}"`
   let storedDisposition = initial === 'wrong-header' ? 'attachment; filename="old.dmg"' : undefined
@@ -104,7 +105,7 @@ it.each(['absent', 'missing-header', 'wrong-header', 'header-not-retained'] as c
 
 it('does not replace changed bytes when recovering an already completed publication', async () => {
   const f = await fixture()
-  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123')
+  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
   try {
     await expect(uploadWebsiteInstaller(installer, { secretId: 'fixture-id', secretKey: 'fixture-key' },
       { read: async () => ({ size: 1, sha512: 'different' }) }, async () => { throw new Error('unexpected write intent') },
@@ -116,5 +117,5 @@ it('rejects an unsupported source ref even when route and manifest agree', async
   const f = await fixture()
   const route = { ...f.route, sourceRef: 'feature/unapproved' }
   const manifest = { ...f.manifest, source: { ...f.manifest.source, sourceRef: route.sourceRef } }
-  await expect(prepareWebsiteInstaller(f.directory, manifest, route, 'owner/repo', 'production-123')).rejects.toThrow('identity or production qualification mismatch')
+  await expect(prepareWebsiteInstaller(f.directory, manifest, route, 'owner/repo', 'production-123', productionOrigin)).rejects.toThrow('identity or production qualification mismatch')
 })

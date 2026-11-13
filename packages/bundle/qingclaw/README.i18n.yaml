@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/bundle/qingclaw/README.md
+/:
+  en: 72eb4921afde369f
+  zh: 8247c4a01633e52c
+/deepseek-ai-dsh-qingclaw-bundle:
+  en: 043d17f16ab13f4b
+  zh: e91c69d302e4b150
+/deepseek-ai-dsh-qingclaw-bundle/summary:
+  en: 9c4d6aab93a276e5
+  zh: d7fcaaadcd6896c0
+/deepseek-ai-dsh-qingclaw-bundle/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-qingclaw-bundle/use-this-package:
+  en: 0fa21bcc962aecb2
+  zh: 3d4a70138566a606
+/deepseek-ai-dsh-qingclaw-bundle/understand-the-implementation:
+  en: c7889ac6c6f485cf
+  zh: d5d82ca5744353be
+/deepseek-ai-dsh-qingclaw-bundle/further-exploration:
+  en: 16f8d9698c006d3b
+  zh: e6e8a1cc853862c6
+/deepseek-ai-dsh-qingclaw-bundle/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-qingclaw-bundle/model-experience/qingclaw-distribution-layer:
+  en: 3463c9547143a490
+  zh: 3f96b488d756f120
+/deepseek-ai-dsh-qingclaw-bundle/model-experience/qingclaw-distribution-layer/what-the-model-sees:
+  en: b90d4dcb2e441081
+  zh: bb96953984955fb2
+/deepseek-ai-dsh-qingclaw-bundle/model-experience/qingclaw-distribution-layer/token-effect:
+  en: fc0d964f10eabc9e
+  zh: 6763ceeff1e3fda8
+/deepseek-ai-dsh-qingclaw-bundle/model-experience/qingclaw-distribution-layer/kv-cache-effect:
+  en: e5a8244a459431ce
+  zh: 4bc284ea1030b013
+/deepseek-ai-dsh-qingclaw-bundle/known-limitations-and-deferred-work:
+  en: abcd590576315278
+  zh: 74858867efa84b6c
+/deepseek-ai-dsh-qingclaw-bundle/known-limitations-and-deferred-work/dev-note:
+  en: 05b63bdc5de4ebde
+  zh: 319fc1abddd7c8c4

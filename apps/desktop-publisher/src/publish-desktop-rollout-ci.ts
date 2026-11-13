@@ -54,7 +54,8 @@ export async function prepareDesktopRolloutCi(env: NodeJS.ProcessEnv) {
   const environment = source.preset === 'test'
     ? { DSH_DESKTOP_AUTO_UPDATE_ENV: 'test', DOWNLOAD_TEST_ORIGIN: config.origin,
       DOWNLOAD_TEST_RELEASE_ID: source.testReleaseId ?? '', DOWNLOAD_TEST_COS_BUCKET: config.bucket }
-    : { DSH_DESKTOP_AUTO_UPDATE_ENV: 'production', DOWNLOAD_PROD_COS_BUCKET: config.bucket }
+    : { DSH_DESKTOP_AUTO_UPDATE_ENV: 'production', DOWNLOAD_PROD_ORIGIN: config.origin,
+      DOWNLOAD_PROD_COS_BUCKET: config.bucket }
   const plan = await prepareDesktopRollout(retainedDesktopPath(root, route.runId, route.attempt), manifest, environment)
   const destination = `${config.bucket}/${plan.upload.publicUrl}${source.channel}`
   const recordsRoot = join(dirname(root), 'upload-records')
@@ -87,7 +88,7 @@ export async function publishDesktopRolloutCi(mode: 'check' | 'apply' | 'website
     if (env.GITHUB_OUTPUT) await appendFile(env.GITHUB_OUTPUT,
       `rollout-requested=${target !== undefined}\napproval=${approval}\nwebsite-approval=${websiteApproval(manifest, config.bucket)}\nwebsite-destination=${createHash('sha256').update(`${config.bucket}/${route.target}`).digest('hex')}\nlabel=${manifest.source.version} / ${route.channel} / ${route.target} → ${target === undefined ? 'website only' : `${target}%`}\n`)
     if (env.GITHUB_STEP_SUMMARY && !env.DESKTOP_ROLLOUT_APPROVAL) await appendFile(env.GITHUB_STEP_SUMMARY,
-      `## 桌面放量与官网发布确认\n\n打包运行：${route.runId} / 第 ${route.attempt} 次；版本：${manifest.source.version}；平台：${route.target}；环境 / 渠道：${route.preset} / ${route.channel}。\n\n目标放量比例：${target === undefined ? '保持当前比例' : `${target}%`}。执行时从 COS 核对当前比例，不允许降低比例。\n\n官网：${website ? desktopWebsiteInstallerUrl(route.target) + '（上传安装包并刷新缓存）' : '不变'}。${website ? '官网安装包面向所有下载用户，不受自动更新放量比例限制，也不要求放量达到 100%。固定下载地址无防降级保护，发布较早版本会替换较新安装包。' : ''}\n\n已确认首次 COS 发布记录；不重新计算全部安装包哈希或校验签名。\n`)
+      `## 桌面放量与官网发布确认\n\n打包运行：${route.runId} / 第 ${route.attempt} 次；版本：${manifest.source.version}；平台：${route.target}；环境 / 渠道：${route.preset} / ${route.channel}。\n\n目标放量比例：${target === undefined ? '保持当前比例' : `${target}%`}。执行时从 COS 核对当前比例，不允许降低比例。\n\n官网：${website ? desktopWebsiteInstallerUrl(config.origin, route.target) + '（上传安装包并刷新缓存）' : '不变'}。${website ? '官网安装包面向所有下载用户，不受自动更新放量比例限制，也不要求放量达到 100%。固定下载地址无防降级保护，发布较早版本会替换较新安装包。' : ''}\n\n已确认首次 COS 发布记录；不重新计算全部安装包哈希或校验签名。\n`)
     return
   }
   if (env.DESKTOP_ROLLOUT_APPROVAL !== approval) throw new Error('desktop rollout: approved inputs or retained metadata changed')

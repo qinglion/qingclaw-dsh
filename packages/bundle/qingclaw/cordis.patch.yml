@@ -1,0 +1,35 @@
+# The QingClaw distribution layer follows dsh-web-app. It owns only QingClaw
+# deployment choices: account and inference origins, optional account surfaces,
+# and brand occupants. Upstream roster changes continue to compose beneath it.
+- id: deepseek-account
+  config:
+    platformOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
+    harnessOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
+    inferenceOrigin: !!js process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com'
+    desktopPlatform: !!js "ctx.get('profileContext')?.name === 'desktop' && ['darwin', 'win32'].includes(process.platform) ? process.platform : null"
+
+- id: llm-deepseek-account
+  disabled: true
+- insert:
+    - id: llm-qingclaw-account
+      name: '@qinglion/dsh-llm-qingclaw-account'
+      config:
+        baseURL: !!js "(process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com').replace(/\\/+$/, '') + '/anthropic'"
+
+- insert:
+    - id: qingclaw-workbench
+      name: '@qinglion/dsh-qingclaw-workbench'
+      config:
+        cacheFile: !!js dshPath('cache', 'qingclaw-workbench', 'feed.json')
+
+# QingClaw does not ship the DeepSeek Platform notification API. The account
+# service remains available; only its optional notification presentation is off.
+- id: ui-account-notifications
+  disabled: true
+
+- id: ui-brand-official
+  name: '@deepseek-ai/dsh-client-ui-brand-official'
+  disabled: true
+- insert:
+    - id: ui-brand-qingclaw
+      name: '@deepseek-ai/dsh-client-ui-brand-qingclaw'

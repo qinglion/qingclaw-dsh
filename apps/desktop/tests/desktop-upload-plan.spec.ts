@@ -50,17 +50,17 @@ async function fixture(
   await writeFile(join(appRoot, 'package.json'), `${JSON.stringify({ version })}\n`)
 
   const [os, arch] = target.split('-') as ['mac' | 'win', 'arm64' | 'x64']
-  const base = `deepseek-harness-${version}-${os}-${arch}`
+  const base = `qingclaw-${version}-${os}-${arch}`
   const origin = environment === 'test'
     ? TEST_ORIGIN
-    : 'https://download.deepseek.com'
+    : 'https://download.example.com'
   await writeFile(join(artifactsRoot, `${target}-release.json`), `${JSON.stringify({
     schemaVersion: 1,
     channel,
     target,
     version,
     environment,
-    publicUrl: `${origin}/dsh-desk/${environment === 'test' ? `${RELEASE_ID}/` : ''}feeds/${target}/`,
+    publicUrl: `${origin}/qingclaw-desktop/${environment === 'test' ? `${RELEASE_ID}/` : ''}feeds/${target}/`,
   })}\n`)
 
   if (os === 'mac') {
@@ -104,6 +104,7 @@ async function fixture(
       : {
         DSH_DESKTOP_UPDATE_CHANNEL: channel,
         DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+        DOWNLOAD_PROD_ORIGIN: origin,
         DOWNLOAD_PROD_COS_BUCKET: PRODUCTION_BUCKET,
       },
   }
@@ -135,7 +136,7 @@ describe('desktop upload plan', () => {
           expect(request.method).toBe('PUT')
           expect(request.path).toBe(`/${artifact.key}`)
           expect(request.body).toEqual(await readFile(artifact.path))
-          expect(request.headers['content-disposition']).toBe(`attachment; filename="deepseek-harness-1.2.3-${target}.${target === 'win-x64' ? 'exe' : 'dmg'}"`)
+          expect(request.headers['content-disposition']).toBe(`attachment; filename="qingclaw-1.2.3-${target}.${target === 'win-x64' ? 'exe' : 'dmg'}"`)
           expect(JSON.parse(await readFile(join(directory, 'result.json'), 'utf8'))).toMatchObject({
             success: true, confirmedPuts: 1, publicReadback: 'not-performed',
           })
@@ -156,9 +157,9 @@ describe('desktop upload plan', () => {
     expect(plan.version).toBe('1.2.3-alpha.4')
     expect(plan.artifacts).toHaveLength(1)
     expect(plan.artifacts[0]).toMatchObject({
-      path: join(paths.artifactsRoot, 'deepseek-harness-1.2.3-alpha.4-win-x64.exe'),
-      key: 'desktop/dsh-latest-windows-x64.exe', channelMetadata: false,
-      contentDisposition: 'attachment; filename="deepseek-harness-1.2.3-alpha.4-win-x64.exe"',
+      path: join(paths.artifactsRoot, 'qingclaw-1.2.3-alpha.4-win-x64.exe'),
+      key: 'desktop/qingclaw-latest-windows-x64.exe', channelMetadata: false,
+      contentDisposition: 'attachment; filename="qingclaw-1.2.3-alpha.4-win-x64.exe"',
     })
   })
 
@@ -170,7 +171,7 @@ describe('desktop upload plan', () => {
       DOWNLOAD_TEST_RELEASE_ID: RELEASE_ID, DOWNLOAD_TEST_COS_BUCKET: TEST_BUCKET,
     })
     if (failure === 'checksum') {
-      const path = join(paths.artifactsRoot, 'deepseek-harness-1.2.3-win-x64.exe')
+      const path = join(paths.artifactsRoot, 'qingclaw-1.2.3-win-x64.exe')
       await writeFile(path, Buffer.alloc((await readFile(path)).length))
     }
     await expect(createDesktopUploadPlan('win-x64', { ...paths, latest: true }))
@@ -199,7 +200,7 @@ describe('desktop upload plan', () => {
         const payload = plan.artifacts.find(file => file.filename.endsWith(target === 'win-x64' ? '.exe' : '.zip'))!
         expect(payload.key).toContain(`/bin/${target}/stable/`)
         expect(load(feed.contents!)).toMatchObject({ version, files: [{
-          url: `${environment === 'test' ? TEST_ORIGIN : 'https://download.deepseek.com'}/${payload.key}`,
+          url: `${environment === 'test' ? TEST_ORIGIN : 'https://download.example.com'}/${payload.key}`,
         }] })
         summaries.push({ environment, version, keys: plan.artifacts.map(file => file.key) })
       }
@@ -211,14 +212,14 @@ describe('desktop upload plan', () => {
     const paths = await fixture('win-x64', '1.2.3', 'production')
     const plan = await createDesktopUploadPlan('win-x64', paths)
     expect(plan.artifacts.map(artifact => artifact.key)).toEqual([
-      'dsh-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe',
-      'dsh-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe.blockmap',
-      'dsh-desk/feeds/win-x64/nightly.yml',
+      'qingclaw-desktop/bin/win-x64/qingclaw-1.2.3-win-x64.exe',
+      'qingclaw-desktop/bin/win-x64/qingclaw-1.2.3-win-x64.exe.blockmap',
+      'qingclaw-desktop/feeds/win-x64/nightly.yml',
     ])
     expect(load(plan.artifacts[2]!.contents!)).toMatchObject({
       version: '1.2.3',
       files: [{
-        url: 'https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe',
+        url: 'https://download.example.com/qingclaw-desktop/bin/win-x64/qingclaw-1.2.3-win-x64.exe',
         sha512: digest('signed NSIS executable fixture'),
       }],
     })
@@ -231,13 +232,13 @@ describe('desktop upload plan', () => {
     expect(plan).toMatchObject({
       environment: 'test',
       version: '1.2.3',
-      publicUrl: `https://desktop-updates.example.com/dsh-desk/${RELEASE_ID}/feeds/mac-arm64/`,
+      publicUrl: `https://desktop-updates.example.com/qingclaw-desktop/${RELEASE_ID}/feeds/mac-arm64/`,
       bucket: TEST_BUCKET,
     })
     expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
-      'deepseek-harness-1.2.3-mac-arm64.dmg',
-      'deepseek-harness-1.2.3-mac-arm64.zip',
-      'deepseek-harness-1.2.3-mac-arm64.zip.blockmap',
+      'qingclaw-1.2.3-mac-arm64.dmg',
+      'qingclaw-1.2.3-mac-arm64.zip',
+      'qingclaw-1.2.3-mac-arm64.zip.blockmap',
       'nightly-mac.yml',
     ])
     expect(plan.artifacts.at(-1)).toMatchObject({
@@ -248,7 +249,7 @@ describe('desktop upload plan', () => {
   it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('publishes every %s object and YAML reference inside the test release directory', async (target) => {
     const paths = await fixture(target)
     const plan = await createDesktopUploadPlan(target, paths)
-    const prefix = `dsh-desk/${RELEASE_ID}`
+    const prefix = `qingclaw-desktop/${RELEASE_ID}`
     const payload = plan.artifacts.find(artifact => artifact.filename.endsWith(target === 'win-x64' ? '.exe' : '.zip'))!
     for (const artifact of plan.artifacts) {
       expect(artifact.key).toBe(`${prefix}/${artifact.channelMetadata ? 'feeds' : 'bin'}/${target}/${artifact.filename}`)
@@ -277,9 +278,9 @@ describe('desktop upload plan', () => {
     const paths = await fixture('mac-arm64', '1.2.3-alpha.4')
     const plan = await createDesktopUploadPlan('mac-arm64', paths)
     expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
-      'deepseek-harness-1.2.3-alpha.4-mac-arm64.dmg',
-      'deepseek-harness-1.2.3-alpha.4-mac-arm64.zip',
-      'deepseek-harness-1.2.3-alpha.4-mac-arm64.zip.blockmap',
+      'qingclaw-1.2.3-alpha.4-mac-arm64.dmg',
+      'qingclaw-1.2.3-alpha.4-mac-arm64.zip',
+      'qingclaw-1.2.3-alpha.4-mac-arm64.zip.blockmap',
       'nightly-mac.yml',
     ])
   })
@@ -288,19 +289,19 @@ describe('desktop upload plan', () => {
     const paths = await fixture('win-x64', '2.0.0', 'production')
     const plan = await createDesktopUploadPlan('win-x64', paths)
     expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
-      'deepseek-harness-2.0.0-win-x64.exe',
-      'deepseek-harness-2.0.0-win-x64.exe.blockmap',
+      'qingclaw-2.0.0-win-x64.exe',
+      'qingclaw-2.0.0-win-x64.exe.blockmap',
       'nightly.yml',
     ])
     expect(plan).toMatchObject({
-      publicUrl: 'https://download.deepseek.com/dsh-desk/feeds/win-x64/',
+      publicUrl: 'https://download.example.com/qingclaw-desktop/feeds/win-x64/',
       bucket: PRODUCTION_BUCKET,
     })
   })
 
   it.each(['missing', 'empty'])('rejects a %s Windows blockmap before publishing its feed', async (condition) => {
     const paths = await fixture('win-x64')
-    const path = join(paths.artifactsRoot, 'deepseek-harness-1.2.3-win-x64.exe.blockmap')
+    const path = join(paths.artifactsRoot, 'qingclaw-1.2.3-win-x64.exe.blockmap')
     if (condition === 'missing') await rm(path)
     else await writeFile(path, '')
     await expect(createDesktopUploadPlan('win-x64', paths)).rejects.toThrow(/missing or empty artifact.*\.exe\.blockmap/u)
@@ -333,7 +334,7 @@ describe('desktop upload plan', () => {
     expect(plan.version).toBe('1.2.3')
     await expect(createDesktopUploadPlan('mac-arm64', { ...paths, packagedProductVersion: '1.2.4' }))
       .rejects.toThrow(/completion record/u)
-    await writeFile(join(paths.artifactsRoot, 'deepseek-harness-1.2.3-mac-arm64.zip'), 'tampered')
+    await writeFile(join(paths.artifactsRoot, 'qingclaw-1.2.3-mac-arm64.zip'), 'tampered')
     await expect(createDesktopUploadPlan('mac-arm64', { ...paths, packagedProductVersion: '1.2.3' }))
       .rejects.toThrow(/size.*metadata/u)
   })
@@ -341,7 +342,7 @@ describe('desktop upload plan', () => {
   it('rejects stale architecture metadata and modified updater bytes', async () => {
     const paths = await fixture('mac-arm64')
     const metadataPath = join(paths.artifactsRoot, 'nightly-mac.yml')
-    const zipPath = join(paths.artifactsRoot, 'deepseek-harness-1.2.3-mac-arm64.zip')
+    const zipPath = join(paths.artifactsRoot, 'qingclaw-1.2.3-mac-arm64.zip')
     await writeFile(zipPath, 'modified')
     await expect(createDesktopUploadPlan('mac-arm64', paths)).rejects.toThrow(/size.*metadata/u)
 
@@ -349,7 +350,7 @@ describe('desktop upload plan', () => {
     await writeFile(metadataPath, `${JSON.stringify({
       version: '1.2.3',
       files: [{
-        url: 'deepseek-harness-1.2.3-mac-x64.zip',
+        url: 'qingclaw-1.2.3-mac-x64.zip',
         size: Buffer.byteLength(x64),
         sha512: digest(x64),
       }],

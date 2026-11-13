@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/llm/llm-qingclaw-account/README.md
+/:
+  en: 4f0e5c254b6135d1
+  zh: 20e0fe9967908133
+/qinglion-dsh-llm-qingclaw-account:
+  en: 35cc4c946c5772b0
+  zh: 8fedfe5b2c6f20a5
+/qinglion-dsh-llm-qingclaw-account/summary:
+  en: 7d60133c277f6d47
+  zh: dc47b563dfd31fe4
+/qinglion-dsh-llm-qingclaw-account/table-of-contents:
+  en: 4aaa4d7a8e8bb2d6
+  zh: 4da4a1bcd187df0f
+/qinglion-dsh-llm-qingclaw-account/use-this-package:
+  en: 6e32dceb0c063d59
+  zh: ee7487d0aa818e93
+/qinglion-dsh-llm-qingclaw-account/security-and-failure-boundaries:
+  en: a4d7b46d8f085acc
+  zh: c4514a3ecdcf1806
+/qinglion-dsh-llm-qingclaw-account/dev-note:
+  en: e83b0cd5b4474be8
+  zh: 8c47fee76528ef60
+/qinglion-dsh-llm-qingclaw-account/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/qinglion-dsh-llm-qingclaw-account/model-experience/authenticated-model-requests:
+  en: 5cf024f0d3370159
+  zh: ed480db8f348a42f
+/qinglion-dsh-llm-qingclaw-account/model-experience/authenticated-model-requests/what-the-model-sees:
+  en: 4a08a165021771fa
+  zh: aa6131326896a8a1
+/qinglion-dsh-llm-qingclaw-account/model-experience/authenticated-model-requests/token-effect:
+  en: f5a4c381241e7192
+  zh: f9229a51a44cafb2
+/qinglion-dsh-llm-qingclaw-account/model-experience/authenticated-model-requests/kv-cache-effect:
+  en: f8844f94548fae76
+  zh: 31d49ade4824106a
+/qinglion-dsh-llm-qingclaw-account/known-limitations-and-deferred-work:
+  en: 1a857fd33fe0f860
+  zh: f6c732c601a6953c
