@@ -12,7 +12,11 @@ import type { DesktopPublishRoute } from '@deepseek-ai/dsh-desktop-publisher/des
 
 const roots: string[] = []
 const productionOrigin = 'https://download.example.com'
+const targets = ['mac-arm64', 'mac-x64', 'win-x64'] as const
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
+function installerDisposition(version: string, target: DesktopPublishRoute['target']): string {
+  return `attachment; filename="qingclaw-${version}-${target}.${target === 'win-x64' ? 'exe' : 'dmg'}"`
+}
 async function fixture(target: DesktopPublishRoute['target'] = 'mac-arm64') {
   const directory = await mkdtemp(join(tmpdir(), 'website-installer-'))
   roots.push(directory)
@@ -29,7 +33,7 @@ async function fixture(target: DesktopPublishRoute['target'] = 'mac-arm64') {
   return { directory, bytes, route, manifest }
 }
 
-it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('accepts only the final %s installer without any update files or current checkout version', async (target) => {
+it.each(targets)('accepts only the final %s installer without any update files or current checkout version', async (target) => {
   const f = await fixture(target)
   f.manifest = { ...f.manifest, files: [...f.manifest.files,
     { name: 'missing-update.zip', size: 1, sha512: 'unused' }, { name: 'nightly.yml', size: 1, sha512: 'unused' }] }
@@ -45,6 +49,13 @@ it('rejects changed installer bytes', async () => {
   const f = await fixture()
   await writeFile(join(f.directory, f.manifest.files[0]!.name), 'wrong bytes')
   await expect(prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)).rejects.toThrow('differs from build manifest')
+})
+
+it('rejects a selected build without a semantic version before opening its installer', async () => {
+  const f = await fixture()
+  const manifest = { ...f.manifest, source: { ...f.manifest.source, version: 'not-semver' } }
+  await expect(prepareWebsiteInstaller(f.directory, manifest, f.route, 'owner/repo', 'production-123', productionOrigin))
+    .rejects.toThrow('selected build has an invalid semantic version')
 })
 
 it.each(['preset', 'qualification', 'attempt', 'commit', 'target', 'repository', 'runId', 'runnerName', 'sourceRef', 'channel'] as const)('rejects mismatched %s even when file bytes match', async (field) => {
@@ -67,7 +78,7 @@ it.each(['absent', 'missing-header', 'wrong-header', 'header-not-retained'] as c
   const f = await fixture()
   const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
   let stored: Buffer | undefined = initial === 'absent' ? undefined : f.bytes
-  const disposition = `attachment; filename="${f.manifest.files[0]!.name}"`
+  const disposition = installerDisposition(f.manifest.source.version, f.route.target)
   let storedDisposition = initial === 'wrong-header' ? 'attachment; filename="old.dmg"' : undefined
   const server = await startCosLoopback((request, response) => {
     if (request.method === 'PUT') {
@@ -102,6 +113,52 @@ it.each(['absent', 'missing-header', 'wrong-header', 'header-not-retained'] as c
     expect(stored).toEqual(f.bytes)
     expect(server.requests.filter(request => request.method === 'PUT')).toHaveLength(1)
   } finally { await installer.handle.close(); await server.close() }
+})
+
+it.each(targets)('allows %s to replace only a strictly older fixed installer', async (target) => {
+  const f = await fixture(target)
+  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
+  let remote = { size: 3, sha512: 'older', contentDisposition: installerDisposition('0.2.1-rc.4', target) }
+  let puts = 0
+  const events: string[] = []
+  try {
+    const outcome = await uploadWebsiteInstaller(installer, { read: async () => remote }, { put: async (upload) => {
+      puts++
+      for await (const _bytes of upload.body) { /* consume the verified stream */ }
+      remote = { ...installer.digest, contentDisposition: upload.contentDisposition }
+    } }, async (event) => { events.push(event) })
+    expect(outcome).toBe('uploaded')
+    expect(puts).toBe(1)
+    expect(events).toEqual(['upload-intent', 'uploaded'])
+    expect(remote.contentDisposition).toBe(installerDisposition('0.2.1-rc.5', target))
+  } finally { await installer.handle.close() }
+})
+
+it.each(targets.flatMap(target => [
+  { target, name: 'newer', disposition: installerDisposition('0.2.1-rc.6', target), error: 'refusing downgrade' },
+  { target, name: 'same-version different', disposition: installerDisposition('0.2.1-rc.5', target), error: 'different remote bytes' },
+  { target, name: 'missing-metadata', disposition: undefined, error: 'no trusted version metadata' },
+  { target, name: 'invalid-metadata', disposition: installerDisposition('not-semver', target), error: 'no trusted version metadata' },
+]))('rejects a $name $target fixed installer before recording or PUT', async ({ target, disposition, error }) => {
+  const f = await fixture(target)
+  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
+  try {
+    await expect(uploadWebsiteInstaller(installer,
+      { read: async () => ({ size: 3, sha512: 'different', ...(disposition ? { contentDisposition: disposition } : {}) }) },
+      { put: async () => { throw new Error('unexpected PUT') } },
+      async () => { throw new Error('unexpected publication event') })).rejects.toThrow(error)
+  } finally { await installer.handle.close() }
+})
+
+it.each(targets)('does not relabel identical %s bytes as an older version', async (target) => {
+  const f = await fixture(target)
+  const installer = await prepareWebsiteInstaller(f.directory, f.manifest, f.route, 'owner/repo', 'production-123', productionOrigin)
+  try {
+    await expect(uploadWebsiteInstaller(installer,
+      { read: async () => ({ ...installer.digest, contentDisposition: installerDisposition('0.2.1-rc.6', target) }) },
+      { put: async () => { throw new Error('unexpected PUT') } },
+      async () => { throw new Error('unexpected publication event') })).rejects.toThrow('refusing downgrade')
+  } finally { await installer.handle.close() }
 })
 
 it('does not replace changed bytes when recovering an already completed publication', async () => {

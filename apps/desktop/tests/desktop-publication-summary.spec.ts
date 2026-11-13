@@ -49,7 +49,7 @@ it('shows the fixed website replacement before production approval only when sel
   const summary = await desktopPublicationSummary(source, plan, 'c'.repeat(64), true)
   await expect(summary).toMatchFileSnapshot('./expected/publication-production-website.md')
   expect(summary).toContain('download.example.com/desktop/qingclaw-latest-windows-x64.exe')
-  expect(summary).toContain('无防降级保护')
+  expect(summary).toContain('按 SemVer 拒绝降级、同版本不同字节和无可信版本元数据的替换')
   expect(await desktopPublicationSummary(source, plan, 'c'.repeat(64), false)).not.toContain('官网固定安装包')
   expect(await desktopPublicationSummary({ ...source, preset: 'test', testReleaseId: 'a'.repeat(32) },
     { ...plan, environment: 'test' }, 'c'.repeat(64), true)).not.toContain('官网固定安装包')

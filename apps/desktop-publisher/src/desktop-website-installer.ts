@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto'
 import { open, lstat, type FileHandle } from 'node:fs/promises'
 import { join } from 'node:path'
+import { compare, valid } from 'semver'
 import type { DesktopRetainedManifest } from './desktop-release-store.ts'
 import type { DesktopPublishRoute } from './desktop-publish-route.ts'
 import {
@@ -19,6 +20,40 @@ export interface DesktopWebsiteInstaller {
   readonly md5: string
   readonly contentDisposition: string
   readonly handle: FileHandle
+}
+
+function websiteInstallerVersion(contentDisposition: string | undefined,
+  target: DesktopPublishRoute['target']): string {
+  const extension = target === 'win-x64' ? 'exe' : 'dmg'
+  const prefix = `attachment; filename="${DESKTOP_ARTIFACT_PREFIX}-`
+  const suffix = `-${target}.${extension}"`
+  if (contentDisposition === undefined || !contentDisposition.startsWith(prefix)
+    || !contentDisposition.endsWith(suffix)) {
+    throw new Error('website installer: existing object has no trusted version metadata; inspect it before replacing')
+  }
+  const version = contentDisposition.slice(prefix.length, -suffix.length)
+  if (valid(version) === null) {
+    throw new Error('website installer: existing object has no trusted version metadata; inspect it before replacing')
+  }
+  return version
+}
+
+function assertWebsiteInstallerAdvance(installer: DesktopWebsiteInstaller,
+  remote: DesktopObjectDigest & { readonly contentDisposition?: string }, sameBytes: boolean): void {
+  let current: string
+  try { current = websiteInstallerVersion(remote.contentDisposition, installer.plan.target) }
+  catch (error) {
+    if (sameBytes) return
+    throw error
+  }
+  const selected = installer.plan.version
+  const order = compare(selected, current)
+  if (order < 0) {
+    throw new Error(`website installer: version ${current} already owns the fixed download; refusing downgrade to ${selected}`)
+  }
+  if (order === 0 && !sameBytes) {
+    throw new Error(`website installer: version ${selected} already owns different remote bytes; select and approve a new version`)
+  }
 }
 
 /**
@@ -42,6 +77,7 @@ export async function prepareWebsiteInstaller(directory: string, manifest: Deskt
     || !/^(?:master|dsh-v[0-9][0-9A-Za-z.-]*)$/u.test(source.sourceRef)) {
     throw new Error('website installer: build identity or production qualification mismatch')
   }
+  if (valid(source.version) === null) throw new Error('website installer: selected build has an invalid semantic version')
   const windows = route.target === 'win-x64'
   const filename = `${DESKTOP_ARTIFACT_PREFIX}-${source.version}-${route.target}.${windows ? 'exe' : 'dmg'}`
   const file = manifest.files.find(item => item.name === filename)
@@ -101,6 +137,11 @@ export async function uploadWebsiteInstaller(installer: DesktopWebsiteInstaller,
     await record('uploaded')
     return 'present'
   }
+  // Repository-wide destination concurrency and the original-runner object lock serialize every
+  // supported website writer. Compare the version carried by the last verified download filename
+  // immediately before replacing it. Identical bytes may repair missing metadata safely; different
+  // bytes without a trusted filename fail closed instead of guessing which release is newer.
+  if (remote !== null) assertWebsiteInstallerAdvance(installer, remote, matches(remote))
   await record('upload-intent')
   const body = installer.handle.createReadStream({ autoClose: false, start: 0 })
   await writer.put({ key: artifact.key, body, digest: installer.digest, md5: installer.md5,

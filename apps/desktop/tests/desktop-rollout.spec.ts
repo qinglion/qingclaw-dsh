@@ -239,7 +239,7 @@ it.each(['apply', 'changed-approval', 'replaced-feed', 'website'] as const)('che
     if (scenario === 'website') {
       const summary = await readFile(env.GITHUB_STEP_SUMMARY, 'utf8')
       expect(summary).toContain('官网安装包面向所有下载用户，不受自动更新放量比例限制')
-      expect(summary).toContain('固定下载地址无防降级保护，发布较早版本会替换较新安装包')
+      expect(summary).toContain('固定下载地址按 SemVer 拒绝降级与同版本不同字节；已有对象缺少可信版本元数据时停止')
     }
     const mock = transport(dump({ ...(load(f.plan.expected) as object), stagingPercentage: 10 }))
     if (scenario === 'replaced-feed') mock.replace(null)
