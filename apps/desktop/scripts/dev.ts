@@ -79,6 +79,7 @@ async function launchElectron(): Promise<void> {
   if (process.platform === 'darwin') {
     const executable = prepareDevelopmentApp({ electron, appRoot: APP_ROOT, directory: DEVELOPMENT_ROOT, home, userData,
       mainPort, rendererPort, hostPort, openDevtools: environment.DSH_DESKTOP_OPEN_DEVTOOLS!,
+      primaryRuntime: environment.DSH_DESKTOP_PRIMARY_RUNTIME_DIR!,
       ...(process.env.QINGCLAW_PLATFORM_ORIGIN ? { platformOrigin: process.env.QINGCLAW_PLATFORM_ORIGIN } : {}),
       ...(process.env.QINGCLAW_INFERENCE_ORIGIN ? { inferenceOrigin: process.env.QINGCLAW_INFERENCE_ORIGIN } : {}) })
     await run(executable, [], APP_ROOT, environment)

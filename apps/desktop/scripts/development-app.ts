@@ -12,6 +12,7 @@ export interface DevelopmentAppOptions {
   readonly directory: string
   readonly home: string
   readonly userData: string
+  readonly primaryRuntime: string
   readonly mainPort: number
   readonly rendererPort: number
   readonly hostPort: number
@@ -73,6 +74,7 @@ export function developmentLauncher(options: DevelopmentAppOptions, bundle: stri
     DSH_DESKTOP_DEV_APP: '1',
     DSH_DESKTOP_HOST_INSPECT_PORT: String(options.hostPort),
     DSH_DESKTOP_OPEN_DEVTOOLS: options.openDevtools,
+    DSH_DESKTOP_PRIMARY_RUNTIME_DIR: options.primaryRuntime,
     ELECTRON_ENABLE_LOGGING: '1',
     ...(options.platformOrigin ? { QINGCLAW_PLATFORM_ORIGIN: options.platformOrigin } : {}),
     ...(options.inferenceOrigin ? { QINGCLAW_INFERENCE_ORIGIN: options.inferenceOrigin } : {}),
