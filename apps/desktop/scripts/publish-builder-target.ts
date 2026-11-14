@@ -18,13 +18,24 @@ const REPOSITORY_ROOT = resolve(import.meta.dirname, '../../..')
 /** Invalid command arguments or builder-owned publication settings. */
 export class BuilderPublishUsageError extends Error {}
 
+/**
+ * Drop the argument separator pnpm keeps when it forwards `pnpm run <script> -- ...`
+ * to the script. Node's parser treats it as end-of-options, so every later flag
+ * would otherwise become a positional target.
+ * @param args - Script arguments from `process.argv.slice(2)`.
+ * @returns Arguments with one leading separator removed.
+ */
+function withoutArgumentSeparator(args: string[]): string[] {
+  return args[0] === '--' ? args.slice(1) : args
+}
+
 /** Parse the intentionally small contract exposed to yuejuan-builder. */
 export function parseBuilderPublishArgs(args: string[]): {
   target: DesktopPackageTargetName
   withLatest: boolean
   recordsRoot: string
 } {
-  const { positionals, values } = parseArgs({ args, allowPositionals: true, options: {
+  const { positionals, values } = parseArgs({ args: withoutArgumentSeparator(args), allowPositionals: true, options: {
     'with-latest': { type: 'boolean' },
     'records-root': { type: 'string' },
   } })
@@ -45,7 +56,7 @@ export function parseBuilderReleaseArgs(args: string[]): {
   withLatest: boolean
   recordsRoot: string
 } {
-  const { positionals, values } = parseArgs({ args, allowPositionals: true, options: {
+  const { positionals, values } = parseArgs({ args: withoutArgumentSeparator(args), allowPositionals: true, options: {
     'with-latest': { type: 'boolean' },
     'records-root': { type: 'string' },
   } })
