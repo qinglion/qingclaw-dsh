@@ -99,7 +99,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   presetMinimalName: '极简模式',
   presetMinimalDescription: 'Agent 使用终端和图片读取工具，并支持上下文压缩，适合测试和对比其基础表现。',
   presetCordisName: '创造模式',
-  presetCordisDescription: '用对话定制 DSH：让 Agent 编写插件，添加新功能或界面；也能组合工具和提示词，创建自己的模式。',
+  presetCordisDescription: '用对话定制 QingClaw：让 Agent 编写插件，添加新功能或界面；也能组合工具和提示词，创建自己的模式。',
 
   inUse: '新任务默认',
 
@@ -144,7 +144,7 @@ export const ja = {
   'presetMinimalName': '最小モード',
   'presetMinimalDescription': 'エージェントはターミナルと画像読み取りを使用し、コンテキスト圧縮にも対応します。基本的な性能のテストや比較に役立ちます。',
   'presetCordisName': 'クリエイターモード',
-  'presetCordisDescription': '会話を通じて DSH をカスタマイズします。機能や UI を追加するプラグインをエージェントに書かせたり、ツールとプロンプトを組み合わせて独自のモードを作成したりできます。',
+  'presetCordisDescription': '会話を通じて QingClaw をカスタマイズします。機能や UI を追加するプラグインをエージェントに書かせたり、ツールとプロンプトを組み合わせて独自のモードを作成したりできます。',
   'inUse': '新しいタスクの既定',
   'noDescription': '説明はありません。',
   'brokenBadge': '読み込みに失敗',
