@@ -32,12 +32,16 @@
     "lib/types/**/*.d.ts",
     "lib/types/**/*.d.ts.map",
     "lib/**/*.js.map",
-    "src"
+    "src",
+    "presets/*.patch.yml"
   ],
   "license": "MIT",
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": [
+        "./cordis.patch.yml",
+        "./presets/qingclaw.patch.yml"
+      ]
     }
   },
   "dependencies": {

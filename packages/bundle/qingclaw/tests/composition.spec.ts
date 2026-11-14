@@ -36,7 +36,7 @@ describe('QingClaw distribution bundle', () => {
       .toBe('@deepseek-ai/dsh-client-ui-brand-official')
 
     const composed = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
-    expect(composed).toHaveLength(web.length + 4)
+    expect(composed).toHaveLength(web.length + 5)
     expect(composed.find(row => row.id === 'ui-brand-official')).toMatchObject({
       name: '@deepseek-ai/dsh-client-ui-brand-official',
       disabled: true,
@@ -61,6 +61,12 @@ describe('QingClaw distribution bundle', () => {
 
     expect(composed.find(row => row.id === 'llm-deepseek-account')?.disabled).toBe(true)
     expect(composed.find(row => row.id === 'llm-deepseek')?.disabled).toBe(true)
+    expect(composed.find(row => row.id === 'agent-preset-registry')?.config).toEqual({ default: 'qingclaw' })
+    const qingclawPreset = composed.find(row => row.id === 'preset-qingclaw')?.config as
+      { id?: string; order?: number; name?: string; plugins?: { id?: string }[] } | undefined
+    expect(qingclawPreset).toMatchObject({ id: 'qingclaw', order: 0, name: '青狮龙虾' })
+    expect(qingclawPreset?.plugins?.some(row => row.id === 'persona')).toBe(false)
+
     expect(composed.find(row => row.id === 'agent-default-model')?.config).toEqual({
       provider: 'deepseek-account',
       model: 'qwen-plus',
@@ -68,7 +74,7 @@ describe('QingClaw distribution bundle', () => {
     })
     const systemPrompt = composed.find(row => row.id === 'system-prompt')?.config as Record<string, unknown> | undefined
     expect(systemPrompt?.includeHarnessIdentity).toBe(false)
-    expect(String(systemPrompt?.personaPrefix)).toContain('青狮龙虾')
+    expect(String(systemPrompt?.personaPrefix)).toContain('使用用户当前消息的语言回答')
     expect(composed.find(row => row.id === 'workspace-controller')?.config).toEqual({
       defaultWorkspaceParent: 'qingclaw',
     })
