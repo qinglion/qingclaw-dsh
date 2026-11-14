@@ -26,6 +26,9 @@ it('loads machine signing credentials independently of the checkout and rejects 
     }
     await rm(secrets)
     expect(loadDesktopPackageEnvironment('darwin', env, root, { unsigned: true }).CSC_KEY_PASSWORD).toBeUndefined()
+    const published = loadDesktopPackageEnvironment('darwin', env, join(root, 'absent-checkout'), { publishOnly: true })
+    expect(published.CSC_KEY_PASSWORD).toBeUndefined()
+    expect(published.DSH_DESKTOP_MACOS_PACK_CONCURRENCY).toBe('2')
     expect(() => loadDesktopPackageEnvironment('darwin', env)).toThrow(/cannot read/u)
     await writeFile(secrets, 'DSH_DESKTOP_MACOS_DOWNLOAD_PROXY=http://localhost:1234\n')
     expect(() => loadDesktopPackageEnvironment('darwin', env)).toThrow(/unsupported setting/u)

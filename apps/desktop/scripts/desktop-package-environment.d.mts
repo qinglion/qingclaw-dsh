@@ -23,7 +23,7 @@ export function loadDesktopPackageEnvironment(
   platform: 'win32' | 'darwin',
   environment?: NodeJS.ProcessEnv,
   appRoot?: string,
-  options?: { unsigned?: boolean, prepareOnly?: boolean },
+  options?: { unsigned?: boolean, prepareOnly?: boolean, publishOnly?: boolean },
 ): NodeJS.ProcessEnv
 
 /**

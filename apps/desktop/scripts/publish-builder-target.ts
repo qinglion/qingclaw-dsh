@@ -91,7 +91,7 @@ async function prepareBuilderTarget(command: BuilderCommand, ambient: NodeJS.Pro
   // Publication only needs the public preset (deployment, channel and object layout).
   // Do not require or re-read signing/notarization credentials on the aggregate
   // publisher job after the signed artifacts have already been retained.
-  const packageEnvironment = loadDesktopPackageEnvironment(target.platform, ambient, undefined, { prepareOnly: true })
+  const packageEnvironment = loadDesktopPackageEnvironment(target.platform, ambient, undefined, { publishOnly: true })
   const deployment = packageEnvironment.DSH_DESKTOP_AUTO_UPDATE_ENV
   if (deployment !== 'test' && deployment !== 'production') {
     throw new BuilderPublishUsageError('packaged deployment must be test or production')
