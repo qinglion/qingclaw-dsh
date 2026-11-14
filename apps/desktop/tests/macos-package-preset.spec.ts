@@ -106,3 +106,16 @@ it.each(['arm64', 'x64'])('records %s debugging artifact paths only for an expli
     await rm(root, { recursive: true, force: true })
   }
 })
+
+it('accepts the shared update root from the preset', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'macos-update-root-'))
+  try {
+    await mkdir(join(root, 'presets'))
+    await writeFile(join(root, 'presets/test.env'), 'DSH_DESKTOP_AUTO_UPDATE_ENV=test\nDSH_DESKTOP_UPDATE_ROOT=qingclaw/beta/desktop\n')
+    const env = loadDesktopPackageEnvironment('darwin',
+      { DSH_PACKAGING_PRESET: 'test', DSH_PACKAGING_CONFIG_DIR: root }, root, { publishOnly: true })
+    expect(env.DSH_DESKTOP_UPDATE_ROOT).toBe('qingclaw/beta/desktop')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
