@@ -1,6 +1,9 @@
 /** Environment variable that selects the Desktop update deployment. */
 export const DESKTOP_AUTO_UPDATE_ENV: 'DSH_DESKTOP_AUTO_UPDATE_ENV'
 
+/** Optional stable object prefix that replaces the release-ID feed layout. */
+export const DESKTOP_UPDATE_ROOT_ENV: 'DSH_DESKTOP_UPDATE_ROOT'
+
 /** Stable QingClaw artifact prefix shared by retained releases and the publisher. */
 export const DESKTOP_ARTIFACT_PREFIX: 'qingclaw'
 

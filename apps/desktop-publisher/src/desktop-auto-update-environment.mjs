@@ -5,6 +5,14 @@ import { valid } from 'semver'
 /** Environment variable that selects the Desktop update deployment. */
 export const DESKTOP_AUTO_UPDATE_ENV = 'DSH_DESKTOP_AUTO_UPDATE_ENV'
 
+/**
+ * Optional stable object prefix that replaces the release-ID feed layout. A
+ * distribution that publishes one continuously updated beta or stable channel
+ * sets this so the packaged app, the publisher, and the website read the same
+ * fixed feed directory.
+ */
+export const DESKTOP_UPDATE_ROOT_ENV = 'DSH_DESKTOP_UPDATE_ROOT'
+
 /** Stable QingClaw artifact prefix shared by retained releases and the publisher. */
 export const DESKTOP_ARTIFACT_PREFIX = 'qingclaw'
 
@@ -161,6 +169,21 @@ function httpsOrigin(value, name) {
 }
 
 /**
+ * Read the optional stable feed prefix.
+ * @param {NodeJS.ProcessEnv} env Packaging or upload environment.
+ * @returns {string | undefined} Lowercase object path segments, without slashes at either end.
+ * @throws {Error} When the value is not a safe object path.
+ */
+function resolveStableUpdateRoot(env) {
+  const value = env[DESKTOP_UPDATE_ROOT_ENV]?.trim()
+  if (value === undefined || value === '') return undefined
+  if (!/^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/u.test(value)) {
+    throw new Error(`desktop auto-update: ${DESKTOP_UPDATE_ROOT_ENV} must be lowercase object path segments`)
+  }
+  return value
+}
+
+/**
  * Resolve the public updater URL and object prefixes for one release target.
  * @param {NodeJS.ProcessEnv} env - Packaging or upload environment.
  * @param {NodeJS.Platform} platform - Target Node.js platform.
@@ -175,6 +198,19 @@ export function resolveDesktopAutoUpdateConfig(env, platform, arch) {
   const deployment = UPDATE_ENVIRONMENTS[environment]
   const { originEnvName } = deployment
   const origin = httpsOrigin(requiredEnvironmentValue(env, originEnvName), originEnvName)
+  const stableRoot = resolveStableUpdateRoot(env)
+  if (stableRoot !== undefined) {
+    const keyPrefix = `${stableRoot}/${target === 'mac-arm64' ? 'arm64' : target === 'mac-x64' ? 'x64' : 'x64'}`
+    return {
+      environment,
+      channel,
+      target,
+      origin,
+      keyPrefix,
+      binaryKeyPrefix: keyPrefix,
+      publicUrl: `${origin}/${keyPrefix}/`,
+    }
+  }
   let releasePrefix = DESKTOP_UPDATE_ROOT
   if (environment === 'test') {
     const releaseId = requiredEnvironmentValue(env, 'DOWNLOAD_TEST_RELEASE_ID')

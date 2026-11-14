@@ -35,6 +35,40 @@ describe('desktop auto-update environment', () => {
     })
   })
 
+  it.each([['darwin', 'arm64', 'arm64'], ['darwin', 'x64', 'x64'], ['win32', 'x64', 'x64']] as const)
+  ('uses one stable quality directory for %s %s when configured', (platform, arch, archDir) => {
+    expect(resolveDesktopAutoUpdateConfig({
+      DSH_DESKTOP_UPDATE_ROOT: 'qingclaw/beta/desktop',
+      DOWNLOAD_TEST_ORIGIN: 'https://d.qinglion.com',
+    }, platform, arch)).toMatchObject({
+      publicUrl: `https://d.qinglion.com/qingclaw/beta/desktop/${archDir}/`,
+      keyPrefix: `qingclaw/beta/desktop/${archDir}`,
+      binaryKeyPrefix: `qingclaw/beta/desktop/${archDir}`,
+    })
+  })
+
+  it('keeps the stable quality directory independent of the test release ID', () => {
+    expect(resolveDesktopAutoUpdateConfig({
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DSH_DESKTOP_UPDATE_ROOT: 'qingclaw/stable/desktop',
+      DOWNLOAD_PROD_ORIGIN: 'https://d.qinglion.com',
+      DOWNLOAD_TEST_RELEASE_ID: RELEASE_ID,
+    }, 'darwin', 'arm64')).toMatchObject({
+      publicUrl: 'https://d.qinglion.com/qingclaw/stable/desktop/arm64/',
+      keyPrefix: 'qingclaw/stable/desktop/arm64',
+    })
+  })
+
+  it.each(['/', 'QingClaw/beta', 'qingclaw//desktop', '../qingclaw', 'qingclaw/beta/'])(
+    'rejects unsafe update root %j',
+    (root) => {
+      expect(() => resolveDesktopAutoUpdateConfig({
+        DSH_DESKTOP_UPDATE_ROOT: root,
+        DOWNLOAD_TEST_ORIGIN: 'https://d.qinglion.com',
+      }, 'darwin', 'arm64')).toThrow(/DSH_DESKTOP_UPDATE_ROOT/u)
+    },
+  )
+
   it('defaults packages and uploads to the test deployment', () => {
     expect(resolveDesktopAutoUpdateEnvironment({})).toBe('test')
     expect(resolveDesktopAutoUpdateConfig({
