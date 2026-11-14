@@ -1,4 +1,4 @@
-name: Publish Desktop · Storage
+name: Publish Desktop · COS
 
 run-name: Publish Desktop package ${{ inputs.package_run_id }} / attempt ${{ inputs.package_run_attempt || 'latest' }}
 

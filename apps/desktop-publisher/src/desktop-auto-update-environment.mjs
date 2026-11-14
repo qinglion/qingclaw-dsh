@@ -5,15 +5,6 @@ import { valid } from 'semver'
 /** Environment variable that selects the Desktop update deployment. */
 export const DESKTOP_AUTO_UPDATE_ENV = 'DSH_DESKTOP_AUTO_UPDATE_ENV'
 
-/** Stable QingClaw artifact prefix shared by retained releases and the publisher. */
-export const DESKTOP_ARTIFACT_PREFIX = 'qingclaw'
-
-/** Stable object-store root for every QingClaw Desktop update deployment. */
-export const DESKTOP_UPDATE_ROOT = 'qingclaw-desktop'
-
-/** Stable filename prefix for website installers outside the update channels. */
-export const DESKTOP_LATEST_INSTALLER_PREFIX = 'qingclaw-latest'
-
 /**
  * Resolve the channel embedded in the installer; omitted local settings retain nightly.
  * @param {NodeJS.ProcessEnv} env Packaging or upload settings.
@@ -28,12 +19,14 @@ export function resolveDesktopUpdateChannel(env) {
 const UPDATE_ENVIRONMENTS = {
   test: {
     originEnvName: 'DOWNLOAD_TEST_ORIGIN',
+    fixedOrigin: undefined,
     bucketEnvName: 'DOWNLOAD_TEST_COS_BUCKET',
     secretIdEnvName: 'DOWNLOAD_TEST_COS_SECRET_ID',
     secretKeyEnvName: 'DOWNLOAD_TEST_COS_SECRET_KEY',
   },
   production: {
-    originEnvName: 'DOWNLOAD_PROD_ORIGIN',
+    originEnvName: undefined,
+    fixedOrigin: 'https://download.deepseek.com',
     bucketEnvName: 'DOWNLOAD_PROD_COS_BUCKET',
     secretIdEnvName: 'DOWNLOAD_PROD_COS_SECRET_ID',
     secretKeyEnvName: 'DOWNLOAD_PROD_COS_SECRET_KEY',
@@ -50,17 +43,16 @@ const UPDATE_TARGETS = new Set(['mac-arm64', 'mac-x64', 'win-x64'])
 export function desktopLatestInstallerFilename(target) {
   if (!UPDATE_TARGETS.has(target)) throw new Error(`desktop upload: unsupported target ${target}`)
   const windows = target === 'win-x64'
-  return `${DESKTOP_LATEST_INSTALLER_PREFIX}-${windows ? 'windows' : 'macos'}-${target === 'mac-arm64' ? 'arm64' : 'x64'}.${windows ? 'exe' : 'dmg'}`
+  return `dsh-latest-${windows ? 'windows' : 'macos'}-${target === 'mac-arm64' ? 'arm64' : 'x64'}.${windows ? 'exe' : 'dmg'}`
 }
 
 /**
  * Resolve the production website installer URL shared by approval, upload and purge.
- * @param {string} origin Public production download origin.
  * @param {'mac-arm64' | 'mac-x64' | 'win-x64'} target Supported Desktop target.
  * @returns {string} Fixed production download URL.
  */
-export function desktopWebsiteInstallerUrl(origin, target) {
-  return `${httpsOrigin(origin, 'production origin')}/desktop/${desktopLatestInstallerFilename(target)}`
+export function desktopWebsiteInstallerUrl(target) {
+  return `${UPDATE_ENVIRONMENTS.production.fixedOrigin}/desktop/${desktopLatestInstallerFilename(target)}`
 }
 
 /**
@@ -173,9 +165,13 @@ export function resolveDesktopAutoUpdateConfig(env, platform, arch) {
   const environment = resolveDesktopAutoUpdateEnvironment(env)
   const target = resolveDesktopAutoUpdateTarget(platform, arch)
   const deployment = UPDATE_ENVIRONMENTS[environment]
-  const { originEnvName } = deployment
-  const origin = httpsOrigin(requiredEnvironmentValue(env, originEnvName), originEnvName)
-  let releasePrefix = DESKTOP_UPDATE_ROOT
+  let origin = deployment.fixedOrigin
+  if (origin === undefined) {
+    const { originEnvName } = deployment
+    if (originEnvName === undefined) throw new Error('desktop auto-update: selected deployment has no origin')
+    origin = httpsOrigin(requiredEnvironmentValue(env, originEnvName), originEnvName)
+  }
+  let releasePrefix = 'dsh-desk'
   if (environment === 'test') {
     const releaseId = requiredEnvironmentValue(env, 'DOWNLOAD_TEST_RELEASE_ID')
     if (!/^[a-f0-9]{32}$/u.test(releaseId)) {
