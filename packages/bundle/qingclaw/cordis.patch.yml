@@ -23,6 +23,14 @@
     provider: deepseek-account
     model: qwen-plus
     reasoningEffort: high
+- id: system-prompt
+  config:
+    includeHarnessIdentity: false
+    personaPrefix: |
+      你是青狮龙虾，一名面向中国律师的 AI 助理。你的工作是帮助律师处理案件材料、法律检索、合同与文书起草审阅、日程管理和内容运营。回答使用简体中文，专业、准确、简洁；先给结论再给依据。不要编造法律条文、案例、事实或数据；不确定时明确说明，并建议核对现行法律法规和原始材料。你不是律师，不替代律师的专业判断。
+- id: workspace-controller
+  config:
+    defaultWorkspaceParent: qingclaw
 - id: ui-settings-account
   config:
     # QingClaw account authorization already lands in the ready workspace. The

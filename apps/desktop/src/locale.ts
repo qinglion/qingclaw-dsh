@@ -1547,16 +1547,23 @@ export const pt = {
   mandatoryNotification: 'Retorne ao aplicativo para confirmar a instalação e reinicie.',
 } satisfies DesktopMessages
 
-function brandDesktopMessages(messages: DesktopMessages, productName: string): DesktopMessages {
-  return Object.fromEntries(Object.entries(messages).map(([key, value]) => [
+function brandDesktopMessages(
+  messages: DesktopMessages,
+  productName: string,
+  overrides: Partial<DesktopMessages> = {},
+): DesktopMessages {
+  const branded = Object.fromEntries(Object.entries(messages).map(([key, value]) => [
     key,
     value.replaceAll('DeepSeek Harness', productName),
   ])) as DesktopMessages
+  return { ...branded, ...overrides }
 }
 
 const dictionaries = {
   en: brandDesktopMessages(en, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
-  zh: brandDesktopMessages(zh, QINGCLAW_DESKTOP_DISTRIBUTION.productName),
+  zh: brandDesktopMessages(zh, QINGCLAW_DESKTOP_DISTRIBUTION.productName, {
+    welcomeDescription: QINGCLAW_DESKTOP_DISTRIBUTION.welcome.description,
+  }),
   ja: brandDesktopMessages(ja, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
   es: brandDesktopMessages(es, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
   fr: brandDesktopMessages(fr, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),

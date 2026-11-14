@@ -39,6 +39,10 @@ export const QINGCLAW_DISTRIBUTION = deepFreeze({
       inferenceOrigin: 'https://api.qingclaw.com',
     },
     microphoneUsageDescription: '青狮龙虾使用麦克风将语音转换为消息草稿。',
+    welcome: {
+      description: '律师 AI 助理，就用青狮龙虾',
+      apiKeyLogin: false,
+    },
   },
   web: {
     appleMobileWebAppTitle: '青狮龙虾',

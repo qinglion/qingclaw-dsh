@@ -66,6 +66,12 @@ describe('QingClaw distribution bundle', () => {
       model: 'qwen-plus',
       reasoningEffort: 'high',
     })
+    const systemPrompt = composed.find(row => row.id === 'system-prompt')?.config as Record<string, unknown> | undefined
+    expect(systemPrompt?.includeHarnessIdentity).toBe(false)
+    expect(String(systemPrompt?.personaPrefix)).toContain('青狮龙虾')
+    expect(composed.find(row => row.id === 'workspace-controller')?.config).toEqual({
+      defaultWorkspaceParent: 'qingclaw',
+    })
     const model = composed.find(row => row.id === 'llm-qingclaw-account')
     expect(model?.name).toBe('@qinglion/dsh-llm-qingclaw-account')
     const modelConfig = model?.config as Record<string, unknown> | undefined
