@@ -16,7 +16,7 @@ for (const platform of ['macos', 'windows'] as const) {
       expect(Object.hasOwn(template, 'secretId')).toBe(false)
       expect(Object.hasOwn(template, 'secretKey')).toBe(false)
       if (preset === 'production') {
-        expect(template.origin).toBe('https://download.qingclaw.com')
+        expect(template.origin).toBe('https://d.qinglion.com')
         expect(paths.isAbsolute(template.githubApp?.privateKeyFile ?? '')).toBe(true)
       }
       const root = await mkdtemp(join(tmpdir(), 'publish-template-'))

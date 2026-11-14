@@ -36,7 +36,7 @@ Production defaults to `https://qingclaw.com` for account authorization and `htt
 
 The patch targets existing account, model, Web, notification, and official-brand row ids. It replaces only their complete configuration or enabled state, then inserts QingClaw-owned plugin rows. The account service retains DSH's browser authorization, local PKCE callback, credential storage, and account-model selection while QingClaw's Rails platform implements the compatible server protocol. Its `inferenceOrigin` release boundary deliberately remains on the Platform origin: generic account-token consumers therefore cannot release the 30-day device session to `api.qingclaw.com`. The model provider separately owns the gateway origin, exchanges that device session for a short-lived model JWT, and sends only `X-DSH-Auth-Token: Bearer <model JWT>` to the QingClaw gateway; the upstream provider key never reaches Desktop. The deployed legacy Serverless gateway authenticates it with built-in Consumer JWT and a local asymmetric JWKS, not the unsupported plug-in marketplace `jwt-auth`/`remote_jwks` path.
 
-The first QingClaw release disables both upstream DeepSeek Web backends. They resolve the long-lived account grant and cannot reuse the QingClaw model provider's private short-JWT cache; the gateway also has no `/v1/tools/search` or `/v1/tools/fetch` route yet. `web_search` consequently has no built-in provider and fails before making an outbound request. Anonymous `web_fetch` remains available through the `http` provider and never reads an account credential. Re-enable gateway-backed search only after a shared short-token seam and the gateway tools route exist, with a test that the request carries the `Bearer `-prefixed model JWT and never the device session. The bundle does not copy the Web roster. Later QingClaw business features can join this bundle as additional plugin rows without changing the DSH agent loop.
+The first QingClaw release disables both upstream DeepSeek Web backends. They resolve the long-lived account grant and cannot reuse the QingClaw model provider's private short-JWT cache; the gateway also has no `/v1/tools/search` or `/v1/tools/fetch` route yet. The distribution plugin applies `tools.restrict()` to each Agent scope, so presets that declare `web_search` do not expose it to the model. Anonymous `web_fetch` remains available through the `http` provider and never reads an account credential. Re-enable gateway-backed search only after a shared short-token seam and the gateway tools route exist, with a test that the request carries the `Bearer `-prefixed model JWT and never the device session. The bundle does not copy the Web roster. Later QingClaw business features can join this bundle as additional plugin rows without changing the DSH agent loop.
 
 -----
 
@@ -56,15 +56,15 @@ The first QingClaw release disables both upstream DeepSeek Web backends. They re
 
 #### What the model sees
 
-The model sees no extra prompt text. The selected account provider sends its requests through the QingClaw inference origin, keeping authentication in the `X-DSH-Auth-Token` header, and receives the gateway's advertised model catalog.
+The model sees no extra prompt text and no `web_search` declaration. The standard, PTC, and Cordis presets retain anonymous `web_fetch`; the minimal preset has neither Web tool. The selected account provider sends its requests through the QingClaw inference origin, keeping authentication in the `X-DSH-Auth-Token` header, and receives the gateway's advertised model catalog.
 
 #### Token effect
 
-The layer adds zero prompt tokens. It sets 8,192 as the QingClaw account route's default maximum output, and the resolved model catalog does not advertise a larger route limit. Inference usage still depends on the selected model and request.
+The layer adds no prompt text. Relative to the upstream Web presets, it removes the `web_search` schema and its conditional guidance. It sets 8,192 as the QingClaw account route's default maximum output, and the resolved model catalog does not advertise a larger route limit. Inference usage still depends on the selected model and request.
 
 #### KV Cache effect
 
-The layer does not change request prefixes, so it has no KV-cache impact.
+The QingClaw request prefix consistently omits `web_search` for presets that otherwise declare it. The layer does not rewrite conversation messages; changing presets still changes the tool catalog and its request prefix.
 
 ## Known Limitations and Deferred Work
 
@@ -74,7 +74,7 @@ The layer does not change request prefixes, so it has no KV-cache impact.
 - QingClaw's account and gateway services must preserve the DSH account protocol, `x-dsh-auth-token` contract, model-listing shape, and Messages streaming behavior. The gateway Consumer JWT contract uses the `Bearer ` prefix and `aud=qingclaw-model-gateway`.
 - The 8,192-token route setting is a client-side default and catalog bound, not a security boundary. The gateway must reject or account for modified-client requests independently.
 - The first release disables account notifications because QingClaw does not yet expose the optional notification endpoints.
-- The first release also disables DeepSeek-backed Web search and DeepSeek Web fetch. Anonymous HTTP page fetch remains enabled; gateway-backed search waits for a shared short-model-JWT credential seam and `/v1/tools` routes.
+- The first release hides `web_search` and disables DeepSeek-backed Web search and DeepSeek Web fetch. Anonymous HTTP page fetch remains enabled; gateway-backed search waits for a shared short-model-JWT credential seam and `/v1/tools` routes.
 - QingClaw 1.0 local-data migration and the existing free and paid skill catalog are deliberately outside the first QingClaw 2.0 slice.
 
 <a id="dev-note"></a>

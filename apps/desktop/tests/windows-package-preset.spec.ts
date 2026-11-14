@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
+import { QINGCLAW_DISTRIBUTION } from '../../../distribution/qingclaw.mjs'
 import { loadDesktopPackageEnvironment } from '../scripts/desktop-package-environment.mjs'
 import { resolveWindowsPackageSettings } from '../scripts/windows-package-settings.mjs'
 
@@ -121,5 +122,20 @@ it.each(['win32', 'darwin'] as const)('applies an explicit test channel override
     expect(() => loadDesktopPackageEnvironment(platform,
       { ...env, DSH_PACKAGING_PRESET: 'production', PACKAGE_TEST_RELEASE_ID: original }, root, { unsigned: true }))
       .toThrow(/requires the test preset/u)
+  })
+})
+
+it.each(['win32', 'darwin'] as const)('defaults only the QingClaw production preset to stable on %s', async (platform) => {
+  await withPreset(async (root) => {
+    const path = join(root, 'presets/production.env')
+    const env = { DSH_PACKAGING_CONFIG_DIR: root, DSH_PACKAGING_PRESET: 'production' }
+    await writeFile(path, `DSH_DESKTOP_AUTO_UPDATE_ENV=production\nDSH_DESKTOP_APP_ID=${QINGCLAW_DISTRIBUTION.desktop.appId}\n`)
+    expect(loadDesktopPackageEnvironment(platform, env, root, { unsigned: true }).DSH_DESKTOP_UPDATE_CHANNEL)
+      .toBe('stable')
+    expect(loadDesktopPackageEnvironment(platform, { ...env, DSH_DESKTOP_UPDATE_CHANNEL: 'nightly' }, root,
+      { unsigned: true }).DSH_DESKTOP_UPDATE_CHANNEL).toBe('nightly')
+    await writeFile(path, 'DSH_DESKTOP_AUTO_UPDATE_ENV=production\nDSH_DESKTOP_APP_ID=com.example.desktop\n')
+    expect(loadDesktopPackageEnvironment(platform, env, root, { unsigned: true }).DSH_DESKTOP_UPDATE_CHANNEL)
+      .toBeUndefined()
   })
 })

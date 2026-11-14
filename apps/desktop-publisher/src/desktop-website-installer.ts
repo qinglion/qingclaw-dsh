@@ -11,7 +11,7 @@ import {
   desktopWebsiteInstallerUrl,
 } from './desktop-auto-update-environment.mjs'
 import type { DesktopObjectDigest, DesktopPublishTransport, DesktopVerifiedObjectWriter } from './desktop-publish.ts'
-import type { DesktopSingleUploadPlan } from './desktop-upload-types.ts'
+import type { DesktopSingleUploadPlan, DesktopUploadPlan } from './desktop-upload-types.ts'
 
 /** Verified file and destination; the caller closes the handle after publication. */
 export interface DesktopWebsiteInstaller {
@@ -20,6 +20,46 @@ export interface DesktopWebsiteInstaller {
   readonly md5: string
   readonly contentDisposition: string
   readonly handle: FileHandle
+}
+
+/**
+ * Open and verify a fixed-download plan produced by the packaged release itself.
+ * This is the stable bridge used by external builders that package and publish in one job.
+ * @param plan Validated single-installer plan from createDesktopUploadPlan(..., { latest: true }).
+ * @returns An open installer whose bytes and download metadata remain pinned through publication.
+ */
+export async function prepareWebsiteInstallerPlan(plan: DesktopUploadPlan): Promise<DesktopWebsiteInstaller> {
+  const artifact = plan.artifacts[0]
+  if (plan.artifacts.length !== 1 || artifact === undefined) throw new Error('website installer: invalid fixed-download plan')
+  const expectedKey = `${plan.environment === 'test' ? 'test/desktop' : 'desktop'}/${desktopLatestInstallerFilename(plan.target)}`
+  let publicPath: string | undefined
+  try { publicPath = new URL(plan.publicUrl).pathname }
+  catch { /* Report the same closed plan-validation failure below. */ }
+  if (valid(plan.version) === null || artifact.key !== expectedKey || artifact.filename !== desktopLatestInstallerFilename(plan.target)
+    || artifact.channelMetadata || artifact.contents !== undefined || artifact.contentDisposition === undefined
+    || publicPath !== `/${expectedKey}`) {
+    throw new Error('website installer: invalid fixed-download plan')
+  }
+  const info = await lstat(artifact.path)
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error('website installer: expected a regular installer file')
+  const handle = await open(artifact.path, 'r')
+  try {
+    const sha512 = createHash('sha512')
+    const md5 = createHash('md5')
+    let size = 0
+    for await (const bytes of handle.createReadStream({ autoClose: false, start: 0 }) as AsyncIterable<Buffer>) {
+      size += bytes.length
+      sha512.update(bytes)
+      md5.update(bytes)
+    }
+    if (size === 0) throw new Error('website installer: installer is empty')
+    const singlePlan: DesktopSingleUploadPlan = { ...plan, artifacts: [artifact] }
+    return { plan: singlePlan, handle, digest: { size, sha512: sha512.digest('base64') },
+      md5: md5.digest('base64'), contentDisposition: artifact.contentDisposition }
+  } catch (error) {
+    await handle.close()
+    throw error
+  }
 }
 
 function websiteInstallerVersion(contentDisposition: string | undefined,

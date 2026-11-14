@@ -24,10 +24,13 @@ export const QINGCLAW_DISTRIBUTION = deepFreeze({
     builtInBundles: ['@deepseek-ai/dsh-qingclaw-bundle'],
   },
   desktop: {
+    packageName: 'qingclaw',
+    companyName: 'QingClaw',
     appId: 'com.qinglion.qingclaw',
     protocol: 'qingclaw',
     protocolName: '青狮龙虾',
     artifactPrefix: 'qingclaw',
+    productionUpdateChannel: 'stable',
     services: {
       platformOrigins: {
         test: 'https://beta.qingclaw.com',

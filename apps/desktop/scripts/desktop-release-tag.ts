@@ -70,6 +70,17 @@ export function tagDesktopRelease(options: {
     return { tag, status: 'created' }
   }
   catch (error) {
+    // Two architecture jobs may finish the same production release together. If the sibling
+    // won the push race, reconcile the remote ref instead of turning an already-correct release
+    // into a manual tag incident. Never accept a remote tag that names different bytes.
+    try {
+      const remoteTag = run('git', ['ls-remote', '--tags', remote, `refs/tags/${tag}`])
+      const remoteCommit = remoteTag.match(/^([a-f0-9]{40})\s+refs\/tags\//u)?.[1]
+      if (remoteCommit === options.commit) return { tag, status: 'present' }
+      if (remoteCommit !== undefined) {
+        return { tag, status: 'failed', detail: `${tag} already names ${remoteCommit}, not the uploaded commit ${options.commit}` }
+      }
+    } catch { /* Preserve the original failure and its recovery commands. */ }
     return {
       tag,
       status: 'failed',

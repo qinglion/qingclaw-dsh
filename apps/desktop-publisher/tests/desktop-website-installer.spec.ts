@@ -6,9 +6,10 @@ import { afterEach, expect, it } from 'vitest'
 import { createDesktopCos } from '@deepseek-ai/dsh-desktop-publisher/desktop-cos.ts'
 import { desktopPublishCos, desktopPublishCosWriter } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-cos.ts'
 import { answer, cosError, startCosLoopback } from './cos-loopback.ts'
-import { prepareWebsiteInstaller, uploadWebsiteInstaller } from '@deepseek-ai/dsh-desktop-publisher/desktop-website-installer.ts'
+import { prepareWebsiteInstaller, prepareWebsiteInstallerPlan, uploadWebsiteInstaller } from '@deepseek-ai/dsh-desktop-publisher/desktop-website-installer.ts'
 import type { DesktopRetainedManifest } from '@deepseek-ai/dsh-desktop-publisher/desktop-release-store.ts'
 import type { DesktopPublishRoute } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-route.ts'
+import type { DesktopSingleUploadPlan } from '@deepseek-ai/dsh-desktop-publisher/desktop-upload-types.ts'
 
 const roots: string[] = []
 const productionOrigin = 'https://download.example.com'
@@ -32,6 +33,39 @@ async function fixture(target: DesktopPublishRoute['target'] = 'mac-arm64') {
   }, files: [{ name: filename, size: bytes.length, sha512: createHash('sha512').update(bytes).digest('base64') }] }
   return { directory, bytes, route, manifest }
 }
+
+it.each(targets)('opens a validated external-builder %s fixed-download plan', async (target) => {
+  const f = await fixture(target)
+  const latest = `qingclaw-latest-${target === 'win-x64' ? 'windows' : 'macos'}-${target === 'mac-arm64' ? 'arm64' : 'x64'}.${target === 'win-x64' ? 'exe' : 'dmg'}`
+  const key = `test/desktop/${latest}`
+  const plan: DesktopSingleUploadPlan = {
+    environment: 'test', target, version: f.manifest.source.version, publicUrl: `${productionOrigin}/${key}`,
+    bucket: 'qinglion', secretIdEnvName: 'unused', secretKeyEnvName: 'unused',
+    artifacts: [{ path: join(f.directory, f.manifest.files[0]!.name), filename: latest, key,
+      contentType: target === 'win-x64' ? 'application/vnd.microsoft.portable-executable' : 'application/x-apple-diskimage',
+      contentDisposition: installerDisposition(f.manifest.source.version, target), channelMetadata: false }],
+  }
+  const installer = await prepareWebsiteInstallerPlan(plan)
+  try {
+    expect(installer.digest).toEqual({ size: f.bytes.length,
+      sha512: createHash('sha512').update(f.bytes).digest('base64') })
+    expect(installer.plan.publicUrl).toBe(`${productionOrigin}/${key}`)
+  } finally { await installer.handle.close() }
+})
+
+it('rejects an external-builder fixed-download plan outside its isolated key', async () => {
+  const f = await fixture()
+  const plan: DesktopSingleUploadPlan = {
+    environment: 'test', target: 'mac-arm64', version: f.manifest.source.version,
+    publicUrl: `${productionOrigin}/desktop/qingclaw-latest-macos-arm64.dmg`, bucket: 'qinglion',
+    secretIdEnvName: 'unused', secretKeyEnvName: 'unused', artifacts: [{
+      path: join(f.directory, f.manifest.files[0]!.name), filename: 'qingclaw-latest-macos-arm64.dmg',
+      key: 'desktop/qingclaw-latest-macos-arm64.dmg', contentType: 'application/x-apple-diskimage',
+      contentDisposition: installerDisposition(f.manifest.source.version, 'mac-arm64'), channelMetadata: false,
+    }],
+  }
+  await expect(prepareWebsiteInstallerPlan(plan)).rejects.toThrow('invalid fixed-download plan')
+})
 
 it.each(targets)('accepts only the final %s installer without any update files or current checkout version', async (target) => {
   const f = await fixture(target)

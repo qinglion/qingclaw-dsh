@@ -16,7 +16,7 @@ vi.mock('node:timers/promises', () => ({ setTimeout: async () => {} }))
 afterEach(() => vi.restoreAllMocks())
 
 it('invalidates website approval when storage region or cache policy changes', () => {
-  const base: DesktopPublishConfig = { bucket: 'qinglion', origin: 'https://download.qingclaw.com',
+  const base: DesktopPublishConfig = { bucket: 'qinglion', origin: 'https://d.qinglion.com',
     credentialsFile: '/credentials.json', storage: { provider: 'aliyun-oss', region: 'oss-cn-hangzhou' },
     cache: { provider: 'none' } }
   const approvals = [
@@ -161,7 +161,7 @@ it('publishes a fixed website installer through the selected Alibaba OSS provide
     await mkdir(release, { recursive: true })
     await writeFile(credentialsFile, JSON.stringify({ accessKeyId: 'fixture-id', accessKeySecret: 'fixture-secret' }))
     await writeFile(join(config, 'publishing', 'production.json'), JSON.stringify({
-      bucket: 'qinglion', origin: 'https://download.qingclaw.com', credentialsFile,
+      bucket: 'qinglion', origin: 'https://d.qinglion.com', credentialsFile,
       storage: { provider: 'aliyun-oss', region: 'oss-cn-hangzhou' }, cache: { provider: 'none' },
       githubApp: { clientId: 'app', privateKeyFile: join(root, 'app.pem') },
     }))
@@ -239,7 +239,7 @@ it('treats cache provider none as a credential-free successful purge no-op', asy
     files: [{ name: 'qingclaw-1.0.0-mac-arm64.dmg', size: 1, sha512: createHash('sha512').update('x').digest('base64') }] }
     await writeFile(join(root, 'releases', '12', '1', 'manifest.json'), JSON.stringify(manifest))
     await writeFile(join(config, 'publishing', 'production.json'), JSON.stringify({
-      bucket: 'qinglion', origin: 'https://download.qingclaw.com', credentialsFile: join(root, 'missing-oss-credentials.json'),
+      bucket: 'qinglion', origin: 'https://d.qinglion.com', credentialsFile: join(root, 'missing-oss-credentials.json'),
       storage: { provider: 'aliyun-oss', region: 'oss-cn-hangzhou' }, cache: { provider: 'none' },
       githubApp: { clientId: 'app', privateKeyFile: join(root, 'missing-app.pem') },
     }))

@@ -124,6 +124,10 @@ export function createElectronBuilderConfig(
       schemes: [QINGCLAW_DISTRIBUTION.desktop.protocol],
     }],
     extraMetadata: {
+      // Keep the source workspace package stable while replacing every identity electron-builder
+      // writes into the installed application, including its company and updater cache directory.
+      name: QINGCLAW_DISTRIBUTION.desktop.packageName,
+      author: { name: QINGCLAW_DISTRIBUTION.desktop.companyName },
       dshDesktopAppId: appId,
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
       qingclawDesktopDeployment: qingclawDeployment,

@@ -35,10 +35,10 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 青狮龙虾的最小生产方案复用 Desktop 已内置的通用更新器，并只向客户端暴露青狮自有 HTTPS 域名：
 
 ```text
-QingClaw Desktop -> https://download.qingclaw.com -> Alibaba Cloud OSS custom domain
+QingClaw Desktop -> https://d.qinglion.com（阿里云 CDN）-> 阿里云 OSS
 ```
 
-青狮龙虾生产模板将 `https://download.qingclaw.com` 预留为固定 origin，并选择现有杭州 OSS bucket `qinglion` 与 `cache.provider=none`。生产打包前必须把该域名及证书直接绑定到 bucket，因为安装包会永久记录所选清单 origin。`qinglion` 当前是 bucket 级 public-read，因此其中只能存放非敏感发布对象；runner 使用的 RAM 身份应严格限制为仅可写入 `qingclaw-desktop/*` 与 `desktop/*`。bucket 必须禁用版本控制，因为不可变二进制依赖 `x-oss-forbid-overwrite`。直连 OSS 时，更新清单 YAML 和固定 `desktop/qingclaw-latest-*` 对象覆盖后立即可见，不需要单独刷新缓存。后续增加 CDN 时，只要保持域名和对象路径不变，已安装客户端无需调整。
+青狮龙虾生产模板复用现有阿里云 CDN 下载域名 `https://d.qinglion.com` 及其后的杭州 OSS bucket `qinglion`；`cache.provider=none` 表示发布器不额外调用缓存刷新 API。安装包会永久记录所选清单 origin，因此需保持该 origin 与 QingClaw 对象路径稳定。`qinglion` 当前是 bucket 级 public-read，其中只能存放非敏感发布对象；runner 使用的 RAM 身份应严格限制为仅可写入 `qingclaw-desktop/*`、`desktop/*` 和隔离的 `test/desktop/*` 固定下载前缀。bucket 必须禁用版本控制，因为不可变二进制依赖 `x-oss-forbid-overwrite`。OSS 上传会给版本化二进制写入 immutable 缓存头，并给更新 feed 与固定安装器别名写入 `no-cache, no-store, must-revalidate`；首次发布前还需确认 CDN 遵循源站缓存头，或为 QingClaw 路径配置等效规则。
 
 留存构建 CI 发布器同时支持既有腾讯 COS/EdgeOne 配置与原生阿里云 OSS。OSS 使用 V4 签名、单次流式写入、远端 SHA-512 对账，并复用不可变对象、审计和放量状态机。凭据文件包含 `accessKeyId` 与 `accessKeySecret`；仓库模板选择 `storage.provider=aliyun-oss`、区域 `oss-cn-hangzhou` 和 `cache.provider=none`。第一阶段中，旧的本地 `pnpm upload:*` 命令、远端版本号发现与已安装更新验收工具仍只支持 COS；OSS 请走留存构建 CI 发布器。阿里云 AI 网关承载模型/API 流量，不作为二进制更新源。
 

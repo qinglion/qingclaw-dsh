@@ -13,7 +13,7 @@ function dialogProps(attempt: AccountView['attempt'], copy: typeof en | typeof z
   const cancel = vi.fn(async () => {})
   const close = vi.fn()
   const useApiKey = vi.fn()
-  return { start, cancel, close, useApiKey, colorScheme, t: (key: keyof typeof en) => copy[key],
+  return { start, cancel, close, useApiKey, allowApiKey: true, colorScheme, t: (key: keyof typeof en) => copy[key],
     account: { view: { status: 'signed-out' as const, attempt, links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' } }, details: undefined, avatar: undefined, failed: false } }
 }
 function mount(attempt: AccountView['attempt'], copy: typeof en | typeof zh = en, colorScheme: 'light' | 'dark' = 'dark') {
@@ -27,6 +27,17 @@ it.each([en, zh])('offers sign in or the existing API key editor', async (copy) 
   fireEvent.click(screen.getByRole('button', { name: copy.addApiKey }))
   expect(props.useApiKey).toHaveBeenCalledOnce()
   expect(props.start).not.toHaveBeenCalled()
+})
+it.each([en, zh])('offers only branded browser sign in when API keys are disabled', async (copy) => {
+  const props = dialogProps(null, copy)
+  props.allowApiKey = false
+  render(<SignInDialog {...props} />)
+  expect(screen.getByText(copy.accountLoginDescription)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: copy.addApiKey })).toBeNull()
+  expect(screen.queryByText(copy.loginDescription)).toBeNull()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: copy.signIn })) })
+  expect(props.start).toHaveBeenCalledOnce()
+  expect(props.useApiKey).not.toHaveBeenCalled()
 })
 it.each([en, zh])('requires a user action after timeout', async (copy) => {
   const props = mount({ id, phase: 'expired', errorCode: 'expired' }, copy)

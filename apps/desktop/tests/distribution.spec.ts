@@ -8,6 +8,13 @@ describe('Desktop QingClaw distribution bridge', () => {
       productName: QINGCLAW_DISTRIBUTION.productName,
       shortName: QINGCLAW_DISTRIBUTION.shortName,
       protocol: QINGCLAW_DISTRIBUTION.desktop.protocol,
+      services: {
+        platformOrigins: {
+          test: QINGCLAW_DISTRIBUTION.desktop.services.platformOrigins.test,
+          production: QINGCLAW_DISTRIBUTION.desktop.services.platformOrigins.production,
+        },
+        inferenceOrigin: QINGCLAW_DISTRIBUTION.desktop.services.inferenceOrigin,
+      },
     })
     expect(Object.isFrozen(QINGCLAW_DESKTOP_DISTRIBUTION)).toBe(true)
   })

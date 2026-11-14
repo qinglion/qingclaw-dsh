@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { expect, it } from 'vitest'
-import { publishDesktopRelease, type DesktopPublishEvent, type DesktopPublishOperations, type DesktopRemoteObject } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish.ts'
+import { publishDesktopRelease, publishDesktopReleaseFiles, type DesktopPublishEvent, type DesktopPublishOperations, type DesktopRemoteObject } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish.ts'
 import type { DesktopUploadPlan } from '../src/desktop-upload-types.ts'
 
 function observed(contents: string): DesktopRemoteObject {
@@ -44,6 +44,16 @@ it('uploads files before the feed and skips identical bytes on a repeat invocati
   expect(f.tags()).toBe(0)
   expect(f.events.find(event => event.key === 'feed/nightly.yml' && event.type === 'put-intent'))
     .toMatchObject({ before: null, after: 'version: 1.0.0\n' })
+})
+
+it('publishes production files for a batch coordinator without tagging or completing', async () => {
+  const f = fixture('production')
+
+  await expect(publishDesktopReleaseFiles(f.plan, f.operations)).resolves.toBeUndefined()
+
+  expect(f.tags()).toBe(0)
+  expect(f.events.at(-1)).toEqual({ type: 'feeds-complete' })
+  expect(f.events).not.toContainEqual({ type: 'complete' })
 })
 
 it('recovers an ambiguous binary write without repeating it or publishing the feed early', async () => {

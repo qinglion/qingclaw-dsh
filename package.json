@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-root",
-  "version": "0.2.2-rc.3",
+  "version": "2.0.0-beta.1",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -48,6 +48,8 @@
     "upload:latest:mac:arm64": "pnpm --filter @deepseek-ai/dsh-desktop run upload:latest:mac:arm64",
     "upload:latest:mac:x64": "pnpm --filter @deepseek-ai/dsh-desktop run upload:latest:mac:x64",
     "upload:latest:win:x64": "pnpm --filter @deepseek-ai/dsh-desktop run upload:latest:win:x64",
+    "publish:desktop:builder": "pnpm --filter @deepseek-ai/dsh-desktop run publish:builder",
+    "publish:desktop:builder:release": "pnpm --filter @deepseek-ai/dsh-desktop run publish:builder:release",
     "purge:latest": "pnpm --filter @deepseek-ai/dsh-desktop run purge:latest",
     "clean": "tsx scripts/clean.ts",
     "change-scope": "tsx scripts/change-scope.ts",

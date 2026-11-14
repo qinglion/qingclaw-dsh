@@ -27,6 +27,7 @@ const themeOf = (colorScheme: 'light' | 'dark'): ThemeSnapshot => ({
 function operationsOf(state: Omit<AccountView, 'links'>, details?: Partial<AccountDetails>, pages?: PlatformPages,
   avatar?: AccountAvatarSnapshot): AccountSectionInjected {
   return {
+    allowApiKey: true,
     ...pages === undefined ? {} : { openPlatformPage: pages.open },
     hooks: {
       account: {
@@ -431,6 +432,37 @@ it.each([
     useTheme={selector => selector(operations.hooks.theme.getSnapshot())}
     wide openSettings={() => {}} openOnboarding={() => {}} t={key => en[key as AccountKey]} />)
   expect(screen.getByRole('button', { name: en.menu }).textContent).toBe(expected)
+})
+
+it.each([
+  {
+    scenario: 'nickname is available',
+    profile: { status: 'ready', value: { id: null, name: '青狮微信用户', contact: null } },
+    expected: '青狮微信用户',
+  },
+  {
+    scenario: 'nickname is empty',
+    profile: { status: 'ready', value: { id: null, name: '', contact: '' } },
+    expected: zh.signedInGeneric,
+  },
+  { scenario: 'profile read failed', profile: { status: 'failed' }, expected: zh.signedInGeneric },
+] as const)('keeps branded identity free of DeepSeek copy when $scenario', async ({ profile, expected }) => {
+  const operations = operationsOf({ status: 'credential-stored', attempt: null }, { profile })
+  operations.allowApiKey = false
+  const globals = {} as GlobalStandardProps
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<>
+    <AccountSection {...globals} {...operations}
+      useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+      useTheme={selector => selector(operations.hooks.theme.getSnapshot())}
+      close={() => {}} t={key => zh[key as AccountKey]} />
+    <AccountMenu renderSlot={() => null} {...globals} {...operations} settingsOpen={false}
+      useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+      useTheme={selector => selector(operations.hooks.theme.getSnapshot())}
+      wide openSettings={() => {}} openOnboarding={() => {}} t={key => zh[key as AccountKey]} />
+  </>)
+  expect(screen.getAllByText(expected)).toHaveLength(2)
+  expect(document.body.textContent).not.toContain(zh.signedIn)
 })
 
 it('shows the same shared picture outcome in settings and the sidebar', async () => {

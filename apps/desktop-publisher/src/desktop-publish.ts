@@ -54,6 +54,8 @@ export interface DesktopPublishOperations {
   /** Ensure the production tag names the packaged commit; never move an existing tag. */
   tag(): Promise<void>
 }
+/** Network and audit operations for a release whose product-level tag is finalized by a batch coordinator. */
+export type DesktopPublishFileOperations = Pick<DesktopPublishOperations, 'transport' | 'record'>
 /** Published files and feeds can succeed even when tag creation remains outstanding. */
 export type DesktopPublishResult = { readonly status: 'complete' } | { readonly status: 'published-tag-pending'; readonly cause: unknown }
 
@@ -97,7 +99,10 @@ export async function prepareDesktopArtifactUpload(artifact: DesktopUploadArtifa
     const body = Readable.from([contents])
     let closed = false
     return { body, digest: { size: contents.length, sha512: sha512.digest('base64') }, md5: md5.digest('base64'),
-      async close() { if (!closed) { closed = true; body.destroy() } } }
+      close() {
+        if (!closed) { closed = true; body.destroy() }
+        return Promise.resolve()
+      } }
   }
   const handle = await open(artifact.path, 'r')
   try {
@@ -136,14 +141,14 @@ function version(contents: string, remote = false): string {
 }
 
 /**
- * Reconcile every binary, then publish feeds, then create the production tag.
- * The caller must hold the channel lock through this entire operation. No writes are retried here;
- * a later invocation hashes remote bytes to recover confirmed and ambiguous earlier writes.
- * @param plan Validated package plan containing both binaries and channel metadata.
- * @param operations Locked transport, durable audit sink, and production tag operation.
- * @returns Complete or published-with-tag-pending; other failures stop all dependent work.
+ * Reconcile every immutable binary and then its architecture-specific feeds without finalizing a product release.
+ * Batch publishers use this primitive while holding every target lock; the ordinary single-target publisher uses
+ * `publishDesktopRelease`, which adds the production tag and final completion event.
  */
-export async function publishDesktopRelease(plan: DesktopUploadPlan, operations: DesktopPublishOperations): Promise<DesktopPublishResult> {
+export async function publishDesktopReleaseFiles(
+  plan: DesktopUploadPlan,
+  operations: DesktopPublishFileOperations,
+): Promise<void> {
   const files = plan.artifacts.filter(file => !file.channelMetadata)
   const feeds = plan.artifacts.filter(file => file.channelMetadata)
   if (files.length === 0 || feeds.length === 0 || new Set(plan.artifacts.map(file => file.key)).size !== plan.artifacts.length) {
@@ -187,6 +192,18 @@ export async function publishDesktopRelease(plan: DesktopUploadPlan, operations:
     await operations.record({ type: 'put-verified', key: artifact.key })
   }
   await operations.record({ type: 'feeds-complete' })
+}
+
+/**
+ * Reconcile every binary, then publish feeds, then create the production tag.
+ * The caller must hold the channel lock through this entire operation. No writes are retried here;
+ * a later invocation hashes remote bytes to recover confirmed and ambiguous earlier writes.
+ * @param plan Validated package plan containing both binaries and channel metadata.
+ * @param operations Locked transport, durable audit sink, and production tag operation.
+ * @returns Complete or published-with-tag-pending; other failures stop all dependent work.
+ */
+export async function publishDesktopRelease(plan: DesktopUploadPlan, operations: DesktopPublishOperations): Promise<DesktopPublishResult> {
+  await publishDesktopReleaseFiles(plan, operations)
   if (plan.environment === 'production') {
     try { await operations.tag() } catch (cause) {
       await operations.record({ type: 'tag-pending' })

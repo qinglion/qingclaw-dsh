@@ -93,10 +93,14 @@ export function loadDesktopPackageEnvironment(platform, environment = process.en
     if (!/^[a-f0-9]{32}$/u.test(releaseId)) throw new Error('desktop package: test release ID must contain 32 lowercase hexadecimal characters')
     settings.DOWNLOAD_TEST_RELEASE_ID = releaseId
   }
+  const updateChannel = environment.DSH_DESKTOP_UPDATE_CHANNEL
+    ?? (preset === 'production' && settings.DSH_DESKTOP_APP_ID === QINGCLAW_DISTRIBUTION.desktop.appId
+      ? QINGCLAW_DISTRIBUTION.desktop.productionUpdateChannel
+      : undefined)
   return {
     ...Object.fromEntries(Object.entries(environment).filter(([name]) => !AMBIENT_RELEASE_SETTING.test(name))),
     ...settings,
-    ...(environment.DSH_DESKTOP_UPDATE_CHANNEL === undefined ? {} : { DSH_DESKTOP_UPDATE_CHANNEL: environment.DSH_DESKTOP_UPDATE_CHANNEL }),
+    ...(updateChannel === undefined ? {} : { DSH_DESKTOP_UPDATE_CHANNEL: updateChannel }),
     ...(preset === undefined ? {} : { DSH_PACKAGING_PRESET: preset }),
   }
 }

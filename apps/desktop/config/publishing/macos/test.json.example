@@ -1,6 +1,6 @@
 {
   "bucket": "qinglion",
-  "origin": "https://download.qingclaw.com",
+  "origin": "https://d.qinglion.com",
   "credentialsFile": "/absolute/path/to/packaging/secrets/oss-test.json",
   "storage": {
     "provider": "aliyun-oss",

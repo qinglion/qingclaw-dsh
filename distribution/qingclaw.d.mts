@@ -7,10 +7,13 @@ export interface QingClawDistribution {
     readonly builtInBundles: readonly ['@deepseek-ai/dsh-qingclaw-bundle']
   }
   readonly desktop: {
+    readonly packageName: 'qingclaw'
+    readonly companyName: 'QingClaw'
     readonly appId: 'com.qinglion.qingclaw'
     readonly protocol: 'qingclaw'
     readonly protocolName: '青狮龙虾'
     readonly artifactPrefix: 'qingclaw'
+    readonly productionUpdateChannel: 'stable'
     readonly services: {
       readonly platformOrigins: {
         readonly test: 'https://beta.qingclaw.com'

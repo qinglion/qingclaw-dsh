@@ -45,13 +45,20 @@ describe('installer preparation preserves application dependencies', () => {
       const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
       const config = createElectronBuilderConfig(env, platform, 'x64')
       const metadataPackager = new Packager({ projectDir: tmpdir() })
-      const metadata: unknown = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+      const sourceMetadata = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as Record<string, unknown>
+      const metadata: Record<string, unknown> = {
+        ...sourceMetadata,
+        ...config.extraMetadata,
+      }
       Object.defineProperties(metadataPackager, {
         config: { value: config },
         metadata: { value: metadata },
       })
       const appInfo = new AppInfo(metadataPackager, undefined)
-      expect(appInfo.companyName).toBe('Hangzhou DeepSeek Artificial Intelligence Co., Ltd.')
+      expect(metadata.author).toEqual({ name: 'QingClaw' })
+      expect(appInfo.name).toBe('qingclaw')
+      expect(appInfo.companyName).toBe('QingClaw')
+      expect(appInfo.updaterCacheDirName).toBe('qingclaw-updater')
       expect(appInfo.copyright).toBe(`Copyright © ${new Date().getFullYear()} 青狮龙虾`)
       if (platform === 'win32') {
         expect(expandMacro(config.nsis.uninstallDisplayName, null, appInfo, {}, false)).toBe('青狮龙虾')

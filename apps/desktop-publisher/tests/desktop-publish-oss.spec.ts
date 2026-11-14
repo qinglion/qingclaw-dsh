@@ -53,8 +53,10 @@ it('publishes immutable binaries and mutable feeds through OSS with exact remote
       { accessKeyId: 'fixture', accessKeySecret: 'fixture' }, () => f.client)
     expect(await transport.read('bin/setup.exe', false)).toBeNull()
     for (const artifact of plan.artifacts) await transport.put(artifact, await desktopArtifactDigest(artifact), !artifact.channelMetadata)
-    expect(f.puts[0]!.options.headers).toMatchObject({ 'x-oss-forbid-overwrite': 'true' })
+    expect(f.puts[0]!.options.headers).toMatchObject({ 'x-oss-forbid-overwrite': 'true',
+      'Cache-Control': 'public, max-age=31536000, immutable' })
     expect(f.puts[1]!.options.headers).not.toHaveProperty('x-oss-forbid-overwrite')
+    expect(f.puts[1]!.options.headers).toMatchObject({ 'Cache-Control': 'no-cache, no-store, must-revalidate' })
     expect(await transport.read('bin/setup.exe', false)).toMatchObject({ size: 13,
       sha512: createHash('sha512').update('signed-binary').digest('base64') })
     expect(await transport.read('feeds/stable.yml', true)).toMatchObject({ contents: 'version: 1.2.3\n' })
@@ -101,4 +103,5 @@ it('uploads a verified open installer stream and retains its download filename',
   expect(await transport.read('desktop/app.dmg', false)).toMatchObject({ size: bytes.length,
     contentDisposition: 'attachment; filename="app.dmg"' })
   expect(f.puts[0]!.options.headers).not.toHaveProperty('x-oss-forbid-overwrite')
+  expect(f.puts[0]!.options.headers).toMatchObject({ 'Cache-Control': 'no-cache, no-store, must-revalidate' })
 })

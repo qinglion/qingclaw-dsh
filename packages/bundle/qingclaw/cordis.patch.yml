@@ -16,6 +16,18 @@
 
 - id: llm-deepseek-account
   disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: ui-settings-account
+  config:
+    # QingClaw account authorization already lands in the ready workspace. The
+    # upstream introduction contains DeepSeek-specific product art and credit
+    # guidance, so keep it out of this distribution until QingClaw owns a
+    # purpose-built onboarding flow.
+    desktopOnboarding: false
+    # QingClaw owns model access through its website account and gateway. Never
+    # expose the upstream DeepSeek API-key provider during cold start or later.
+    allowApiKey: false
 - insert:
     - id: llm-qingclaw-account
       name: '@qinglion/dsh-llm-qingclaw-account'
@@ -29,6 +41,12 @@
       config:
         cacheFile: !!js dshPath('cache', 'qingclaw-workbench', 'feed.json')
 
+- insert:
+    # Preset declarations remain owned by dsh-web-app. This QingClaw-only
+    # policy masks Web Search in each Agent scope without copying those lists.
+    - id: qingclaw-distribution
+      name: '@deepseek-ai/dsh-qingclaw-bundle'
+
 # The upstream DeepSeek web backends resolve the long-lived account grant; they
 # do not share llm-qingclaw-account's short model-JWT cache. The QingClaw gateway
 # also does not expose /v1/tools/search or /v1/tools/fetch yet. Disable both the
@@ -40,6 +58,20 @@
 - id: web-search-deepseek
   disabled: true
 - id: web-deepseek-api
+  disabled: true
+
+# QingClaw ships without DeepSeek-operated product analytics or session-log
+# reporting. Keep the generic OTel infrastructure available to other plugins,
+# but disable every upstream entry that can collect, export, or present upload
+# controls for DeepSeek telemetry. A future QingClaw-owned telemetry service
+# must be introduced as a separate, explicitly reviewed distribution patch.
+- id: desktop-product-telemetry
+  disabled: true
+- id: product-analytics
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true
+- id: ui-settings-session-log
   disabled: true
 
 # QingClaw does not ship the DeepSeek Platform notification API. The account

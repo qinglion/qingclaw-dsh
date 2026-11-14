@@ -30,13 +30,14 @@ function header(headers: object, name: string): string | undefined {
 }
 
 function putOptions(size: number, contentType: string, md5: string, contentDisposition?: string,
-  forbidOverwrite = false): OSS.PutStreamOptions {
+  forbidOverwrite = false, mutable = false): OSS.PutStreamOptions {
   return {
     contentLength: size,
     timeout: 900_000,
     mime: contentType,
     headers: {
       'Content-MD5': md5,
+      'Cache-Control': mutable ? 'no-cache, no-store, must-revalidate' : 'public, max-age=31536000, immutable',
       ...(contentDisposition ? { 'Content-Disposition': contentDisposition } : {}),
       ...(forbidOverwrite ? { 'x-oss-forbid-overwrite': 'true' } : {}),
     },
@@ -97,7 +98,8 @@ export function desktopPublishOss(
         }
         try {
           await client().putStream(artifact.key, upload.body,
-            putOptions(digest.size, artifact.contentType, upload.md5, artifact.contentDisposition, forbidOverwrite))
+            putOptions(digest.size, artifact.contentType, upload.md5, artifact.contentDisposition,
+              forbidOverwrite, artifact.channelMetadata))
         } catch (error) { throw new DesktopOssOperationError('PutObject', error) }
       } finally { await upload.close() }
     },
@@ -117,7 +119,7 @@ export function desktopPublishOssWriter(
     if (upload.digest.size === 0) throw new Error('desktop publish: OSS does not publish empty update objects')
     try {
       await client().putStream(upload.key, upload.body,
-        putOptions(upload.digest.size, upload.contentType, upload.md5, upload.contentDisposition))
+        putOptions(upload.digest.size, upload.contentType, upload.md5, upload.contentDisposition, false, true))
     } catch (error) { throw new DesktopOssOperationError('PutObject', error) }
     finally { upload.body.destroy() }
   } }
