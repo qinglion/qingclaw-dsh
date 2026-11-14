@@ -45,6 +45,8 @@
     "upload:latest:mac:arm64": "tsx scripts/upload-target.ts mac-arm64 --latest",
     "upload:latest:mac:x64": "tsx scripts/upload-target.ts mac-x64 --latest",
     "upload:latest:win:x64": "tsx scripts/upload-target.ts win-x64 --latest",
+    "publish:builder": "tsx scripts/publish-builder-target.ts",
+    "publish:builder:release": "tsx scripts/publish-builder-release.ts",
     "purge:latest": "tsx scripts/upload-target.ts --latest --purge-only"
   },
   "dependencies": {

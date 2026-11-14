@@ -1,12 +1,14 @@
 /** Resume Desktop publication by reconciling object bytes before changing update feeds. */
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
+import { open } from 'node:fs/promises'
+import { Readable } from 'node:stream'
 import { load } from 'js-yaml'
 import { gt, valid } from 'semver'
 import { z } from 'zod'
 import type { DesktopUploadArtifact, DesktopUploadPlan } from './desktop-upload-types.ts'
 
-/** File identity computed from bytes, never inferred from COS ETags. */
+/** File identity computed from bytes, never inferred from provider ETags. */
 export interface DesktopObjectDigest { readonly size: number; readonly sha512: string }
 /** Remote bytes, optional download filename header, and exact YAML for channel objects. */
 export interface DesktopRemoteObject extends DesktopObjectDigest { readonly contents?: string; readonly contentDisposition?: string }
@@ -14,8 +16,28 @@ export interface DesktopRemoteObject extends DesktopObjectDigest { readonly cont
 export interface DesktopPublishTransport {
   /** Read and hash remote bytes; only a confirmed missing object returns null. */
   read(key: string, channel: boolean): Promise<DesktopRemoteObject | null>
-  /** Write once. Immutable binaries must use COS overwrite prevention. */
+  /** Write once. Immutable binaries must use provider overwrite prevention. */
   put(artifact: DesktopUploadArtifact, digest: DesktopObjectDigest, forbidOverwrite: boolean): Promise<void>
+}
+/** Already verified open stream used by fixed website installer publication. */
+export interface DesktopVerifiedObjectUpload {
+  readonly key: string
+  readonly body: Readable
+  readonly digest: DesktopObjectDigest
+  readonly md5: string
+  readonly contentType: string
+  readonly contentDisposition: string
+}
+/** Provider write path that preserves the caller-owned verified file handle. */
+export interface DesktopVerifiedObjectWriter {
+  put(upload: DesktopVerifiedObjectUpload): Promise<void>
+}
+/** One local artifact held open from verification through its provider upload. */
+export interface DesktopPreparedArtifactUpload {
+  readonly body: Readable
+  readonly digest: DesktopObjectDigest
+  readonly md5: string
+  close(): Promise<void>
 }
 /** Credential-free, durably flushed publication event. */
 export interface DesktopPublishEvent {
@@ -32,6 +54,8 @@ export interface DesktopPublishOperations {
   /** Ensure the production tag names the packaged commit; never move an existing tag. */
   tag(): Promise<void>
 }
+/** Network and audit operations for a release whose product-level tag is finalized by a batch coordinator. */
+export type DesktopPublishFileOperations = Pick<DesktopPublishOperations, 'transport' | 'record'>
 /** Published files and feeds can succeed even when tag creation remains outstanding. */
 export type DesktopPublishResult = { readonly status: 'complete' } | { readonly status: 'published-tag-pending'; readonly cause: unknown }
 
@@ -57,6 +81,51 @@ export async function desktopArtifactDigest(artifact: DesktopUploadArtifact): Pr
   return { size, sha512: hash.digest('base64') }
 }
 
+/**
+ * Open and hash one file-backed artifact once, then rewind the same handle for upload.
+ * The Content-MD5 protects against in-place writes while the body is being consumed; retaining
+ * the handle prevents a path replacement after verification from changing the uploaded inode.
+ * @param artifact Validated file-backed artifact or generated metadata.
+ * @returns SHA-512/MD5 evidence, an upload stream, and an idempotent close operation.
+ */
+export async function prepareDesktopArtifactUpload(artifact: DesktopUploadArtifact): Promise<DesktopPreparedArtifactUpload> {
+  const sha512 = createHash('sha512')
+  const md5 = createHash('md5')
+  let size = 0
+  if (artifact.contents !== undefined) {
+    const contents = Buffer.from(artifact.contents)
+    sha512.update(contents)
+    md5.update(contents)
+    const body = Readable.from([contents])
+    let closed = false
+    return { body, digest: { size: contents.length, sha512: sha512.digest('base64') }, md5: md5.digest('base64'),
+      close() {
+        if (!closed) { closed = true; body.destroy() }
+        return Promise.resolve()
+      } }
+  }
+  const handle = await open(artifact.path, 'r')
+  try {
+    for await (const bytes of handle.createReadStream({ autoClose: false, start: 0 }) as AsyncIterable<Buffer>) {
+      size += bytes.length
+      sha512.update(bytes)
+      md5.update(bytes)
+    }
+    const body = handle.createReadStream({ autoClose: false, start: 0 })
+    let closed = false
+    return { body, digest: { size, sha512: sha512.digest('base64') }, md5: md5.digest('base64'),
+      async close() {
+        if (closed) return
+        closed = true
+        body.destroy()
+        await handle.close()
+      } }
+  } catch (error) {
+    await handle.close()
+    throw error
+  }
+}
+
 function same(left: DesktopObjectDigest | null, right: DesktopObjectDigest | null): boolean {
   return left === null || right === null ? left === right : left.size === right.size && left.sha512 === right.sha512
 }
@@ -72,14 +141,14 @@ function version(contents: string, remote = false): string {
 }
 
 /**
- * Reconcile every binary, then publish feeds, then create the production tag.
- * The caller must hold the channel lock through this entire operation. No writes are retried here;
- * a later invocation hashes remote bytes to recover confirmed and ambiguous earlier writes.
- * @param plan Validated package plan containing both binaries and channel metadata.
- * @param operations Locked transport, durable audit sink, and production tag operation.
- * @returns Complete or published-with-tag-pending; other failures stop all dependent work.
+ * Reconcile every immutable binary and then its architecture-specific feeds without finalizing a product release.
+ * Batch publishers use this primitive while holding every target lock; the ordinary single-target publisher uses
+ * `publishDesktopRelease`, which adds the production tag and final completion event.
  */
-export async function publishDesktopRelease(plan: DesktopUploadPlan, operations: DesktopPublishOperations): Promise<DesktopPublishResult> {
+export async function publishDesktopReleaseFiles(
+  plan: DesktopUploadPlan,
+  operations: DesktopPublishFileOperations,
+): Promise<void> {
   const files = plan.artifacts.filter(file => !file.channelMetadata)
   const feeds = plan.artifacts.filter(file => file.channelMetadata)
   if (files.length === 0 || feeds.length === 0 || new Set(plan.artifacts.map(file => file.key)).size !== plan.artifacts.length) {
@@ -123,6 +192,18 @@ export async function publishDesktopRelease(plan: DesktopUploadPlan, operations:
     await operations.record({ type: 'put-verified', key: artifact.key })
   }
   await operations.record({ type: 'feeds-complete' })
+}
+
+/**
+ * Reconcile every binary, then publish feeds, then create the production tag.
+ * The caller must hold the channel lock through this entire operation. No writes are retried here;
+ * a later invocation hashes remote bytes to recover confirmed and ambiguous earlier writes.
+ * @param plan Validated package plan containing both binaries and channel metadata.
+ * @param operations Locked transport, durable audit sink, and production tag operation.
+ * @returns Complete or published-with-tag-pending; other failures stop all dependent work.
+ */
+export async function publishDesktopRelease(plan: DesktopUploadPlan, operations: DesktopPublishOperations): Promise<DesktopPublishResult> {
+  await publishDesktopReleaseFiles(plan, operations)
   if (plan.environment === 'production') {
     try { await operations.tag() } catch (cause) {
       await operations.record({ type: 'tag-pending' })

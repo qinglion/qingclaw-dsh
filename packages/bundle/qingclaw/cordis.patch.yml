@@ -1,0 +1,107 @@
+# The QingClaw distribution layer follows dsh-web-app. It owns only QingClaw
+# deployment choices: account origins, the device-grant release boundary, the
+# model gateway origin, optional account surfaces, and brand occupants. Upstream
+# roster changes continue to compose beneath it.
+- id: deepseek-account
+  config:
+    platformOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
+    harnessOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
+    # This is the release boundary for the long-lived device grant, not the
+    # QingClaw model endpoint. Keep it on Platform so generic account-token
+    # consumers can never release that grant to api.qingclaw.com. The model
+    # provider below owns the gateway origin and exchanges the grant for a
+    # short-lived model JWT first.
+    inferenceOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
+    desktopPlatform: !!js "ctx.get('profileContext')?.name === 'desktop' && ['darwin', 'win32'].includes(process.platform) ? process.platform : null"
+
+- id: llm-deepseek-account
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: agent-default-model
+  config:
+    provider: deepseek-account
+    model: qwen-plus
+    reasoningEffort: high
+- id: system-prompt
+  config:
+    includeHarnessIdentity: false
+    personaPrefix: |
+      你是青狮龙虾，一名面向中国律师的 AI 助理。你的工作是帮助律师处理案件材料、法律检索、合同与文书起草审阅、日程管理和内容运营。回答使用简体中文，专业、准确、简洁；先给结论再给依据。不要编造法律条文、案例、事实或数据；不确定时明确说明，并建议核对现行法律法规和原始材料。你不是律师，不替代律师的专业判断。
+- id: workspace-controller
+  config:
+    defaultWorkspaceParent: qingclaw
+- id: ui-settings-account
+  config:
+    # QingClaw account authorization already lands in the ready workspace. The
+    # upstream introduction contains DeepSeek-specific product art and credit
+    # guidance, so keep it out of this distribution until QingClaw owns a
+    # purpose-built onboarding flow.
+    desktopOnboarding: false
+    # QingClaw owns model access through its website account and gateway. Never
+    # expose the upstream DeepSeek API-key provider during cold start or later.
+    allowApiKey: false
+- insert:
+    - id: llm-qingclaw-account
+      name: '@qinglion/dsh-llm-qingclaw-account'
+      config:
+        baseURL: !!js "(process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com').replace(/\\/+$/, '') + '/anthropic'"
+        maxTokens: 8192
+
+- insert:
+    - id: qingclaw-workbench
+      name: '@qinglion/dsh-qingclaw-workbench'
+      config:
+        cacheFile: !!js dshPath('cache', 'qingclaw-workbench', 'feed.json')
+
+- insert:
+    # Preset declarations remain owned by dsh-web-app. This QingClaw-only
+    # policy masks Web Search in each Agent scope without copying those lists.
+    - id: qingclaw-distribution
+      name: '@deepseek-ai/dsh-qingclaw-bundle'
+
+# The upstream DeepSeek web backends resolve the long-lived account grant; they
+# do not share llm-qingclaw-account's short model-JWT cache. The QingClaw gateway
+# also does not expose /v1/tools/search or /v1/tools/fetch yet. Disable both the
+# direct Search/Fetch API and legacy Messages-search backends instead of ever
+# forwarding a device grant to the gateway. Anonymous HTTP fetch remains active.
+- id: web
+  config:
+    fetchProvider: http
+- id: web-search-deepseek
+  disabled: true
+- id: web-deepseek-api
+  disabled: true
+
+# QingClaw ships without DeepSeek-operated product analytics or session-log
+# reporting. Keep the generic OTel infrastructure available to other plugins,
+# but disable every upstream entry that can collect, export, or present upload
+# controls for DeepSeek telemetry. The DeepSeek session-log and active-plugin
+# inventory contributors are also disabled so QingClaw Messages requests do not
+# carry their provider-specific top-level fields. A future QingClaw-owned
+# telemetry service must be introduced as a separate, explicitly reviewed
+# distribution patch.
+- id: desktop-product-telemetry
+  disabled: true
+- id: product-analytics
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true
+- id: ui-settings-session-log
+  disabled: true
+- id: session-log-deepseek
+  disabled: true
+- id: plugin-package-inventory-deepseek
+  disabled: true
+
+# QingClaw does not ship the DeepSeek Platform notification API. The account
+# service remains available; only its optional notification presentation is off.
+- id: ui-account-notifications
+  disabled: true
+
+- id: ui-brand-official
+  name: '@deepseek-ai/dsh-client-ui-brand-official'
+  disabled: true
+- insert:
+    - id: ui-brand-qingclaw
+      name: '@deepseek-ai/dsh-client-ui-brand-qingclaw'

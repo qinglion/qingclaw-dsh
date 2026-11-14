@@ -5,6 +5,7 @@ import { Toast } from '@deepseek-ai/dsh-client-ui-primitives/src/Toast.tsx'
 import { StateDot } from '@deepseek-ai/dsh-client-ui-primitives/src/StateDot.tsx'
 import type { AccountView } from '@deepseek-ai/dsh-deepseek-account/types'
 import type { WelcomeApi } from '../welcome-api.ts'
+import { QINGCLAW_DESKTOP_DISTRIBUTION } from '../distribution.ts'
 
 type Page = 'entry' | 'key' | 'account'
 
@@ -14,7 +15,10 @@ type Page = 'entry' | 'key' | 'account'
  * @param props.api - isolated preload API; no account credentials reach the renderer.
  * @returns welcome pages with fixed bottom actions.
  */
-export function Welcome({ api }: { api: WelcomeApi }) {
+export function Welcome({ api, allowApiKeyLogin = QINGCLAW_DESKTOP_DISTRIBUTION.welcome.apiKeyLogin }: {
+  api: WelcomeApi
+  allowApiKeyLogin?: boolean
+}) {
   const { messages: m } = api
   const [expiryNotice, setExpiryNotice] = useState(false)
   const [page, setPage] = useState<Page>('entry')
@@ -203,14 +207,14 @@ export function Welcome({ api }: { api: WelcomeApi }) {
           <StateDot state="ongoing" size={16} className="welcome-loading" />
         </button>
         <button id="auth-retry" className="primary" type="button" hidden={!failed} onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'sign_in' }); void start() }}>{m.welcomeAuthRetry}</button>
-        <button id="auth-api-key" className="secondary" type="button" hidden={!failed} onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'api-key' }); navigate('key') }}>{m.welcomeApiKey}</button>
+        <button id="auth-api-key" className="secondary" type="button" hidden={!failed || !allowApiKeyLogin} onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'api-key' }); navigate('key') }}>{m.welcomeApiKey}</button>
         <button id="auth-cancel" className="secondary" type="button" hidden={failed}
           disabled={cancelling || phase === 'committing' || phase === 'succeeded' || (phase === 'initializing' && !attempt?.id)}
           onClick={() => { void cancel() }}>{m.welcomeAuthCancel}</button>
       </div>
       <div id="entry-actions" className="actions" hidden={page !== 'entry'}>
         <button id="sign-in" className="primary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'sign_in' }); void start() }}>{m.welcomeSignIn}</button>
-        <button ref={keyButton} id="api-key" className="secondary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'api-key' }); navigate('key') }}>{m.welcomeApiKey}</button>
+        <button ref={keyButton} id="api-key" className="secondary" type="button" hidden={!allowApiKeyLogin} onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'api-key' }); navigate('key') }}>{m.welcomeApiKey}</button>
       </div>
       <div id="key-actions" className="actions" hidden={page !== 'key'}>
         <button id="save-key" className="primary" type="submit" form="key-form" disabled={busy || draft.trim() === ''}>{m.welcomeKeySave}</button>

@@ -37,12 +37,14 @@ export { DirectoryPickerController } from './directory-picker.ts'
 export interface Config {
   /** Override the system Documents directory with a fully qualified path. */
   documentsDirectory?: string
+  /** Directory under Documents that owns the first-use Workspace. */
+  defaultWorkspaceParent?: string
   /** Maximum duration of the operating system's Documents lookup. */
   documentsLookupTimeoutMs?: number
 }
 
 /** Directory policy after schema defaults have been applied. */
-type ResolvedConfig = Config & { documentsLookupTimeoutMs: number }
+type ResolvedConfig = Config & { defaultWorkspaceParent: string; documentsLookupTimeoutMs: number }
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -57,6 +59,7 @@ export class WorkspaceController extends TypertRemoteService {
 
   static Config: z<Config, ResolvedConfig> = z.object({
     documentsDirectory: z.string(),
+    defaultWorkspaceParent: z.string().default('deepseek-harness'),
     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
   })
 
@@ -73,6 +76,10 @@ export class WorkspaceController extends TypertRemoteService {
     ctx.typert.resources.register('workspace', { field: 'workspaceId' })
     this.config = WorkspaceController.Config(config)
     if (this.config.documentsDirectory !== undefined) validateDocumentsDirectory(this.config.documentsDirectory)
+    if (!/^[A-Za-z0-9._-]+$/u.test(this.config.defaultWorkspaceParent)
+      || this.config.defaultWorkspaceParent === '.' || this.config.defaultWorkspaceParent === '..') {
+      throw new Error('workspaceController: defaultWorkspaceParent must be one safe directory name')
+    }
     this.commands = new WorkspaceCommands(ctx)
     this.feed = new WorkspaceFeed(ctx)
     // This package is the Loader entry for both Remote owners it hosts: the
@@ -105,7 +112,7 @@ export class WorkspaceController extends TypertRemoteService {
     const workspace = await this.ctx.workspaceRegistry.initializeDefault(async () => {
       const timeout = AbortSignal.timeout(this.config.documentsLookupTimeoutMs)
       return await defaultWorkspaceDirectory(
-        this.config.documentsDirectory, AbortSignal.any([signal, timeout]),
+        this.config.documentsDirectory, AbortSignal.any([signal, timeout]), {}, this.config.defaultWorkspaceParent,
       )
     })
     return workspace === undefined ? undefined : { workspace: workspaceView(workspace) }

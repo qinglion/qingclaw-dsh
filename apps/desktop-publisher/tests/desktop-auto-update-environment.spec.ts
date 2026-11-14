@@ -29,11 +29,45 @@ describe('desktop auto-update environment', () => {
   ('uses one test release directory for %s %s feeds and binaries', (platform, arch, target) => {
     expect(resolveDesktopAutoUpdateConfig({ DOWNLOAD_TEST_ORIGIN: 'https://updates.example.com',
       DOWNLOAD_TEST_RELEASE_ID: RELEASE_ID }, platform, arch)).toMatchObject({
-      publicUrl: `https://updates.example.com/dsh-desk/${RELEASE_ID}/feeds/${target}/`,
-      keyPrefix: `dsh-desk/${RELEASE_ID}/feeds/${target}`,
-      binaryKeyPrefix: `dsh-desk/${RELEASE_ID}/bin/${target}`,
+      publicUrl: `https://updates.example.com/qingclaw-desktop/${RELEASE_ID}/feeds/${target}/`,
+      keyPrefix: `qingclaw-desktop/${RELEASE_ID}/feeds/${target}`,
+      binaryKeyPrefix: `qingclaw-desktop/${RELEASE_ID}/bin/${target}`,
     })
   })
+
+  it.each([['darwin', 'arm64', 'arm64'], ['darwin', 'x64', 'x64'], ['win32', 'x64', 'x64']] as const)
+  ('uses one stable quality directory for %s %s when configured', (platform, arch, archDir) => {
+    expect(resolveDesktopAutoUpdateConfig({
+      DSH_DESKTOP_UPDATE_ROOT: 'qingclaw/beta/desktop',
+      DOWNLOAD_TEST_ORIGIN: 'https://d.qinglion.com',
+    }, platform, arch)).toMatchObject({
+      publicUrl: `https://d.qinglion.com/qingclaw/beta/desktop/${archDir}/`,
+      keyPrefix: `qingclaw/beta/desktop/${archDir}`,
+      binaryKeyPrefix: `qingclaw/beta/desktop/${archDir}`,
+    })
+  })
+
+  it('keeps the stable quality directory independent of the test release ID', () => {
+    expect(resolveDesktopAutoUpdateConfig({
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DSH_DESKTOP_UPDATE_ROOT: 'qingclaw/stable/desktop',
+      DOWNLOAD_PROD_ORIGIN: 'https://d.qinglion.com',
+      DOWNLOAD_TEST_RELEASE_ID: RELEASE_ID,
+    }, 'darwin', 'arm64')).toMatchObject({
+      publicUrl: 'https://d.qinglion.com/qingclaw/stable/desktop/arm64/',
+      keyPrefix: 'qingclaw/stable/desktop/arm64',
+    })
+  })
+
+  it.each(['/', 'QingClaw/beta', 'qingclaw//desktop', '../qingclaw', 'qingclaw/beta/'])(
+    'rejects unsafe update root %j',
+    (root) => {
+      expect(() => resolveDesktopAutoUpdateConfig({
+        DSH_DESKTOP_UPDATE_ROOT: root,
+        DOWNLOAD_TEST_ORIGIN: 'https://d.qinglion.com',
+      }, 'darwin', 'arm64')).toThrow(/DSH_DESKTOP_UPDATE_ROOT/u)
+    },
+  )
 
   it('defaults packages and uploads to the test deployment', () => {
     expect(resolveDesktopAutoUpdateEnvironment({})).toBe('test')
@@ -44,9 +78,9 @@ describe('desktop auto-update environment', () => {
       environment: 'test', channel: 'nightly',
       target: 'mac-arm64',
       origin: 'https://desktop-updates.example.com',
-      publicUrl: `https://desktop-updates.example.com/dsh-desk/${RELEASE_ID}/feeds/mac-arm64/`,
-      keyPrefix: `dsh-desk/${RELEASE_ID}/feeds/mac-arm64`,
-      binaryKeyPrefix: `dsh-desk/${RELEASE_ID}/bin/mac-arm64`,
+      publicUrl: `https://desktop-updates.example.com/qingclaw-desktop/${RELEASE_ID}/feeds/mac-arm64/`,
+      keyPrefix: `qingclaw-desktop/${RELEASE_ID}/feeds/mac-arm64`,
+      binaryKeyPrefix: `qingclaw-desktop/${RELEASE_ID}/bin/mac-arm64`,
     })
     expect(resolveDesktopUploadConfig({
       DOWNLOAD_TEST_ORIGIN: 'https://desktop-updates.example.com/',
@@ -62,15 +96,17 @@ describe('desktop auto-update environment', () => {
   it.each([undefined, RELEASE_ID, 'unused-test-value'])('keeps production paths independent of test release ID %s', (id) => {
     expect(resolveDesktopAutoUpdateConfig({
       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DOWNLOAD_PROD_ORIGIN: 'https://download.example.com',
       DOWNLOAD_TEST_RELEASE_ID: id,
     }, 'win32', 'x64')).toMatchObject({
       environment: 'production',
       target: 'win-x64',
-      publicUrl: 'https://download.deepseek.com/dsh-desk/feeds/win-x64/',
-      binaryKeyPrefix: 'dsh-desk/bin/win-x64',
+      publicUrl: 'https://download.example.com/qingclaw-desktop/feeds/win-x64/',
+      binaryKeyPrefix: 'qingclaw-desktop/bin/win-x64',
     })
     expect(resolveDesktopUploadConfig({
       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DOWNLOAD_PROD_ORIGIN: 'https://download.example.com',
       DOWNLOAD_PROD_COS_BUCKET: 'production-download-bucket',
     }, 'win32', 'x64')).toMatchObject({
       bucket: 'production-download-bucket',
@@ -92,6 +128,10 @@ describe('desktop auto-update environment', () => {
     }, 'darwin', 'arm64')).toThrow(/DOWNLOAD_TEST_COS_BUCKET/u)
     expect(() => resolveDesktopUploadConfig({
       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+    }, 'win32', 'x64')).toThrow(/DOWNLOAD_PROD_ORIGIN/u)
+    expect(() => resolveDesktopUploadConfig({
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DOWNLOAD_PROD_ORIGIN: 'https://download.example.com',
     }, 'win32', 'x64')).toThrow(/DOWNLOAD_PROD_COS_BUCKET/u)
   })
 
@@ -122,19 +162,21 @@ describe('desktop auto-update environment', () => {
 })
 
 it.each([
-  ['mac-arm64', 'dsh-latest-macos-arm64.dmg'],
-  ['mac-x64', 'dsh-latest-macos-x64.dmg'],
-  ['win-x64', 'dsh-latest-windows-x64.exe'],
+  ['mac-arm64', 'qingclaw-latest-macos-arm64.dmg'],
+  ['mac-x64', 'qingclaw-latest-macos-x64.dmg'],
+  ['win-x64', 'qingclaw-latest-windows-x64.exe'],
 ] as const)('uses the production origin for website target %s', (target, filename) => {
-  expect(desktopWebsiteInstallerUrl(target)).toBe(`https://download.deepseek.com/desktop/${filename}`)
+  expect(desktopWebsiteInstallerUrl('https://download.example.com/', target))
+    .toBe(`https://download.example.com/desktop/${filename}`)
 })
 
 it.each([['darwin', 'arm64', 'mac-arm64', 'stable-mac.yml'], ['darwin', 'x64', 'mac-x64', 'stable-mac.yml'], ['win32', 'x64', 'win-x64', 'stable.yml']] as const)
 ('routes stable metadata and binaries separately for %s %s', (platform, arch, target, filename) => {
-  const config = resolveDesktopAutoUpdateConfig({ DSH_DESKTOP_AUTO_UPDATE_ENV: 'production', DSH_DESKTOP_UPDATE_CHANNEL: 'stable' }, platform, arch)
+  const config = resolveDesktopAutoUpdateConfig({ DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+    DOWNLOAD_PROD_ORIGIN: 'https://download.example.com', DSH_DESKTOP_UPDATE_CHANNEL: 'stable' }, platform, arch)
   expect(config.channel).toBe('stable')
-  expect(config.keyPrefix).toBe(`dsh-desk/feeds/${target}`)
-  expect(config.binaryKeyPrefix).toBe(`dsh-desk/bin/${target}/stable`)
+  expect(config.keyPrefix).toBe(`qingclaw-desktop/feeds/${target}`)
+  expect(config.binaryKeyPrefix).toBe(`qingclaw-desktop/bin/${target}/stable`)
   expect(desktopUpdateMetadataFilename('1.0.0', platform, config.channel)).toBe(filename)
   expect(() => resolveDesktopAutoUpdateConfig({ DSH_DESKTOP_UPDATE_CHANNEL: 'latest' }, platform, arch)).toThrow(/channel/u)
 })

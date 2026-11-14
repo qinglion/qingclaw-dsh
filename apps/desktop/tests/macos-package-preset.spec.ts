@@ -26,6 +26,9 @@ it('loads machine signing credentials independently of the checkout and rejects 
     }
     await rm(secrets)
     expect(loadDesktopPackageEnvironment('darwin', env, root, { unsigned: true }).CSC_KEY_PASSWORD).toBeUndefined()
+    const published = loadDesktopPackageEnvironment('darwin', env, join(root, 'absent-checkout'), { publishOnly: true })
+    expect(published.CSC_KEY_PASSWORD).toBeUndefined()
+    expect(published.DSH_DESKTOP_MACOS_PACK_CONCURRENCY).toBe('2')
     expect(() => loadDesktopPackageEnvironment('darwin', env)).toThrow(/cannot read/u)
     await writeFile(secrets, 'DSH_DESKTOP_MACOS_DOWNLOAD_PROXY=http://localhost:1234\n')
     expect(() => loadDesktopPackageEnvironment('darwin', env)).toThrow(/unsupported setting/u)
@@ -99,6 +102,19 @@ it.each(['arm64', 'x64'])('records %s debugging artifact paths only for an expli
     expect(await readFile(output, 'utf8')).toContain('artifacts=unnotarized-artifacts\nmode=unnotarized-debug\n')
     expect(await readFile(summary, 'utf8')).toContain('Internal debugging only')
     expect(await readFile(summary, 'utf8')).toContain(`macOS ${arch} signed installer`)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('accepts the shared update root from the preset', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'macos-update-root-'))
+  try {
+    await mkdir(join(root, 'presets'))
+    await writeFile(join(root, 'presets/test.env'), 'DSH_DESKTOP_AUTO_UPDATE_ENV=test\nDSH_DESKTOP_UPDATE_ROOT=qingclaw/beta/desktop\n')
+    const env = loadDesktopPackageEnvironment('darwin',
+      { DSH_PACKAGING_PRESET: 'test', DSH_PACKAGING_CONFIG_DIR: root }, root, { publishOnly: true })
+    expect(env.DSH_DESKTOP_UPDATE_ROOT).toBe('qingclaw/beta/desktop')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

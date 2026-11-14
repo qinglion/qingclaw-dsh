@@ -1,6 +1,6 @@
 /** Notarize and qualify macOS disk images after electron-builder creates them. */
 
-import { notarizeMacOS } from './notarize-macos.mjs'
+import { notarizeMacOS, retryTransientNotarization } from './notarize-macos.mjs'
 import { rmSync } from 'node:fs'
 import { resolveMacOSNotarizationEnvironment } from './desktop-release-environment.mjs'
 import { verifyMacOSDiskImage } from './verify-macos-signature.mjs'
@@ -25,6 +25,8 @@ export async function notarizeMacOSDiskImageArtifact(
   rmSync(`${artifact.file}.blockmap`, { force: true })
   const credentials = resolveMacOSNotarizationEnvironment(env)
   await submit({ appPath: artifact.file, ...credentials })
-  verify(artifact.file, expected)
+  // Ticket validation asks Apple for the same ticket delivery the submission
+  // just used, so it shares the transient-failure retry.
+  await retryTransientNotarization(async () => { verify(artifact.file, expected) })
   process.stdout.write(`desktop macOS notarization: verified disk image ${artifact.file}\n`)
 }

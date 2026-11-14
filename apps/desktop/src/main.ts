@@ -71,6 +71,8 @@ import { DesktopUpdateOverlays } from './update-overlay.ts'
 import { DesktopQuitConfirmation } from './quit-confirmation.ts'
 import { DesktopTray } from './tray.ts'
 import { DesktopBackgroundNotice } from './background-notice.ts'
+import { QINGCLAW_DESKTOP_DISTRIBUTION } from './distribution.ts'
+import { qingclawDesktopDeployment } from './deployment.ts'
 
 let focusPrimaryWindow = (): void => {}
 let stopForRecovery = async (): Promise<void> => { await stopOperationReports() }
@@ -380,12 +382,17 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
 
 async function main(): Promise<void> {
   const desktopSettings = await readDesktopSettings(app.getPath('userData'))
+  const manifest: unknown = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
+  const sealedDeployment = app.isPackaged ? qingclawDesktopDeployment(manifest) : undefined
   void pruneCrashReports(app.getPath('logs'))
   const journalDirectory = process.env.DSH_DESKTOP_UPDATE_JOURNAL_DIR
   const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   const development = !app.isPackaged
+  if (process.platform === 'darwin' && development) {
+    app.dock?.setIcon(join(app.getAppPath(), 'resources', 'icon-macos.png'))
+  }
   const primaryRuntime = development
     ? developmentPrimaryRuntime()
     : join(process.resourcesPath, 'runtime', 'primary-runtime')
@@ -402,7 +409,9 @@ async function main(): Promise<void> {
     return result.environment
   })
   let hostEnvironment: NodeJS.ProcessEnv = process.env
-  const prepareHostEnvironment = async (): Promise<void> => { hostEnvironment = await loginShell }
+  const prepareHostEnvironment = async (): Promise<void> => {
+    hostEnvironment = { ...await loginShell, ...(sealedDeployment?.environment ?? {}) }
+  }
   let quitting = false
   let startup: Promise<void> | undefined
   let workspaceRecovery: Promise<void> | undefined
@@ -694,7 +703,6 @@ async function main(): Promise<void> {
     return startup
   }
 
-  const manifest: unknown = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
   const packagedChannel = desktopUpdateChannel(manifest)
   const channelSettings = new DesktopUpdateSettings(app.getPath('userData'), packagedChannel)
   const initialChannel = await channelSettings.load()
@@ -1158,7 +1166,7 @@ async function main(): Promise<void> {
   const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
     : join(process.resourcesPath, 'icon.png')
   app.setAboutPanelOptions({
-    applicationName: 'DeepSeek Harness',
+    applicationName: QINGCLAW_DESKTOP_DISTRIBUTION.productName,
     applicationVersion: app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',
@@ -1485,10 +1493,13 @@ async function main(): Promise<void> {
     window.focus()
   }
 
-  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient('dsh')
+  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') {
+    app.setAsDefaultProtocolClient(QINGCLAW_DESKTOP_DISTRIBUTION.protocol)
+  }
   app.on('open-url', (event, url) => {
     event.preventDefault()
-    if (url === 'dsh://open' || url === 'dsh://open/') focusPrimaryWindow()
+    const open = `${QINGCLAW_DESKTOP_DISTRIBUTION.protocol}://open`
+    if (url === open || url === `${open}/`) focusPrimaryWindow()
   })
 
   app.on('activate', (_event, hasVisibleWindows) => {

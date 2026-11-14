@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/qingclaw-workbench/README.md
+/:
+  en: 6346f7234bfffa54
+  zh: bd63d1e47482d9d0
+/qinglion-dsh-qingclaw-workbench:
+  en: 6acfd8058f0e692d
+  zh: c6369e45dd024d30
+/qinglion-dsh-qingclaw-workbench/summary:
+  en: ecacffd94fde211d
+  zh: ea837369d9374cd5
+/qinglion-dsh-qingclaw-workbench/table-of-contents:
+  en: 4e53164159b5ce41
+  zh: bd61ce1bef78579b
+/qinglion-dsh-qingclaw-workbench/use-this-package:
+  en: fe0a137ec9fbb078
+  zh: ae1dad080ec1456c
+/qinglion-dsh-qingclaw-workbench/model-experience:
+  en: eb5625d7fbec0ad2
+  zh: b7bcdd7faebfaf45
+/qinglion-dsh-qingclaw-workbench/model-experience/kv-cache-effect:
+  en: 48dc23dd8eb3bb20
+  zh: 07591bf3f8bc6182
+/qinglion-dsh-qingclaw-workbench/known-limitations-and-deferred-work:
+  en: ac8da7bf0d6529b3
+  zh: f961ef2a796b2967
+/qinglion-dsh-qingclaw-workbench/known-limitations-and-deferred-work/dev-note:
+  en: 8b3e28e33360c691
+  zh: 566ee351751c39f7

@@ -29,6 +29,16 @@ it('generates Japanese NSIS strings from the same files that select packaged lan
   expect(renderInstallerStrings(japanese)).not.toContain('${LANG_ENGLISH}')
 })
 
+it('uses the QingClaw product name in every user-facing installer locale', () => {
+  for (const locale of readInstallerLocales()) {
+    const productName = locale.id === 'zh_CN' ? '青狮龙虾' : 'QingClaw'
+    expect(locale.strings.INSTALLER_LAUNCH_FAILED, locale.id).toContain(productName)
+    expect(locale.strings.INSTALLER_RUNNING, locale.id).toContain(productName)
+    expect(locale.strings.INSTALLER_PATH_OWNERSHIP, locale.id).toContain(productName)
+    expect(Object.values(locale.strings).join('\n'), locale.id).not.toContain('DeepSeek Harness')
+  }
+})
+
 it.each(['en_US', 'zh_CN', 'ja_JP', 'es_ES', 'fr_FR', 'de_DE', 'ru_RU', 'pt_BR'])('rejects a missing %s configuration', (id) => {
   const directory = fixture()
   rmSync(join(directory, `${id}.json`))

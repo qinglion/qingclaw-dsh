@@ -1,8 +1,46 @@
 /** macOS development bundle that loads the current workspace through Electron. */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { QINGCLAW_DISTRIBUTION } from '../../../distribution/qingclaw.mjs'
+
+const DEVELOPMENT_APP_ICON = `${QINGCLAW_DISTRIBUTION.shortName}.icns`
+
+type IconCommand = (executable: string, args: readonly string[]) => void
+
+function runIconCommand(executable: string, args: readonly string[]): void {
+  execFileSync(executable, [...args], { stdio: 'pipe' })
+}
+
+/**
+ * Render the branded PNG into the multi-resolution icon used by Finder and Launch Services.
+ * @param source - 1024 px product icon checked into Desktop resources.
+ * @param bundle - Generated development application bundle.
+ * @param run - Command runner overridden by unit tests.
+ * @returns icon filename written beneath Contents/Resources.
+ */
+export function createDevelopmentAppIcon(source: string, bundle: string, run: IconCommand = runIconCommand): string {
+  const scratch = mkdtempSync(join(tmpdir(), 'dsh-development-icon-'))
+  try {
+    const iconset = join(scratch, `${QINGCLAW_DISTRIBUTION.shortName}.iconset`)
+    mkdirSync(iconset)
+    for (const points of [16, 32, 128, 256, 512]) {
+      for (const scale of [1, 2]) {
+        const pixels = points * scale
+        const suffix = scale === 2 ? '@2x' : ''
+        run('/usr/bin/sips', ['-z', String(pixels), String(pixels), source, '--out',
+          join(iconset, `icon_${String(points)}x${String(points)}${suffix}.png`)])
+      }
+    }
+    run('/usr/bin/iconutil', ['--convert', 'icns', '--output',
+      join(bundle, 'Contents', 'Resources', DEVELOPMENT_APP_ICON), iconset])
+    return DEVELOPMENT_APP_ICON
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+}
 
 /** Workspace and runtime settings captured for Launch Services cold starts. */
 export interface DevelopmentAppOptions {
@@ -11,10 +49,13 @@ export interface DevelopmentAppOptions {
   readonly directory: string
   readonly home: string
   readonly userData: string
+  readonly primaryRuntime: string
   readonly mainPort: number
   readonly rendererPort: number
   readonly hostPort: number
   readonly openDevtools: string
+  readonly platformOrigin?: string
+  readonly inferenceOrigin?: string
 }
 
 function quote(value: string): string { return `'${value.replaceAll("'", "'\\''")}'` }
@@ -26,21 +67,30 @@ function quote(value: string): string { return `'${value.replaceAll("'", "'\\''"
  */
 export function prepareDevelopmentApp(options: DevelopmentAppOptions): string {
   const source = dirname(dirname(dirname(options.electron)))
-  const bundle = join(options.directory, 'Harness Dev.app')
-  const executable = join(bundle, 'Contents', 'MacOS', 'HarnessDev')
+  const bundle = join(options.directory, `${QINGCLAW_DISTRIBUTION.shortName} Dev.app`)
+  const executableName = `${QINGCLAW_DISTRIBUTION.shortName}Dev`
+  const executable = join(bundle, 'Contents', 'MacOS', executableName)
   const stamp = join(bundle, 'Contents', 'Resources', 'dsh-development.json')
+  const iconSource = join(options.appRoot, 'resources', 'icon-macos.png')
   const launcher = developmentLauncher(options, bundle)
-  const identity = JSON.stringify({ ...options, launcher, plist: readFileSync(join(source, 'Contents', 'Info.plist'), 'utf8') })
+  const identity = JSON.stringify({ ...options, launcher,
+    icon: createHash('sha256').update(readFileSync(iconSource)).digest('hex'),
+    plist: readFileSync(join(source, 'Contents', 'Info.plist'), 'utf8') })
   if (!existsSync(stamp) || readFileSync(stamp, 'utf8') !== identity) {
     rmSync(bundle, { recursive: true, force: true })
     execFileSync('/usr/bin/ditto', [source, bundle])
     const plist = join(bundle, 'Contents', 'Info.plist')
     const values = {
-      CFBundleIdentifier: `com.deepseek.harness.dev.${createHash('sha256').update(options.appRoot).digest('hex').slice(0, 12)}`,
-      CFBundleName: 'Harness Dev',
-      CFBundleDisplayName: 'Harness Dev',
-      CFBundleExecutable: 'HarnessDev',
-      CFBundleURLTypes: [{ CFBundleURLName: 'DeepSeek Harness', CFBundleURLSchemes: ['dsh'], CFBundleTypeRole: 'Viewer' }],
+      CFBundleIdentifier: `${QINGCLAW_DISTRIBUTION.desktop.appId}.dev.${createHash('sha256').update(options.appRoot).digest('hex').slice(0, 12)}`,
+      CFBundleName: `${QINGCLAW_DISTRIBUTION.shortName} Dev`,
+      CFBundleDisplayName: `${QINGCLAW_DISTRIBUTION.shortName} Dev`,
+      CFBundleExecutable: executableName,
+      CFBundleIconFile: createDevelopmentAppIcon(iconSource, bundle),
+      CFBundleURLTypes: [{
+        CFBundleURLName: QINGCLAW_DISTRIBUTION.desktop.protocolName,
+        CFBundleURLSchemes: [QINGCLAW_DISTRIBUTION.desktop.protocol],
+        CFBundleTypeRole: 'Viewer',
+      }],
     }
     for (const [key, value] of Object.entries(values)) {
       execFileSync('/usr/bin/plutil', ['-replace', key, '-json', JSON.stringify(value), plist])
@@ -65,7 +115,10 @@ export function developmentLauncher(options: DevelopmentAppOptions, bundle: stri
     DSH_DESKTOP_DEV_APP: '1',
     DSH_DESKTOP_HOST_INSPECT_PORT: String(options.hostPort),
     DSH_DESKTOP_OPEN_DEVTOOLS: options.openDevtools,
+    DSH_DESKTOP_PRIMARY_RUNTIME_DIR: options.primaryRuntime,
     ELECTRON_ENABLE_LOGGING: '1',
+    ...(options.platformOrigin ? { QINGCLAW_PLATFORM_ORIGIN: options.platformOrigin } : {}),
+    ...(options.inferenceOrigin ? { QINGCLAW_INFERENCE_ORIGIN: options.inferenceOrigin } : {}),
   }
   const args = [
     join(bundle, 'Contents', 'MacOS', 'Electron'),

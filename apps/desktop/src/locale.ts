@@ -1,5 +1,7 @@
 /** Typed shell copy for every shipped language owned by the Electron shell. */
 
+import { QINGCLAW_DESKTOP_DISTRIBUTION } from './distribution.ts'
+
 export const en = {
   cliCommandMenu: 'Manage dsh Command…',
   cliCommandTitle: 'Manage dsh Command',
@@ -1545,7 +1547,30 @@ export const pt = {
   mandatoryNotification: 'Retorne ao aplicativo para confirmar a instalação e reinicie.',
 } satisfies DesktopMessages
 
-const dictionaries = { en, zh, ja, es, fr, de, ru, pt }
+function brandDesktopMessages(
+  messages: DesktopMessages,
+  productName: string,
+  overrides: Partial<DesktopMessages> = {},
+): DesktopMessages {
+  const branded = Object.fromEntries(Object.entries(messages).map(([key, value]) => [
+    key,
+    value.replaceAll('DeepSeek Harness', productName),
+  ])) as DesktopMessages
+  return { ...branded, ...overrides }
+}
+
+const dictionaries = {
+  en: brandDesktopMessages(en, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
+  zh: brandDesktopMessages(zh, QINGCLAW_DESKTOP_DISTRIBUTION.productName, {
+    welcomeDescription: QINGCLAW_DESKTOP_DISTRIBUTION.welcome.description,
+  }),
+  ja: brandDesktopMessages(ja, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
+  es: brandDesktopMessages(es, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
+  fr: brandDesktopMessages(fr, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
+  de: brandDesktopMessages(de, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
+  ru: brandDesktopMessages(ru, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
+  pt: brandDesktopMessages(pt, QINGCLAW_DESKTOP_DISTRIBUTION.shortName),
+}
 
 /** Locale payload exposed to the Desktop-owned renderer. */
 export interface DesktopLocale {
@@ -1560,7 +1585,7 @@ export function resolveDesktopLocale(locale: string): DesktopLocale {
     const id = primary as keyof typeof dictionaries
     return { id: id === 'zh' ? 'zh-CN' : id, messages: dictionaries[id] }
   }
-  return { id: 'en', messages: en }
+  return { id: 'en', messages: dictionaries.en }
 }
 
 /**

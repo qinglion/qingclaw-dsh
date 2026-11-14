@@ -4,7 +4,7 @@ import { DesktopPurgeExecutionError } from './desktop-purge-recovery.ts'
 import { DesktopPublishError } from './desktop-publish.ts'
 
 const publicCodes = new Set(['AccessDenied', 'InternalError', 'NoSuchBucket', 'BadDigest', 'SignatureDoesNotMatch',
-  'RequestTimeout', 'TimeoutError', 'AbortError', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ENOSPC', 'EACCES', 'EPERM', 'ENOENT'])
+  'PreconditionFailed', 'RequestTimeout', 'TimeoutError', 'AbortError', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ENOSPC', 'EACCES', 'EPERM', 'ENOENT'])
 
 /** COS operation failure retaining its cause for safe diagnostics; a failed write may have an unknown remote outcome. */
 export class DesktopCosOperationError extends Error {
@@ -15,6 +15,18 @@ export class DesktopCosOperationError extends Error {
       : failure.message
     super(`COS ${operation}: ${message}`, { cause })
     this.name = 'DesktopCosOperationError'
+  }
+}
+
+/** OSS operation failure retaining only a safe provider-independent cause for diagnostics. */
+export class DesktopOssOperationError extends Error {
+  constructor(readonly operation: 'GetObject' | 'PutObject', cause: unknown) {
+    const failure = desktopPublicationFailure(cause, operation)
+    const message = failure.code === 'AccessDenied'
+      ? `AccessDenied. Check oss:${operation} permission and explicit deny rules for the selected bucket/object. Publication stopped; reconcile remote state before retrying.`
+      : failure.message
+    super(`OSS ${operation}: ${message}`, { cause })
+    this.name = 'DesktopOssOperationError'
   }
 }
 
@@ -32,10 +44,10 @@ export function desktopPublicationFailure(error: unknown, phase: string): {
   requestId?: string
   httpStatus?: number
 } {
-  if (error instanceof DesktopCosOperationError) {
+  if (error instanceof DesktopCosOperationError || error instanceof DesktopOssOperationError) {
     const cause = typeof error.cause === 'object' && error.cause !== null ? error.cause : {}
-    const requestId = 'RequestId' in cause ? cause.RequestId : undefined
-    const status = 'statusCode' in cause ? cause.statusCode : undefined
+    const requestId = 'RequestId' in cause ? cause.RequestId : 'requestId' in cause ? cause.requestId : undefined
+    const status = 'statusCode' in cause ? cause.statusCode : 'status' in cause ? cause.status : undefined
     return { ...desktopPublicationFailure(error.cause, phase), operation: error.operation, message: error.message,
       ...(typeof requestId === 'string' && /^[\w+/=.-]{1,256}$/u.test(requestId) ? { requestId } : {}),
       ...(typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599 ? { httpStatus: status } : {}) }

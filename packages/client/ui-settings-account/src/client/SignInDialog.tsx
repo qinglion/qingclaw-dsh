@@ -8,7 +8,7 @@ import { authorizeUrlWithTheme } from './authorize-url.ts'
 import css from './SignInDialog.module.css'
 
 /** @param props - safe account state, localized copy, and user actions. @returns login dialog. */
-export function SignInDialog({ account, colorScheme, start, cancel, close, useApiKey, t }: {
+export function SignInDialog({ account, colorScheme, start, cancel, close, useApiKey, allowApiKey, t }: {
   account: AccountSnapshot
   /** Resolved scheme of the active application theme; the copied link carries it. */
   colorScheme: 'light' | 'dark'
@@ -16,6 +16,8 @@ export function SignInDialog({ account, colorScheme, start, cancel, close, useAp
   cancel: (id: SignInAttemptId) => Promise<void>
   close: () => void
   useApiKey: () => void
+  /** Whether the official API-key route is available in this distribution. */
+  allowApiKey: boolean
   t: (key: AccountKey) => string
 }) {
   const [busy, setBusy] = useState(false)
@@ -74,12 +76,12 @@ export function SignInDialog({ account, colorScheme, start, cancel, close, useAp
           {t(copyResult?.messageKey ?? 'copyLink')}
         </button>{t('browserDescription')}
       </p> : <p className={css.description}>
-        {error ? t(failureKey) : expired ? t('timeoutDescription') : t('loginDescription')}
+        {error ? t(failureKey) : expired ? t('timeoutDescription') : t(allowApiKey ? 'loginDescription' : 'accountLoginDescription')}
       </p>}
     </div>
     <div className={css.actions}>
-      <Button variant="outline" className={css.secondaryButton} disabled={committing || busy}
-        onClick={active ? dismiss : useApiKey}>{t(active ? 'cancel' : 'addApiKey')}</Button>
+      {(active || allowApiKey) && <Button variant="outline" className={css.secondaryButton} disabled={committing || busy}
+        onClick={active ? dismiss : useApiKey}>{t(active ? 'cancel' : 'addApiKey')}</Button>}
       <Button variant="primary" className={css.primaryButton} disabled={busy || committing || waiting || account.view === undefined}
         aria-label={waiting ? t('waiting') : undefined} onClick={() => { void run(retry) }}>
         {waiting ? <IconLoadingOutlineRegular className={css.spinner} /> : t(expired || error ? 'retry' : 'signIn')}

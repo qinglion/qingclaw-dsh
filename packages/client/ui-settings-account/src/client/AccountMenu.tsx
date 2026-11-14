@@ -23,6 +23,7 @@ export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
   useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, renderSlot,
   contactUs, showLogin, start, cancel, avatarFailed, t,
+  allowApiKey,
 }: AccountMenuProps) {
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
   // re-renders, section switches and tab switches inside one open must not read again.
@@ -39,8 +40,9 @@ export function AccountMenu({
   const [expiryNotice, setExpiryNotice] = useState(false)
   useEffect(() => subscribeSessionExpired?.(() => { setExpiryNotice(true) }), [subscribeSessionExpired])
   const profile = account.details?.profile
+  const signedInFallback = t(allowApiKey ? 'signedIn' : 'signedInGeneric')
   const label = profile === undefined ? null : profile.status === 'ready'
-    ? profile.value.name ?? profile.value.contact ?? t('signedIn') : t('signedIn')
+    ? profile.value.name || profile.value.contact || signedInFallback : signedInFallback
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
@@ -85,7 +87,7 @@ export function AccountMenu({
         else void requestSignOut()
       }} />
     {account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
-      start={start} cancel={cancel} t={t}
+      start={start} cancel={cancel} t={t} allowApiKey={allowApiKey}
       close={() => { showLogin(false) }} useApiKey={() => { showLogin(false); openOnboarding('deepseek-official') }} />}
     {signedIn && signOutImpact !== undefined && <SignOutDialog running={signOutImpact} signOut={signOut}
       close={() => { setSignOutImpact(undefined) }} t={t} />}

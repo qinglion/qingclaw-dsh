@@ -5,7 +5,11 @@ import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { dump, load } from 'js-yaml'
 import { z } from 'zod'
-import { desktopUpdateMetadataFilename, resolveDesktopUploadConfig } from './desktop-auto-update-environment.mjs'
+import {
+  DESKTOP_ARTIFACT_PREFIX,
+  desktopUpdateMetadataFilename,
+  resolveDesktopUploadConfig,
+} from './desktop-auto-update-environment.mjs'
 import type { DesktopRetainedManifest } from './desktop-release-store.ts'
 import type { DesktopSingleUploadPlan } from './desktop-upload-types.ts'
 import { desktopArtifactDigest, type DesktopPublishOperations, type DesktopRemoteObject } from './desktop-publish.ts'
@@ -54,7 +58,7 @@ export async function prepareDesktopRollout(directory: string, manifest: Desktop
     throw new Error('desktop rollout: retained update metadata differs from manifest')
   }
   const parsed = metadata(contents)
-  const payload = `deepseek-harness-${source.version}-${source.target}.${windows ? 'exe' : 'zip'}`
+  const payload = `${DESKTOP_ARTIFACT_PREFIX}-${source.version}-${source.target}.${windows ? 'exe' : 'zip'}`
   const file = manifest.files.find(entry => entry.name === payload)
   const entry = parsed.files[0]
   if (parsed.version !== source.version || entry.url !== payload || !file
@@ -78,7 +82,7 @@ export async function prepareDesktopRollout(directory: string, manifest: Desktop
 /**
  * Verify current remote metadata against the package, allowing only a different rollout percentage.
  * @param plan Approved package identity and channel destination.
- * @param remote Current COS metadata object.
+ * @param remote Current object-store metadata object.
  * @returns Parsed metadata and effective percentage (100 when absent).
  */
 export function verifyDesktopRolloutFeed(plan: DesktopRolloutPlan, remote: DesktopRemoteObject | null) {
@@ -97,7 +101,7 @@ export function verifyDesktopRolloutFeed(plan: DesktopRolloutPlan, remote: Deskt
  * Update a published feed under the existing channel lock, or verify it for website-only publication.
  * @param plan Metadata-only plan approved for the selected original package.
  * @param target Target percentage; undefined only verifies current publication.
- * @param operations COS transport and durable audit sink; no binary reads or writes are issued.
+ * @param operations Object-store transport and durable audit sink; no binary reads or writes are issued.
  * @returns Current and requested percentage; identical requests perform no write.
  */
 export async function rolloutDesktopRelease(plan: DesktopRolloutPlan, target: number | undefined,

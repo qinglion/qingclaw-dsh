@@ -13,13 +13,14 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 ## 目录
 
 - [发布前提](#prerequisites)
+- [青狮龙虾生产拓扑](#qingclaw-production)
 - [部署环境与测试发布标识](#upload-updates)
 - [发布安装包与更新清单](#publish-feeds)
 - [固定安装包下载](#fixed-downloads)
 - [上传凭据](#credentials)
 - [上传审计与恢复](#audit-and-recovery)
 
-自托管留存构建使用 [CI 发布工作流](ci/README.zh.md)，在原机器保留安装包并支持恢复发布。 以下命令继续作为现有人工授权的本地上传器使用：它们保留 checkout 内的审计记录，并使用操作员的 Git 身份，不共享 CI 发布器的锁、审批或仅补 tag 恢复机制。不要让两种上传器并发写入同一频道。两者复用相同的上传计划校验；分开编排可保留现有手动命令，同时为 CI 增加不可变 attempt 恢复能力。统一或退役手动命令属于独立工作。
+自托管留存构建使用 [CI 发布工作流](ci/README.zh.md)，在原机器保留安装包并支持恢复发布。本文后续章节中的命令和环境变量仍描述现有仅支持 COS、需人工授权的本地上传器：它们保留 checkout 内的审计记录，并使用操作员的 Git 身份，不共享 CI 发布器的锁、审批或仅补 tag 恢复机制。不要让两种上传器并发写入同一频道。两者复用相同的上传计划校验；分开编排可保留现有手动命令，同时为 CI 增加不可变 attempt 恢复能力。统一或退役手动命令属于独立工作。
 
 <a id="prerequisites"></a>
 
@@ -27,18 +28,34 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 
 发布需要完整的 release 产物和操作者明确授权。生成安装包或下载 Actions 产物不会发布它。先阅读[发布版本规则](../packaging/README.zh.md#release-versions)并保留打包证据。机器 preset 用于打包，不支持 upload/COS 命令：取消设置 `DSH_PACKAGING_PRESET`，并提供既有目标 dotenv 上传配置。配置以及真实 COS/CDN 验收由发布操作者验证。
 
+<a id="qingclaw-production"></a>
+
+## 青狮龙虾生产拓扑
+
+青狮龙虾的最小生产方案复用 Desktop 已内置的通用更新器，并只向客户端暴露青狮自有 HTTPS 域名：
+
+```text
+QingClaw Desktop -> https://d.qinglion.com（阿里云 CDN）-> 阿里云 OSS
+```
+
+青狮龙虾生产模板复用现有阿里云 CDN 下载域名 `https://d.qinglion.com` 及其后的杭州 OSS bucket `qinglion`；`cache.provider=none` 表示发布器不额外调用缓存刷新 API。安装包会永久记录所选清单 origin，因此需保持该 origin 与 QingClaw 对象路径稳定。`qinglion` 当前是 bucket 级 public-read，其中只能存放非敏感发布对象；runner 使用的 RAM 身份应严格限制为仅可写入 `qingclaw-desktop/*`、`desktop/*` 和隔离的 `test/desktop/*` 固定下载前缀。bucket 必须禁用版本控制，因为不可变二进制依赖 `x-oss-forbid-overwrite`。OSS 上传会给版本化二进制写入 immutable 缓存头，并给更新 feed 与固定安装器别名写入 `no-cache, no-store, must-revalidate`；首次发布前还需确认 CDN 遵循源站缓存头，或为 QingClaw 路径配置等效规则。
+
+留存构建 CI 发布器同时支持既有腾讯 COS/EdgeOne 配置与原生阿里云 OSS。OSS 使用 V4 签名、单次流式写入、远端 SHA-512 对账，并复用不可变对象、审计和放量状态机。凭据文件包含 `accessKeyId` 与 `accessKeySecret`；仓库模板选择 `storage.provider=aliyun-oss`、区域 `oss-cn-hangzhou` 和 `cache.provider=none`。第一阶段中，旧的本地 `pnpm upload:*` 命令、远端版本号发现与已安装更新验收工具仍只支持 COS；OSS 请走留存构建 CI 发布器。阿里云 AI 网关承载模型/API 流量，不作为二进制更新源。
+
+仓库不保存任何云端或签名秘密。runner 从 Git 外部文件或平台证书存储读取 OSS 或 COS 凭据、GitHub App 私钥、macOS Developer ID/公证材料及 Windows 代码签名证书。仓库内示例只包含公开目标和占位标识。
+
 <a id="upload-updates"></a>
 
 ## 部署环境与测试发布标识
 
-`DSH_DESKTOP_AUTO_UPDATE_ENV` 同时选择打包写入的 URL 与后续 COS 上传环境，可取 `test` 或 `production`；缺省为 `test`。测试打包通过 `DOWNLOAD_TEST_ORIGIN` 提供 HTTPS origin；生产使用 `https://download.deepseek.com`。上传通过 `DOWNLOAD_TEST_COS_BUCKET` 或 `DOWNLOAD_PROD_COS_BUCKET` 提供所选 bucket。生产清单位于 `dsh-desk/feeds/<target>/`，安装包位于 `dsh-desk/bin/<target>/`。测试发布必须配置 `DOWNLOAD_TEST_RELEASE_ID`：32 位小写十六进制字符，分别插入路径 `dsh-desk/<release-id>/feeds/<target>/` 和 `dsh-desk/<release-id>/bin/<target>/`。YAML 引用、稳定通道别名和 blockmap 都位于该发布目录内。目标为 `mac-arm64`、`mac-x64` 和 `win-x64`。
+`DSH_DESKTOP_AUTO_UPDATE_ENV` 同时选择打包写入的 URL 与后续 COS 上传环境，可取 `test` 或 `production`；缺省为 `test`。测试打包通过 `DOWNLOAD_TEST_ORIGIN` 提供 HTTPS origin；生产通过 `DOWNLOAD_PROD_ORIGIN` 提供 HTTPS origin。上传通过 `DOWNLOAD_TEST_COS_BUCKET` 或 `DOWNLOAD_PROD_COS_BUCKET` 提供所选 bucket。生产清单位于 `qingclaw-desktop/feeds/<target>/`，安装包位于 `qingclaw-desktop/bin/<target>/`。测试发布必须配置 `DOWNLOAD_TEST_RELEASE_ID`：32 位小写十六进制字符，分别插入路径 `qingclaw-desktop/<release-id>/feeds/<target>/` 和 `qingclaw-desktop/<release-id>/bin/<target>/`。YAML 引用、稳定通道别名和 blockmap 都位于该发布目录内。目标为 `mac-arm64`、`mac-x64` 和 `win-x64`。
 
 更新目标与上传凭据都与所选环境对应；生产固定下载还需配置 [EdgeOne 设置](#fixed-downloads)：
 
 | 环境 | 公开 origin | COS bucket | COS 凭据 |
 |---|---|---|---|
 | `test` 或未设置 | `DOWNLOAD_TEST_ORIGIN` | `DOWNLOAD_TEST_COS_BUCKET` | `DOWNLOAD_TEST_COS_SECRET_ID`、`DOWNLOAD_TEST_COS_SECRET_KEY` |
-| `production` | `https://download.deepseek.com` | `DOWNLOAD_PROD_COS_BUCKET` | `DOWNLOAD_PROD_COS_SECRET_ID`、`DOWNLOAD_PROD_COS_SECRET_KEY` |
+| `production` | `DOWNLOAD_PROD_ORIGIN` | `DOWNLOAD_PROD_COS_BUCKET` | `DOWNLOAD_PROD_COS_SECRET_ID`、`DOWNLOAD_PROD_COS_SECRET_KEY` |
 
 每个测试发布批次用下方命令生成新 ID，将输出填入 `.env.macos` 或 `.env.windows` 的 `DOWNLOAD_TEST_RELEASE_ID`。这两个被 Git 忽略的平台文件管理该值，shell 变量不能覆盖它，dotenv 值也不会进行 shell 展开。打包、上传和重试必须沿用同一个 ID；上传会拒绝更新 URL 不一致的完成记录。需要验证跨版本升级时，后续版本沿用已安装客户端的 ID。生产环境不使用该字段。
 
@@ -59,7 +76,7 @@ pnpm run package:desktop:mac:arm64
 pnpm run upload:mac:arm64
 ```
 
-内测打包在目标 `.env` 中显式设置 `DSH_DESKTOP_AUTO_UPDATE_ENV=test` 和 `DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`；上传使用 `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` 及独立测试凭据。部署与更新渠道相互独立；参见[安装包渠道选择](../packaging/README.zh.md#release-versions)。
+内测打包在目标 `.env` 中显式设置 `DSH_DESKTOP_AUTO_UPDATE_ENV=test`，并使用青狮控制的测试 origin，例如 `DOWNLOAD_TEST_ORIGIN=https://download-test.qingclaw.com`；上传使用独立的青狮测试 bucket 及独立测试凭据。部署与更新渠道相互独立；参见[安装包渠道选择](../packaging/README.zh.md#release-versions)。
 
 前期内测包使用 `test` 部署。只有正式发布才显式选择 `production`；更换上传凭据不会改变已有安装包的更新目标。打包不需要 COS 凭据，会禁用 electron-builder 发布、移除子进程的 COS 凭据，并且仅在签名与公证成功后记录完成状态。上传在读取凭据前验证该记录、部署、目标、共同版本号、文件名、大小与 SHA-512。安装包和 blockmap 先于 YAML 上传；历史对象继续保留。每个包仅发布自身选定渠道的清单：`nightly.yml` / `nightly-mac.yml` 或 `stable.yml` / `stable-mac.yml`。发布的 YAML 使用安装包绝对 URL。上传器不设置 Cache-Control，包括 COS SDK 否则会添加的空头部：缓存策略由部署基础设施负责，清单不缓存，安装包缓存单独配置。同一目标应串行发布，并在发布验收前验证公网产物与清单内容。
 
@@ -69,9 +86,9 @@ Windows NSIS 上传要求安装包旁存在生成的非空 `.exe.blockmap`。blo
 
 ## 固定安装包下载
 
-上传设置 `Content-Disposition: attachment`，`filename` 沿用经校验安装包的 basename，保留完整版本、平台和架构。固定 `dsh-latest-*` URL 与 nightly/stable 升级通道独立，不另加命名后缀。发布后需验证 CDN 响应头透传及浏览器保存文件名。
+上传设置 `Content-Disposition: attachment`，`filename` 沿用经校验安装包的 basename，保留完整版本、平台和架构。固定 `qingclaw-latest-*` URL 与 nightly/stable 升级通道独立，不另加命名后缀。发布后需验证 CDN 响应头透传及浏览器保存文件名。
 
-固定安装包下载在仓库根目录使用 `pnpm run upload:latest:mac:arm64`、`pnpm run upload:latest:mac:x64` 或 `pnpm run upload:latest:win:x64`。它们把已完成目标的 DMG 或 EXE 上传到 `desktop/dsh-latest-macos-arm64.dmg`、`desktop/dsh-latest-macos-x64.dmg` 或 `desktop/dsh-latest-windows-x64.exe`。生产 URL 以 `https://download.deepseek.com/` 开头；测试 URL 使用 `DOWNLOAD_TEST_ORIGIN`。两个部署环境均复用目标 dotenv 中的部署、bucket 和凭据、全部常规发布校验以及下述上传审计。每个命令覆盖一个固定对象，不发布更新清单、blockmap 或发布标签。测试固定下载在测试 bucket 中跨发布 ID 共享；包内更新 URL 仍要求原有发布 ID。发布由操作人员显式执行，也允许预发布版本。生产命令随后提交一次 EdgeOne URL 缓存清除任务并报告任务 ID，不查询或等待缓存清除完成。测试上传仍由部署基础设施管理缓存策略。本地回环测试覆盖上传行为；真实 COS 和 CDN 验收由发布操作人员负责。
+固定安装包下载在仓库根目录使用 `pnpm run upload:latest:mac:arm64`、`pnpm run upload:latest:mac:x64` 或 `pnpm run upload:latest:win:x64`。生产上传把已完成目标的 DMG 或 EXE 放到 `desktop/qingclaw-latest-macos-arm64.dmg`、`desktop/qingclaw-latest-macos-x64.dmg` 或 `desktop/qingclaw-latest-windows-x64.exe`，官网使用的就是这些地址；测试上传则使用对应的 `test/desktop/qingclaw-latest-*` 对象键。生产 URL 使用 `DOWNLOAD_PROD_ORIGIN`；测试 URL 使用 `DOWNLOAD_TEST_ORIGIN`。即使有意把两个部署环境配置到同一个 bucket 或公网来源，按环境隔离的对象键也能防止测试替换上传覆盖官网安装包。两个部署环境均复用目标 dotenv 中的部署、bucket 和凭据、全部常规发布校验以及下述上传审计。每个命令覆盖一个固定对象，不发布更新清单、blockmap 或发布标签。测试固定下载在测试前缀内跨发布 ID 共享；包内更新 URL 仍要求原有发布 ID。发布由操作人员显式执行，也允许预发布版本。生产命令随后提交一次 EdgeOne URL 缓存清除任务并报告任务 ID，不查询或等待缓存清除完成。测试上传仍由部署基础设施管理缓存策略。本地回环测试覆盖上传行为；真实 COS 和 CDN 验收由发布操作人员负责。
 
 生产固定下载要求在目标 dotenv 中配置 `DOWNLOAD_PROD_EO_ZONE_ID`，且既有 `DOWNLOAD_PROD_COS_SECRET_ID` / `DOWNLOAD_PROD_COS_SECRET_KEY` 身份具备对应站点的 `teo:CreatePurgeTask` 权限。发布操作人员须在使用前确认该权限；无需新增 CI Secret。上传前解析必需配置。提交请求超时为 30 秒，不自动重试。
 

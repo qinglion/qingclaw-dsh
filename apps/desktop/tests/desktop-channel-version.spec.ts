@@ -28,6 +28,7 @@ it.each(['arm64', 'x64'] as const)('embeds stable in a prerelease macOS %s packa
   const config = createElectronBuilderConfig({
     DSH_DESKTOP_APP_ID: 'com.example.channel-test',
     DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+    DOWNLOAD_PROD_ORIGIN: 'https://download.example.com',
     DSH_DESKTOP_UPDATE_CHANNEL: 'stable',
     DSH_DESKTOP_BUILD_VERSION: version,
     DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN: 'https://policy.example.com',
@@ -35,8 +36,14 @@ it.each(['arm64', 'x64'] as const)('embeds stable in a prerelease macOS %s packa
     DSH_DESKTOP_MACOS_TEAM_ID: 'TEAMID1234',
     APPLE_KEYCHAIN_PROFILE: 'channel-test',
   }, 'darwin', arch)
-  expect(config.extraMetadata).toMatchObject({ version, dshDesktopUpdateChannel: 'stable' })
-  expect(config.publish).toEqual([{ provider: 'generic', url: `https://download.deepseek.com/dsh-desk/feeds/mac-${arch}/`, channel: 'stable' }])
+  expect(config.extraMetadata).toMatchObject({
+    version,
+    dshDesktopUpdateChannel: 'stable',
+    qingclawDesktopDeployment: 'production',
+    qingclawPlatformOrigin: 'https://qingclaw.com',
+    qingclawInferenceOrigin: 'https://api.qingclaw.com',
+  })
+  expect(config.publish).toEqual([{ provider: 'generic', url: `https://download.example.com/qingclaw-desktop/feeds/mac-${arch}/`, channel: 'stable' }])
 })
 
 it('accepts a stable prerelease in an unsigned Windows x64 configuration', () => {
@@ -50,6 +57,11 @@ it('accepts a stable prerelease in an unsigned Windows x64 configuration', () =>
     DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN: 'https://policy.example.com',
     DSH_DESKTOP_UNSIGNED: '1',
   }, 'win32', 'x64')
-  expect(config.extraMetadata).toMatchObject({ version })
+  expect(config.extraMetadata).toMatchObject({
+    version,
+    qingclawDesktopDeployment: 'production',
+    qingclawPlatformOrigin: 'https://qingclaw.com',
+    qingclawInferenceOrigin: 'https://api.qingclaw.com',
+  })
   expect(config.publish).toBeNull()
 })

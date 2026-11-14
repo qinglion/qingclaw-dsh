@@ -1,6 +1,18 @@
 /** Environment variable that selects the Desktop update deployment. */
 export const DESKTOP_AUTO_UPDATE_ENV: 'DSH_DESKTOP_AUTO_UPDATE_ENV'
 
+/** Optional stable object prefix that replaces the release-ID feed layout. */
+export const DESKTOP_UPDATE_ROOT_ENV: 'DSH_DESKTOP_UPDATE_ROOT'
+
+/** Stable QingClaw artifact prefix shared by retained releases and the publisher. */
+export const DESKTOP_ARTIFACT_PREFIX: 'qingclaw'
+
+/** Stable object-store root for every QingClaw Desktop update deployment. */
+export const DESKTOP_UPDATE_ROOT: 'qingclaw-desktop'
+
+/** Stable filename prefix for website installers outside the update channels. */
+export const DESKTOP_LATEST_INSTALLER_PREFIX: 'qingclaw-latest'
+
 /** Supported Desktop update deployment. */
 export type DesktopAutoUpdateEnvironment = 'test' | 'production'
 
@@ -16,10 +28,11 @@ export function desktopLatestInstallerFilename(target: DesktopAutoUpdateTarget):
 
 /**
  * Resolve the production website installer URL shared by approval, upload and purge.
+ * @param origin Public production download origin.
  * @param target Supported Desktop target.
  * @returns Fixed production download URL.
  */
-export function desktopWebsiteInstallerUrl(target: DesktopAutoUpdateTarget): string
+export function desktopWebsiteInstallerUrl(origin: string, target: DesktopAutoUpdateTarget): string
 
 /** Public updater URL and object prefixes for one release target. */
 export interface DesktopAutoUpdateConfig {

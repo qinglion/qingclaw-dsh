@@ -27,6 +27,8 @@ export interface Config extends ContactConfig {
 export const Config = z.object({
   contactFormUrl: ContactConfigFields.contactFormUrl,
   contactSource: ContactConfigFields.contactSource,
+  desktopOnboarding: ContactConfigFields.desktopOnboarding,
+  allowApiKey: ContactConfigFields.allowApiKey,
   version: OnboardingSettingsFields.version.volatile(),
   step: OnboardingSettingsFields.step.volatile(),
   purpose: OnboardingSettingsFields.purpose.volatile(),
@@ -48,6 +50,8 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('webserver/index-inject', (table) => {
     table.push({ kind: 'global', name: CONTACT_CONFIG_GLOBAL, value: {
       contactFormUrl: config.contactFormUrl, contactSource: config.contactSource,
+      desktopOnboarding: config.desktopOnboarding,
+      allowApiKey: config.allowApiKey,
     } satisfies ContactConfig })
   })
 }

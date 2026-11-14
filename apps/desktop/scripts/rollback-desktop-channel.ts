@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util'
 import { z } from 'zod'
 import { prepareDesktopPublication } from './publish-desktop-ci.ts'
 import { readDesktopUploadCredentials } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-config.ts'
-import { desktopPublishCos } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-cos.ts'
+import { createDesktopPublishStorage } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-storage.ts'
 import { createDesktopPublicationRecord, withDesktopChannelLock } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-record.ts'
 import { rollbackDesktopChannel } from './desktop-rollback.ts'
 import { desktopPublicationFailure } from '@deepseek-ai/dsh-desktop-publisher/desktop-publication-failure.ts'
@@ -33,6 +33,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
       throw new Error('desktop rollback: successful publication record does not match the selected package')
     }
     const credentials = await readDesktopUploadCredentials(config)
+    const storage = createDesktopPublishStorage(plan, config, credentials)
     phase = 'rollback channel lock and audit creation'
     await withDesktopChannelLock(join(dirname(root), 'publish-locks'), destination, async () => {
       const journal = await createDesktopPublicationRecord(join(dirname(root), 'upload-records'), {
@@ -43,7 +44,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
       try {
         phase = 'historical object verification and channel restoration'
         const outcome = await rollbackDesktopChannel(plan, values['expected-version']!, values.execute!, {
-          transport: desktopPublishCos(plan, credentials), record: event => journal.record(event),
+          transport: storage.transport, record: event => journal.record(event),
           tag: async () => { throw new Error('desktop rollback never changes tags') },
         })
         process.stdout.write(`${JSON.stringify(outcome, null, 2)}\n`)

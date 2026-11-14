@@ -1,12 +1,11 @@
 /** COS transport for resumable Desktop publication; callers authorize writes and own the channel lock. */
 import { createHash } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import { Readable, Writable } from 'node:stream'
+import { Writable } from 'node:stream'
 import type COS from 'cos-nodejs-sdk-v5'
 import { createDesktopCos, DESKTOP_COS_REGION, type DesktopCosCredentials } from './desktop-cos.ts'
 import { cosOperation } from './cos-operation.ts'
 import type { DesktopUploadPlan } from './desktop-upload-types.ts'
-import { desktopArtifactDigest, type DesktopPublishTransport } from './desktop-publish.ts'
+import { prepareDesktopArtifactUpload, type DesktopPublishTransport, type DesktopVerifiedObjectWriter } from './desktop-publish.ts'
 import { DesktopCosOperationError } from './desktop-publication-failure.ts'
 
 function missing(error: unknown): boolean {
@@ -62,23 +61,40 @@ export function desktopPublishCos(
       if (keys.get(artifact.key) !== artifact.channelMetadata || forbidOverwrite === artifact.channelMetadata) {
         throw new Error('desktop publish: object write policy mismatch')
       }
-      const actual = await desktopArtifactDigest(artifact)
-      if (actual.size !== digest.size || actual.sha512 !== digest.sha512) throw new Error('desktop publish: local input changed')
-      const cos = client()
-      const md5 = createHash('md5')
-      const bytes = artifact.contents === undefined
-        ? createReadStream(artifact.path) as AsyncIterable<Buffer> : [Buffer.from(artifact.contents)]
-      for await (const chunk of bytes) md5.update(chunk)
-      const body = artifact.contents === undefined ? createReadStream(artifact.path) : Readable.from([Buffer.from(artifact.contents)])
+      const upload = await prepareDesktopArtifactUpload(artifact)
       try {
-        await cosOperation(cos, 900_000, () => cos.putObject({
-          ...address, Body: body, ContentLength: digest.size, ContentType: artifact.contentType,
-          Headers: { 'Content-MD5': md5.digest('base64'),
-            ...(artifact.contentDisposition ? { 'Content-Disposition': artifact.contentDisposition } : {}), ...(forbidOverwrite ? { 'x-cos-forbid-overwrite': 'true' } : {}) },
-        }))
-      } catch (error) {
-        throw new DesktopCosOperationError('PutObject', error)
-      } finally { body.destroy() }
+        if (upload.digest.size !== digest.size || upload.digest.sha512 !== digest.sha512) {
+          throw new Error('desktop publish: local input changed')
+        }
+        const cos = client()
+        try {
+          await cosOperation(cos, 900_000, () => cos.putObject({
+            ...address, Body: upload.body, ContentLength: digest.size, ContentType: artifact.contentType,
+            Headers: { 'Content-MD5': upload.md5,
+              ...(artifact.contentDisposition ? { 'Content-Disposition': artifact.contentDisposition } : {}), ...(forbidOverwrite ? { 'x-cos-forbid-overwrite': 'true' } : {}) },
+          }))
+        } catch (error) { throw new DesktopCosOperationError('PutObject', error) }
+      } finally { await upload.close() }
     },
   }
+}
+
+/** Create the COS write path for a caller-owned, already verified installer stream. */
+export function desktopPublishCosWriter(
+  plan: DesktopUploadPlan, credentials: DesktopCosCredentials,
+  createClient: (credentials: DesktopCosCredentials) => COS = createDesktopCos,
+): DesktopVerifiedObjectWriter {
+  const keys = new Set(plan.artifacts.map(artifact => artifact.key))
+  return { async put(upload) {
+    if (!keys.has(upload.key)) throw new Error('desktop publish: object is outside the selected plan')
+    const cos = createClient(credentials)
+    try {
+      await cosOperation(cos, 900_000, () => cos.putObject({
+        Bucket: plan.bucket, Region: DESKTOP_COS_REGION, Key: upload.key, Body: upload.body,
+        ContentLength: upload.digest.size, ContentType: upload.contentType,
+        Headers: { 'Content-MD5': upload.md5, 'Content-Disposition': upload.contentDisposition },
+      }))
+    } catch (error) { throw new DesktopCosOperationError('PutObject', error) }
+    finally { upload.body.destroy() }
+  } }
 }

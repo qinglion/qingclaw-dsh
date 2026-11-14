@@ -65,6 +65,26 @@ describe('desktop release tag', () => {
       .toMatchObject({ status: 'failed', recovery: [`git push origin desktop-v${VERSION}`] })
   })
 
+  it('accepts a concurrent architecture job that pushed the same remote tag first', () => {
+    const { run } = recorder({
+      tag: '',
+      push: new Error('remote rejected'),
+      'ls-remote': `${COMMIT}\trefs/tags/desktop-v${VERSION}`,
+    })
+    expect(tagDesktopRelease({ version: VERSION, commit: COMMIT, repositoryRoot: '.', run }))
+      .toEqual({ tag: `desktop-v${VERSION}`, status: 'present' })
+  })
+
+  it('rejects a concurrent remote tag that names another commit', () => {
+    const { run } = recorder({
+      tag: '',
+      push: new Error('remote rejected'),
+      'ls-remote': `${OTHER}\trefs/tags/desktop-v${VERSION}`,
+    })
+    expect(tagDesktopRelease({ version: VERSION, commit: COMMIT, repositoryRoot: '.', run }))
+      .toMatchObject({ status: 'failed', detail: `${desktopReleaseTag(VERSION)} already names ${OTHER}, not the uploaded commit ${COMMIT}` })
+  })
+
   it('recovers a failed tag by creating it before pushing', () => {
     const { run } = recorder({ tag: new Error('cannot write ref') })
     expect(tagDesktopRelease({ version: VERSION, commit: COMMIT, repositoryRoot: '.', run }))

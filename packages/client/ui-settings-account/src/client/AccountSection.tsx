@@ -36,6 +36,8 @@ export interface AccountSnapshot {
 
 /** Host operations injected into the Cordis-free account component. */
 export interface AccountSectionInjected {
+  /** Whether this distribution exposes the official API-key credential path. */
+  allowApiKey: boolean
   /** @param snapshot - picture attempt whose rendered image failed; superseded attempts are ignored. */
   avatarFailed: (snapshot: AccountAvatarSnapshot) => void
   /** Subscribe to live credential-expiry notifications.
@@ -82,7 +84,9 @@ export interface AccountSectionInjected {
 export type AccountSectionProps =
   PropsRuntime<'settings.section'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 /** @param props - localized actions, account subscription, and the shared Platform page channel. @returns account settings UI. */
-export function AccountSection({ t, useAccount, useTheme, start, cancel, openPlatformPage, avatarFailed }: AccountSectionProps) {
+export function AccountSection({
+  t, useAccount, useTheme, start, cancel, openPlatformPage, avatarFailed, allowApiKey,
+}: AccountSectionProps) {
   const { view: state, details, avatar, failed: streamFailed } = useAccount(value => value)
   const colorScheme = useTheme(snapshot => snapshot.active.colorScheme)
   // The shared host owns the native view; this page holds only its own request,
@@ -95,6 +99,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
   const bonusWallets = details?.balance?.status === 'ready'
     ? details.balance.bonusWallets.filter(wallet => new Big(wallet.balance).gt(0)) : []
   const showBonusRow = details?.balance?.status !== 'ready' || bonusWallets.length > 0
+  const signedInFallback = t(allowApiKey ? 'signedIn' : 'signedInGeneric')
   const attempt = state?.attempt
   const active = attempt !== null && attempt !== undefined
     && ['initializing', 'waiting-browser', 'exchanging', 'committing'].includes(attempt.phase)
@@ -142,9 +147,9 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
     <section className={css.signedOut} aria-label={t('nav')}>
       <div className={css.signedOutContent}>
         <div className={css.signedOutCopy}>
-          <span className={css.signedOutTitle}>{t('settingsSignedOutTitle')}</span>
+          <span className={css.signedOutTitle}>{t(allowApiKey ? 'settingsSignedOutTitle' : 'loginTitle')}</span>
           <span className={css.signedOutDescription} role="status">
-            {failed || streamFailed ? t('failed') : t('settingsSignedOutDescription')}
+            {failed || streamFailed ? t('failed') : t(allowApiKey ? 'settingsSignedOutDescription' : 'accountLoginDescription')}
           </span>
         </div>
         <Button variant="primary" className={css.signInButton} disabled={busy || state === undefined}
@@ -160,7 +165,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
             <AccountAvatar avatar={signedIn ? avatar : undefined} avatarFailed={avatarFailed} />
           </span>
           <div className={css.identityCopy}>
-            <span className={css.name}>{signedIn ? profile?.name ?? t('signedIn') : t('signedOut')}</span>
+            <span className={css.name}>{signedIn ? profile?.name || signedInFallback : t('signedOut')}</span>
             <span className={css.status} role="status">{status}</span>
           </div>
         </div>

@@ -24,7 +24,7 @@ it.each(['mac-arm64', 'win-x64'] as const)('preflights a complete retained %s bu
       bucket: 'fixture-1250000000', origin: 'https://EXAMPLE.com:443/', credentialsFile: join(root, 'absent-credentials.json'),
     }))
     const commit = 'b'.repeat(40)
-    const base = `deepseek-harness-1.0.0-${target}`
+    const base = `qingclaw-1.0.0-${target}`
     const extension = target === 'win-x64' ? 'exe' : 'zip'
     const bytes = 'fixture installer bytes'
     await writeFile(join(artifacts, `${base}.${extension}`), bytes)
@@ -32,7 +32,7 @@ it.each(['mac-arm64', 'win-x64'] as const)('preflights a complete retained %s bu
     if (target !== 'win-x64') await writeFile(join(artifacts, `${base}.dmg`), 'fixture DMG')
     await writeFile(join(artifacts, `${target}-release.json`), JSON.stringify({
       schemaVersion: 1, target, environment: 'test', version: '1.0.0', commit, dirty: false,
-      publicUrl: `https://example.com/dsh-desk/${releaseId}/feeds/${target}/`,
+      publicUrl: `https://example.com/qingclaw-desktop/${releaseId}/feeds/${target}/`,
     }))
     await writeFile(join(artifacts, target === 'win-x64' ? 'nightly.yml' : 'nightly-mac.yml'), JSON.stringify({
       version: '1.0.0', files: [{ url: `${base}.${extension}`, size: Buffer.byteLength(bytes),
@@ -78,6 +78,18 @@ it.each(['mac-arm64', 'win-x64'] as const)('preflights a complete retained %s bu
     const blank = await prepareDesktopPublication({ ...env, DESKTOP_STAGING_PERCENTAGE: ' ' }, signature)
     expect(blank.approval).toBe(prepared.approval)
     await expect(prepareDesktopPublication({ ...env, DESKTOP_APPROVED_PACKAGE: 'wrong' }, signature)).rejects.toThrow(/changed after approval/u)
+    const publishConfig = join(configRoot, 'publishing/test.json')
+    await writeFile(publishConfig, JSON.stringify({
+      bucket: 'fixture-1250000000', origin: 'https://EXAMPLE.com:443/', credentialsFile: join(root, 'absent-credentials.json'),
+      storage: { provider: 'aliyun-oss', region: 'oss-cn-hangzhou' }, cache: { provider: 'none' },
+    }))
+    const changedPolicy = await prepareDesktopPublication(env, signature)
+    expect(changedPolicy.approval).not.toBe(prepared.approval)
+    await expect(prepareDesktopPublication({ ...env, DESKTOP_APPROVED_PACKAGE: prepared.approval }, signature))
+      .rejects.toThrow(/changed after approval/u)
+    await writeFile(publishConfig, JSON.stringify({
+      bucket: 'fixture-1250000000', origin: 'https://EXAMPLE.com:443/', credentialsFile: join(root, 'absent-credentials.json'),
+    }))
     await expect(prepareDesktopPublication({ ...env, RUNNER_NAME: 'other-machine' }, signature)).rejects.toThrow(/different machine/u)
     await writeFile(join(retained, `${base}.${extension}`), 'changed')
     await expect(prepareDesktopPublication(env, signature)).rejects.toThrow(/changed file/u)

@@ -61,7 +61,7 @@ export async function desktopPublicationSummary(
     row('打包来源', `${link(runUrl, `查看打包运行 #${source.runId} · 第 ${source.attempt} 次尝试`)}<br>源码：${code(`${source.sourceRef} @ ${source.commit}`)}<br>打包机器：${code(source.runnerName)}`),
     row('签名与公证', plan.target === 'win-x64' ? 'EXE 签名校验通过' : 'DMG 校验通过<br>ZIP 内应用校验通过'),
     ...(uploadWebsite && plan.environment === 'production' ? [row('官网固定安装包',
-      `${link(desktopWebsiteInstallerUrl(plan.target))}<br>替换为版本 ${code(plan.version)}；已有安装包会被替换，无防降级保护；官网上传与刷新在后续 job 中执行，可能需另行审批。`)] : []),
+      `${link(desktopWebsiteInstallerUrl(origin, plan.target))}<br>替换为版本 ${code(plan.version)}；执行时按 SemVer 拒绝降级、同版本不同字节和无可信版本元数据的替换；官网上传与刷新在后续 job 中执行，可能需另行审批。`)] : []),
     row('Git tag', tag), '', '### 批准后将执行', '',
     '1. 重新校验产物与发布目标；若与审批摘要不一致则停止。',
     '2. 上传缺少的文件，跳过内容一致的已有文件；发现内容冲突则停止。',
@@ -69,7 +69,7 @@ export async function desktopPublicationSummary(
     ...(plan.environment === 'production' ? ['4. 为实际打包提交创建上述 Git tag；若 tag 创建失败，记录“已发布，待补 tag”。'] : []), '',
     ...(plan.environment === 'test' ? ['**本次只发布 test，不修改 production。**', ''] : []),
     '<details>', '<summary>技术详情与文件清单</summary>', '',
-    `COS 存储桶：${code(plan.bucket)}`, '',
+    `对象存储桶：${code(plan.bucket)}`, '',
     ...(plan.environment === 'test' ? [
       'release ID 取自原打包产物清单。打包时优先使用表单 `test_release_id`；留空则使用机器 `presets/test.env` 中的 `DOWNLOAD_TEST_RELEASE_ID`。发布时不重新选择。', '',
     ] : []),

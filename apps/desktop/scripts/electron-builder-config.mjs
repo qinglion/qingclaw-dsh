@@ -29,6 +29,7 @@ import { installWindowsDirectoryInstaller } from './windows-directory-installer.
 import { preserveWindowsRuntimeSignature, signWindowsCode } from './windows-runtime-signature.mjs'
 import { prepareWindowsAsarUnpack, verifyWindowsAsarUnpack } from './windows-asar-unpack.mjs'
 import { recordPackagingEvent } from './packaging-run.mjs'
+import { QINGCLAW_DISTRIBUTION } from '../../../distribution/qingclaw.mjs'
 import {
   resolveMacOSAppUpdateFeed,
   verifyMacOSAppUpdateConfig,
@@ -100,6 +101,16 @@ export function createElectronBuilderConfig(
     installWindowsNsisBootstrapSigner({ sign: windowsSigner })
   }
   const update = unsigned ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
+  const requestedDeployment = env.DSH_DESKTOP_AUTO_UPDATE_ENV?.trim()
+  if (requestedDeployment !== undefined && requestedDeployment !== ''
+    && requestedDeployment !== 'test' && requestedDeployment !== 'production') {
+    throw new Error('desktop package: DSH_DESKTOP_AUTO_UPDATE_ENV must be test or production')
+  }
+  // Signed builds use the same lane resolved for their update feed. Local unsigned builds have no
+  // feed, so they retain the production service endpoints unless an explicit packaging preset owns them.
+  const qingclawDeployment = requestedDeployment || update?.environment || 'production'
+  const qingclawPlatformOrigin = QINGCLAW_DISTRIBUTION.desktop.services.platformOrigins[qingclawDeployment]
+  const qingclawInferenceOrigin = QINGCLAW_DISTRIBUTION.desktop.services.inferenceOrigin
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   // electron-builder merges extraMetadata into the packaged manifest, so a build version here reaches
   // the artifact names, the update feed, and the installed app.getVersion() the updater compares against.
@@ -108,19 +119,29 @@ export function createElectronBuilderConfig(
   const packaged = resolveDesktopBuildCommit(env)
   return {
     appId,
-    protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
+    protocols: [{
+      name: QINGCLAW_DISTRIBUTION.desktop.protocolName,
+      schemes: [QINGCLAW_DISTRIBUTION.desktop.protocol],
+    }],
     extraMetadata: {
+      // Keep the source workspace package stable while replacing every identity electron-builder
+      // writes into the installed application, including its company and updater cache directory.
+      name: QINGCLAW_DISTRIBUTION.desktop.packageName,
+      author: { name: QINGCLAW_DISTRIBUTION.desktop.companyName },
       dshDesktopAppId: appId,
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
+      qingclawDesktopDeployment: qingclawDeployment,
+      qingclawPlatformOrigin,
+      qingclawInferenceOrigin,
       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),
       ...buildVersion === productVersion ? {} : { version: buildVersion },
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
     },
-    productName: 'DeepSeek Harness',
+    productName: QINGCLAW_DISTRIBUTION.productName,
     // The default copyright uses author.name; this line names the product instead.
     copyright: `Copyright © ${new Date().getFullYear()} \${productName}`,
     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
-    artifactName: `deepseek-harness-\${version}-\${os}-\${arch}${output.suffix}.\${ext}`,
+    artifactName: `${QINGCLAW_DISTRIBUTION.desktop.artifactPrefix}-\${version}-\${os}-\${arch}${output.suffix}.\${ext}`,
     directories: { output: output.directory },
     asar: true,
     electronDist: buildPaths.electron,
@@ -169,7 +190,7 @@ export function createElectronBuilderConfig(
       // macOS matches the application locale against this bundle, not Electron Framework resources.
       extendInfo: {
         CFBundleLocalizations: ['en', 'zh_CN', 'ja', 'es', 'fr', 'de', 'ru', 'pt'],
-        NSMicrophoneUsageDescription: 'DeepSeek Harness uses your microphone to transcribe speech into message drafts.',
+        NSMicrophoneUsageDescription: QINGCLAW_DISTRIBUTION.desktop.microphoneUsageDescription,
       },
       // Ad-hoc signing keeps the modified Electron executable runnable without a Developer ID.
       identity: unsigned ? '-' : macOSSigning?.signingIdentity,

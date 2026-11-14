@@ -707,18 +707,34 @@ export class DeepSeekAccount extends TypertRemoteService {
         try { url = new URL(req.url ?? '/', callbackOrigin) }
         catch { res.writeHead(400, { 'cache-control': 'no-store' }).end(); return }
         if (url.origin !== callbackOrigin.origin || url.pathname !== '/oauth/callback') { await next(); return }
-        const receivedCode = url.searchParams.get('code')
+        const receivedCodes = url.searchParams.getAll('code')
+        const receivedErrors = url.searchParams.getAll('error')
+        const receivedCode = receivedCodes[0]
         const receivedState = url.searchParams.get('state') ?? ''
         const validState = Buffer.byteLength(receivedState) === Buffer.byteLength(state)
           && timingSafeEqual(Buffer.from(receivedState), Buffer.from(state))
-        if (req.method !== 'GET' || !validState || !receivedCode
-          || url.searchParams.getAll('state').length !== 1 || url.searchParams.getAll('code').length !== 1) {
+        const approved = receivedCodes.length === 1 && receivedCode !== undefined && receivedCode.length > 0
+          && receivedErrors.length === 0
+        const denied = receivedErrors.length === 1 && receivedErrors[0] === 'access_denied'
+          && receivedCodes.length === 0
+        if (req.method !== 'GET' || !validState || url.searchParams.getAll('state').length !== 1
+          || (!approved && !denied)) {
           res.writeHead(400, { 'cache-control': 'no-store' }).end(); return
         }
         if (signal.aborted || attempt.callback !== undefined || attempt.view.phase !== 'waiting-browser') {
           res.writeHead(410, { 'cache-control': 'no-store' }).end(); return
         }
         attempt.callback = res
+        if (denied) {
+          // The Platform consent page already cancelled its one-time authorization. Settle the
+          // local authorization seam immediately so the Desktop UI leaves its waiting state and
+          // the held loopback response is closed by the normal cancelled-attempt path.
+          this.ctx.authorization.cancel(KEY)
+          return
+        }
+        if (receivedCode === undefined) {
+          res.writeHead(400, { 'cache-control': 'no-store' }).end(); return
+        }
         code.resolve(receivedCode)
       })
       signal.throwIfAborted()

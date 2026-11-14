@@ -4,11 +4,19 @@ import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { z } from 'zod'
-import { readDesktopPublishConfig, readDesktopUploadCredentials, requireDesktopEdgeOneZoneId } from './desktop-publish-config.ts'
+import {
+  desktopPublishDestination,
+  desktopPublishPolicy,
+  readDesktopPublishConfig,
+  readDesktopUploadCredentials,
+  requireDesktopCosCredentials,
+  requireDesktopWebsiteCache,
+  type DesktopPublishConfig,
+} from './desktop-publish-config.ts'
 import { desktopReleasesRoot } from './desktop-releases-root.ts'
 import { readRetainedDesktopManifest, retainedDesktopPath } from './desktop-release-store.ts'
 import { prepareWebsiteInstaller, uploadWebsiteInstaller } from './desktop-website-installer.ts'
-import { desktopPublishCos } from './desktop-publish-cos.ts'
+import { createDesktopPublishStorage } from './desktop-publish-storage.ts'
 import { withDesktopChannelLock } from './desktop-publish-record.ts'
 import { recoverDesktopPurge, type DesktopPurgeRecord } from './desktop-purge-recovery.ts'
 import { desktopPublicationFailure } from './desktop-publication-failure.ts'
@@ -24,13 +32,13 @@ const stateSchema = z.object({ approval: z.string(), upload: z.enum(['pending', 
   uploadConfirmed: z.boolean().optional(), purge: purgeSchema.optional(), purgeAttempt: z.string().optional() })
 
 /**
- * Bind website approval to the retained manifest and exact production bucket.
+ * Bind website approval to the retained manifest and complete non-secret publication policy.
  * @param manifest Retained build metadata already matched to GitHub evidence.
- * @param bucket Production COS destination.
+ * @param config Production object-store and cache destination.
  * @returns Non-secret digest passed through the production approval job.
  */
-export function websiteApproval(manifest: unknown, bucket: string): string {
-  return createHash('sha256').update(JSON.stringify({ manifest, bucket })).digest('hex')
+export function websiteApproval(manifest: unknown, config: DesktopPublishConfig): string {
+  return createHash('sha256').update(JSON.stringify({ manifest, policy: desktopPublishPolicy(config) })).digest('hex')
 }
 
 /**
@@ -46,9 +54,9 @@ export async function publishWebsiteCi(mode: 'upload' | 'purge', env: NodeJS.Pro
   const root = desktopReleasesRoot(env)
   const manifest = await readRetainedDesktopManifest(root, route.runId, route.attempt)
   const config = await readDesktopPublishConfig(z.string().parse(env.DSH_PACKAGING_CONFIG_DIR), 'production')
-  const approval = websiteApproval(manifest, config.bucket)
+  const approval = websiteApproval(manifest, config)
   if (!env.DESKTOP_WEBSITE_APPROVAL || env.DESKTOP_WEBSITE_APPROVAL !== approval) throw new Error('website publication: approved build or destination changed')
-  const zoneId = requireDesktopEdgeOneZoneId(config)
+  const cache = requireDesktopWebsiteCache(config)
   const directory = join(dirname(root), 'upload-records', `website-${env.GITHUB_RUN_ID}-${route.target}`)
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const stateFile = join(directory, 'state.json')
@@ -62,20 +70,22 @@ export async function publishWebsiteCi(mode: 'upload' | 'purge', env: NodeJS.Pro
     await rename(temporary, stateFile)
   }
   if (env.GITHUB_OUTPUT) await appendFile(env.GITHUB_OUTPUT, `record=${directory}\n`)
-  const credentials = await readDesktopUploadCredentials(config)
   if (mode === 'upload') {
+    const credentials = await readDesktopUploadCredentials(config)
     const installer = await prepareWebsiteInstaller(retainedDesktopPath(root, route.runId, route.attempt), manifest, route,
-      env.GITHUB_REPOSITORY || '', config.bucket)
+      env.GITHUB_REPOSITORY || '', config.bucket, config.origin)
     try {
-      const outcome = await withDesktopChannelLock(join(dirname(root), 'publish-locks'), `${config.bucket}/${installer.plan.artifacts[0].key}`, async () => {
-        const previouslyUploaded = state.uploadConfirmed === true || state.upload === 'uploaded'
-        return uploadWebsiteInstaller(installer, credentials, desktopPublishCos(installer.plan, credentials), async (event) => {
-          state = event === 'upload-intent'
-            ? { approval: state.approval, upload: event, uploadConfirmed: previouslyUploaded }
-            : { ...state, upload: event, uploadConfirmed: true }
-          await save()
-        }, { previouslyUploaded })
-      })
+      const storage = createDesktopPublishStorage(installer.plan, config, credentials)
+      const outcome = await withDesktopChannelLock(join(dirname(root), 'publish-locks'),
+        desktopPublishDestination(config, installer.plan.artifacts[0].key), async () => {
+          const previouslyUploaded = state.uploadConfirmed === true || state.upload === 'uploaded'
+          return uploadWebsiteInstaller(installer, storage.transport, storage.verifiedWriter, async (event) => {
+            state = event === 'upload-intent'
+              ? { approval: state.approval, upload: event, uploadConfirmed: previouslyUploaded }
+              : { ...state, upload: event, uploadConfirmed: true }
+            await save()
+          }, { previouslyUploaded })
+        })
       const disposition = outcome === 'present' ? 'identical remote bytes and download filename confirmed; skipped' : 'uploaded'
       const text = `Website installer ${disposition}: ${installer.plan.publicUrl}; version ${installer.plan.version}\n`
       process.stdout.write(text)
@@ -85,7 +95,15 @@ export async function publishWebsiteCi(mode: 'upload' | 'purge', env: NodeJS.Pro
   }
   if (state.upload !== 'uploaded') throw new Error('website publication: upload completion is not confirmed; recover the upload job first')
   const { desktopWebsiteInstallerUrl } = await import('./desktop-auto-update-environment.mjs')
-  const publicUrl = desktopWebsiteInstallerUrl(route.target)
+  const publicUrl = desktopWebsiteInstallerUrl(config.origin, route.target)
+  if (cache.provider === 'none') {
+    const text = `Website cache purge not required for direct object-store origin: ${publicUrl}\n`
+    process.stdout.write(text)
+    if (env.GITHUB_STEP_SUMMARY) await appendFile(env.GITHUB_STEP_SUMMARY, text)
+    return
+  }
+  const credentials = requireDesktopCosCredentials(await readDesktopUploadCredentials(config))
+  const zoneId = cache.zoneId
   const { teo } = await import('tencentcloud-sdk-nodejs-teo')
   const client = new teo.v20220901.Client({ credential: credentials, region: '',
     profile: { httpProfile: { endpoint: 'teo.tencentcloudapi.com', reqTimeout: 30 } } })
