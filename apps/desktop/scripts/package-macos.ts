@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process'
 import { mkdtemp, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
-import { notarizeMacOS } from './notarize-macos.mjs'
+import { notarizeMacOS, retryTransientNotarization } from './notarize-macos.mjs'
 import { packagingStep } from './packaging-step.mjs'
 import {
   resolveMacOSNotarizationEnvironment,
@@ -96,7 +96,7 @@ export async function packageMacOSArtifacts(
     const results = await Promise.allSettled([
       timed('App notarization and ZIP', async () => {
         await apple.notarize({ appPath: zipApp, ...credentials })
-        apple.verifyNotarization(zipApp, expected)
+        await retryTransientNotarization(async () => { apple.verifyNotarization(zipApp, expected) })
         await build({ format: 'zip', appPath: zipApp, output: zipOutput })
       }, secrets),
       timed('DMG creation and notarization', async () => {
