@@ -40,7 +40,7 @@ Messages 传输与目录规则来自 [`@deepseek-ai/dsh-llm-deepseek`](../llm-de
 
 插件向当前登录平台 origin 下的 `/auth-api/v0/dsh/model_token` 发起 POST 请求。同一设备会话的并发换取只产生一次请求。JWT 只保存在内存中，并在 `exp` 前 60 秒停止使用。
 
-首次鉴权目录访问会请求网关 origin 下的 `/models`。路由缺失或请求失败不会阻断 Messages：还没有成功列表时，提供方会公布内置的 `deepseek-flash` 与 `deepseek-v4-pro`；成功获取过列表后，刷新失败会保留最后一份可用目录。
+首次鉴权目录访问会请求网关 origin 下的 `/models`。路由缺失或请求失败不会阻断 Messages：还没有成功列表时，青狮龙虾插件会公布已经通过网关实测的纯文本模型目录（Qwen Plus、Qwen 3.8 Flash、Qwen 3.8 Max、DeepSeek V4.1 Flash、Kimi K3.1 Pro）；成功获取过列表后，刷新失败会保留最后一份可用目录。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -62,7 +62,7 @@ Messages 传输与目录规则来自 [`@deepseek-ai/dsh-llm-deepseek`](../llm-de
 <a id="dev-note"></a>
 ## 开发备注
 
-针对性测试覆盖单飞换取、过期、响应校验、平台与网关的 401 边界、Loader namespace 组合、`/models` 404 时回退内置目录，以及使用短期 JWT 成功执行 Messages 流式请求。
+针对性测试覆盖单飞换取、过期、响应校验、平台与网关的 401 边界、Loader namespace 组合、`/models` 404 时回退青狮龙虾插件内置的已验证多模型目录，以及使用短期 JWT 成功执行 Messages 流式请求。
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -87,5 +87,4 @@ Messages 传输与目录规则来自 [`@deepseek-ai/dsh-llm-deepseek`](../llm-de
 
 - token 与列表缓存只在当前进程中保存，重启后会重建。
 - 模型网关必须校验模型 JWT 的 audience 与 claims；桌面客户端使用前只校验有效期元数据。
-- 旧版 Serverless 网关需要先配置 VPC 公网 NAT/SNAT，AI 服务才能访问公网 DeepSeek 端点。
-- 没有 `/models` 时，内置目录可能落后于网关实际可用模型，直到开启该路由或更新桌面 bundle。
+- 没有 `/models` 时，模型目录由青狮龙虾插件的已验证清单提供；新增模型仍应先完成网关实测，再更新插件或开启动态目录路由。

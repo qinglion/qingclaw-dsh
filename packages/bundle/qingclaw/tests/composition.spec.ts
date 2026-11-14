@@ -61,6 +61,11 @@ describe('QingClaw distribution bundle', () => {
 
     expect(composed.find(row => row.id === 'llm-deepseek-account')?.disabled).toBe(true)
     expect(composed.find(row => row.id === 'llm-deepseek')?.disabled).toBe(true)
+    expect(composed.find(row => row.id === 'agent-default-model')?.config).toEqual({
+      provider: 'deepseek-account',
+      model: 'qwen-plus',
+      reasoningEffort: 'high',
+    })
     const model = composed.find(row => row.id === 'llm-qingclaw-account')
     expect(model?.name).toBe('@qinglion/dsh-llm-qingclaw-account')
     const modelConfig = model?.config as Record<string, unknown> | undefined
@@ -115,12 +120,14 @@ describe('QingClaw distribution bundle', () => {
     expect(minimalConfig?.plugins?.some(row => row.id === 'tool-web')).toBe(false)
   })
 
-  it('disables every upstream DeepSeek telemetry surface only in QingClaw', () => {
+  it('disables upstream DeepSeek telemetry and request metadata only in QingClaw', () => {
     const telemetryRows = [
       ['desktop-product-telemetry', '@deepseek-ai/dsh-host-product-telemetry-otel'],
       ['product-analytics', '@deepseek-ai/dsh-client-product-analytics'],
       ['session-telemetry-otel', '@deepseek-ai/dsh-session-telemetry-otel'],
       ['ui-settings-session-log', '@deepseek-ai/dsh-client-ui-settings-session-log'],
+      ['session-log-deepseek', '@deepseek-ai/dsh-session-log-deepseek'],
+      ['plugin-package-inventory-deepseek', '@deepseek-ai/dsh-plugin-package-inventory-deepseek'],
     ] as const
 
     const upstream = composeEntries([bundle('base'), bundle('web-app')])

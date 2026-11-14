@@ -40,7 +40,7 @@ Mount this plugin instead of `@deepseek-ai/dsh-llm-deepseek-account` while keepi
 
 The plugin posts to `/auth-api/v0/dsh/model_token` on the signed-in Platform origin. Concurrent exchanges for one device session share one request. A JWT stays in memory until 60 seconds before its `exp` claim and is never persisted.
 
-The first authenticated catalog access requests `/models` at the gateway origin. A missing or failed route does not block Messages: before any successful listing, the provider publishes the bundled `deepseek-flash` and `deepseek-v4-pro` entries; after a successful listing, refresh failures retain the last-known catalog.
+The first authenticated catalog access requests `/models` at the gateway origin. A missing or failed route does not block Messages: before any successful listing, the QingClaw plug-in publishes the gateway-verified text catalog (Qwen Plus, Qwen 3.8 Flash, Qwen 3.8 Max, DeepSeek V4.1 Flash, and Kimi K3.1 Pro); after a successful listing, refresh failures retain the last-known catalog.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -62,7 +62,7 @@ A gateway HTTP 401 clears only the exact rejected short JWT, so the next request
 <a id="dev-note"></a>
 ## Dev Note
 
-Focused tests cover single-flight exchange, expiry, response validation, Platform and gateway 401 boundaries, Loader namespace composition, bundled catalog fallback on `/models` 404, and successful Messages streaming with the short JWT.
+Focused tests cover single-flight exchange, expiry, response validation, Platform and gateway 401 boundaries, Loader namespace composition, the QingClaw plug-in's verified multi-model fallback on `/models` 404, and successful Messages streaming with the short JWT.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -87,5 +87,4 @@ Neither the device session nor the model JWT enters model input, so exchanging o
 
 - Token and listing caches are process-local and reset on restart.
 - The gateway must validate the model JWT audience and claims; the desktop client only validates lifetime metadata before use.
-- The legacy Serverless gateway needs VPC public NAT/SNAT before its AI service can reach the public DeepSeek endpoint.
-- Without `/models`, the bundled catalog can lag behind gateway-side model availability until the route is enabled or the desktop bundle updates.
+- Without `/models`, the QingClaw plug-in supplies the verified model catalog; add models only after gateway validation, or enable a dynamic listing route.

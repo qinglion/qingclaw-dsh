@@ -33,7 +33,17 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => () => tokens.dispose(), 'llm-qingclaw-account: model token cache')
   ctx.on('deepseek-account/signed-out', () => { tokens.clear() })
 
-  const supported = resolveAdapterOptions({}).models
+  // Keep a small, verified catalog in the QingClaw integration plug-in so the
+  // upstream client stays untouched even while the gateway has no /models route.
+  const supported = resolveAdapterOptions({
+    models: [
+      { id: 'qwen-plus', name: 'Qwen Plus', inputModalities: ['text'] },
+      { id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] },
+      { id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] },
+      { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash', inputModalities: ['text'] },
+      { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] },
+    ],
+  }).models
   const resolveAuth = async (_connection: ResolvedDeepSeekOptions): Promise<DeepSeekRequestAuth> => {
     const token = await tokens.resolve()
     if (token === undefined) {

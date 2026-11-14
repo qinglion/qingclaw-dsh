@@ -36,7 +36,7 @@ kind: "package-bundle"
 
 patch 定位已有的账号、模型、网页、通知与官方品牌行 id，只替换这些行的完整配置或启用状态，再插入青狮自有插件行。账号服务继续复用 DSH 的浏览器授权、本机 PKCE 回调、凭据存储和账号模型选择，青狮 Rails 平台负责实现兼容的服务端协议。账号服务的 `inferenceOrigin` 令牌释放边界会刻意留在官网来源，因此通用账号令牌消费者无法把 30 天设备会话释放给 `api.qingclaw.com`。模型 provider 单独持有网关来源，先把设备会话换成短期模型 JWT，再只向青狮网关发送 `X-DSH-Auth-Token: Bearer <model JWT>`；上游模型密钥不会到达桌面端。当前旧版 Serverless 网关使用自带的消费者 JWT 与本地非对称 JWKS 鉴权，不走该版本不支持的插件市场 `jwt-auth`/`remote_jwks` 方案。
 
-青狮龙虾第一版会停用上游两套 DeepSeek 网页后端。它们解析的是长期账号授权，无法复用青狮模型 provider 私有的短 JWT 缓存；网关目前也还没有 `/v1/tools/search` 或 `/v1/tools/fetch` 路由。发行插件会对每个 Agent 作用域应用 `tools.restrict()`，因此声明了 `web_search` 的 preset 不会向模型公开它。匿名 `web_fetch` 仍通过 `http` provider 可用，并且不会读取账号凭据。只有在共享短令牌 seam 和网关 tools 路由都具备后，才能重新启用网关搜索；同时必须用测试保证请求携带带 `Bearer ` 前缀的模型 JWT，绝不会携带设备会话。本 bundle 不复制 Web roster。后续青狮业务能力可以作为额外插件行加入本 bundle，无需修改 DSH agent loop。
+青狮龙虾第一版会停用上游两套 DeepSeek 网页后端。它们解析的是长期账号授权，无法复用青狮模型 provider 私有的短 JWT 缓存；网关目前也还没有 `/v1/tools/search` 或 `/v1/tools/fetch` 路由。发行插件会对每个 Agent 作用域应用 `tools.restrict()`，因此声明了 `web_search` 的 preset 不会向模型公开它。匿名 `web_fetch` 仍通过 `http` provider 可用，并且不会读取账号凭据。只有在共享短令牌 seam 和网关 tools 路由都具备后，才能重新启用网关搜索；同时必须用测试保证请求携带带 `Bearer ` 前缀的模型 JWT，绝不会携带设备会话。本 bundle 还会停用 DeepSeek 会话日志与活跃插件清单贡献器，因此青狮 Messages 请求不会携带 `dsh_session_log` 和 `dsh_plugin_packages` 顶层字段。本 bundle 不复制 Web roster。后续青狮业务能力可以作为额外插件行加入本 bundle，无需修改 DSH agent loop。
 
 -----
 

@@ -30,7 +30,7 @@ function grant(token: string): Response {
 
 function successfulMessages(): Response {
   const events = [
-    { type: 'message_start', message: { id: 'msg_qingclaw', model: 'deepseek-flash', usage: { input_tokens: 1, output_tokens: 0 } } },
+    { type: 'message_start', message: { id: 'msg_qingclaw', model: 'qwen-plus', usage: { input_tokens: 1, output_tokens: 0 } } },
     { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
     { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'QingClaw ready' } },
     { type: 'content_block_stop', index: 0 },
@@ -46,7 +46,7 @@ function successfulMessages(): Response {
 async function finishOf(ctx: Context) {
   const assembler = new BlockAssembler()
   for await (const chunk of ctx.llm.stream({
-    provider: 'deepseek-account', model: 'deepseek-flash', messages: [],
+    provider: 'deepseek-account', model: 'qwen-plus', messages: [],
   })) assembler.push(chunk)
   return assembler.finish
 }
@@ -93,10 +93,13 @@ describe('QingClaw account provider', () => {
     const { ctx, rejectToken } = await mount(request)
 
     await expect(ctx.llm.listModels('deepseek-account'))
-      .resolves.toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: 'deepseek-flash' }),
-        expect.objectContaining({ id: 'deepseek-v4-pro' }),
-      ]))
+      .resolves.toEqual([
+        expect.objectContaining({ provider: 'deepseek-account', id: 'qwen-plus', name: 'Qwen Plus', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] }),
+      ])
     await expect(finishOf(ctx)).resolves.toMatchObject({ kind: 'stop' })
 
     const platform = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/model_token')

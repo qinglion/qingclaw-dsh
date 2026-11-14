@@ -18,6 +18,11 @@
   disabled: true
 - id: llm-deepseek
   disabled: true
+- id: agent-default-model
+  config:
+    provider: deepseek-account
+    model: qwen-plus
+    reasoningEffort: high
 - id: ui-settings-account
   config:
     # QingClaw account authorization already lands in the ready workspace. The
@@ -63,8 +68,11 @@
 # QingClaw ships without DeepSeek-operated product analytics or session-log
 # reporting. Keep the generic OTel infrastructure available to other plugins,
 # but disable every upstream entry that can collect, export, or present upload
-# controls for DeepSeek telemetry. A future QingClaw-owned telemetry service
-# must be introduced as a separate, explicitly reviewed distribution patch.
+# controls for DeepSeek telemetry. The DeepSeek session-log and active-plugin
+# inventory contributors are also disabled so QingClaw Messages requests do not
+# carry their provider-specific top-level fields. A future QingClaw-owned
+# telemetry service must be introduced as a separate, explicitly reviewed
+# distribution patch.
 - id: desktop-product-telemetry
   disabled: true
 - id: product-analytics
@@ -72,6 +80,10 @@
 - id: session-telemetry-otel
   disabled: true
 - id: ui-settings-session-log
+  disabled: true
+- id: session-log-deepseek
+  disabled: true
+- id: plugin-package-inventory-deepseek
   disabled: true
 
 # QingClaw does not ship the DeepSeek Platform notification API. The account
