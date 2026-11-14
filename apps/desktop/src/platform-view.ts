@@ -117,7 +117,8 @@ export class DesktopPlatformView {
     browserSession.setPermissionCheckHandler(() => false)
     const deploymentHeaders = account.requestHeaders ?? {}
     const injectedNames = new Set([...Object.keys(deploymentHeaders),
-      ...Object.keys(platformClientHeaders(this.platform, desktopClientMetadata(this.getLocale())))]
+      ...Object.keys(platformClientHeaders(this.platform, desktopClientMetadata(this.getLocale()))),
+      'x-dsh-auth-token']
       .map(name => name.toLowerCase()))
     const injectedRequests = new Set<number>()
     browserSession.webRequest.onCompleted((details) => { injectedRequests.delete(details.id) })
@@ -127,9 +128,10 @@ export class DesktopPlatformView {
       if (new URL(details.url).origin === account.origin) {
         injectedRequests.add(details.id)
         // The document identifies the UI that is asking, so language and UTC offset are sampled now.
-        const injected = {
+        const injected: Record<string, string> = {
           ...deploymentHeaders,
           ...platformClientHeaders(this.platform, desktopClientMetadata(this.getLocale())),
+          'x-dsh-auth-token': account.token,
         }
         const cookie = headers.cookie ?? ''
         Object.assign(headers, injected)

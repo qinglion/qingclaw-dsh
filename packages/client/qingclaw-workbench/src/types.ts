@@ -39,3 +39,11 @@ export interface WorkbenchFeedResult {
   readonly source: WorkbenchFeedSource
   readonly stale: boolean
 }
+
+
+/** QingClaw model entitlement projected for professional-plugin gates. */
+export interface ProEntitlement {
+  readonly active: boolean
+  readonly plan: string | null
+  readonly endsAt: string | null
+}

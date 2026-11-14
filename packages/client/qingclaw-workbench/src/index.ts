@@ -9,11 +9,20 @@ import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typer
 import {
   fetchOfficialFeed, parseCacheRecord, serializeCacheRecord, type WorkbenchCacheRecord,
 } from './feed.ts'
-import type { WorkbenchFeedResult } from './types.ts'
+import type { ProEntitlement, WorkbenchFeedResult } from './types.ts'
 
 export type * from './types.ts'
 
 const DEFAULT_FEED_URL = 'https://qingclaw.com/api/workbench-feed'
+
+/** Minimal account reader used for the professional entitlement gate. */
+interface AccountProfileReader {
+  getProfile(client: { version: string; locale: string; timezoneOffsetSeconds: number }): Promise<
+    | { status: 'ready'; value: { plan?: string | null; subscriptionEndsAt?: string | null } }
+    | { status: 'failed' }
+    | null
+  >
+}
 
 /** Host settings for the public feed boundary and optional durable cache. */
 export interface Config {
@@ -92,6 +101,27 @@ export default class QingClawWorkbench extends TypertRemoteService {
       return await pending
     } finally {
       if (this.pending === pending) this.pending = undefined
+    }
+  }
+
+  /** Read the signed-in account's QingClaw professional entitlement. */
+  @Remote
+  async getEntitlement(): Promise<ProEntitlement> {
+    try {
+      const account = this.ctx.get('deepseekAccount') as AccountProfileReader | undefined
+      if (account === undefined) return { active: false, plan: null, endsAt: null }
+      const result = await account.getProfile({
+        version: process.env.DSH_CLIENT_VERSION ?? '0.0.0',
+        locale: 'zh-CN',
+        timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60,
+      })
+      if (result === null || result.status !== 'ready') return { active: false, plan: null, endsAt: null }
+      const plan = result.value.plan ?? null
+      const endsAt = result.value.subscriptionEndsAt ?? null
+      const active = plan === 'pro' && (endsAt === null || Date.parse(endsAt) > Date.now())
+      return { active, plan, endsAt }
+    } catch {
+      return { active: false, plan: null, endsAt: null }
     }
   }
 

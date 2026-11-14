@@ -36,6 +36,14 @@ export const zh = {
   stale: '官网内容暂时无法更新，当前显示上次成功同步的版本。',
   emptyVideos: '暂时还没有公开视频。',
   emptyCourses: '暂时还没有公开课程。',
+  proTitle: '专业插件',
+  proChecking: '正在检查订阅…',
+  proLocked: '订阅年度专业版后解锁专业插件与内置服务。',
+  proSubscribe: '去订阅 / 了解专业版',
+  proUnlocked: '已解锁：合同审查（示例专业插件）',
+  proPlaceholder: '粘贴合同文本，生成审查清单…',
+  proAction: '生成审查清单',
+  proResult: '合同审查清单',
 } satisfies Record<string, string>
 
 /** Workbench locale key union. */
@@ -74,6 +82,14 @@ export const en = {
   stale: 'The official feed could not be refreshed. Showing the last successful version.',
   emptyVideos: 'No public videos are available yet.',
   emptyCourses: 'No public courses are available yet.',
+  proTitle: 'Professional plugins',
+  proChecking: 'Checking subscription…',
+  proLocked: 'Subscribe to the annual plan to unlock professional plugins and hosted services.',
+  proSubscribe: 'Subscribe / view plans',
+  proUnlocked: 'Unlocked: contract review (sample professional plugin)',
+  proPlaceholder: 'Paste a contract to generate a review checklist…',
+  proAction: 'Generate checklist',
+  proResult: 'Contract review checklist',
 } satisfies Record<WorkbenchLocaleKey, string>
 
 export const ja = { ...en } satisfies Record<WorkbenchLocaleKey, string>

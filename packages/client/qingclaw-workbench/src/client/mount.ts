@@ -28,6 +28,11 @@ export function registerWorkbenchUi(ctx: Context): void {
       if (!result.ok) throw result.error
       return result.value
     },
+    loadEntitlement: async () => {
+      const result = await ctx.remote.qingclawWorkbench.getEntitlement()
+      if (!result.ok) throw result.error
+      return result.value
+    },
   })
   // Keep the navigation entry and its target transactional across late slot declarations.
   ctx.slots.inject('main', () => ctx.slots.inject('sidebar.panellist', function* () {

@@ -7,6 +7,8 @@ const user = z.object({
   id: z.string().nullish(),
   email: z.string(), mobile: z.string().optional(), mobile_number: z.string().optional(),
   id_profile: z.object({ name: z.string().nullable(), picture: z.string().nullish() }).nullish(),
+  plan: z.string().nullish(),
+  subscription_ends_at: z.string().nullish(),
 })
 // balance and amount arrive as strings that Platform's Web client passes to big.js, whose decimal
 // grammar also accepts an omitted integer or fraction part and a decimal exponent (0E-16, 1e+3).
@@ -31,6 +33,8 @@ function projectProfile(value: z.infer<typeof user>): AccountProfile {
     id: value.id == null ? null : value.id as AccountUserId,
     avatarUrl: identity?.picture || null,
     name: identity?.name || null, contact: mobile || mobileNumber || email || null,
+    ...(value.plan == null ? {} : { plan: value.plan }),
+    ...(value.subscription_ends_at == null ? {} : { subscriptionEndsAt: value.subscription_ends_at }),
   }
 }
 

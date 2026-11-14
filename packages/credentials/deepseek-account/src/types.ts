@@ -57,6 +57,10 @@ export interface AccountProfile {
   readonly contact: string | null
   /** Profile image URL supplied by Platform, absent when no picture is configured. */
   readonly avatarUrl?: string | null
+  /** QingClaw model entitlement plan, when the deployment supplies one. */
+  readonly plan?: string | null
+  /** ISO timestamp when the current subscription ends. */
+  readonly subscriptionEndsAt?: string | null
 }
 /** Platform recharge or bonus wallet balance; decimal strings retain server precision. */
 export interface AccountWallet {

@@ -7,14 +7,15 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { WorkbenchCourse, WorkbenchFeedResult, WorkbenchVideo } from '../types.ts'
+import type { ProEntitlement, WorkbenchCourse, WorkbenchFeedResult, WorkbenchVideo } from '../types.ts'
 import { dailyQuoteKey } from './daily-quote.ts'
-import type { NS } from './locales.ts'
+import type { NS, WorkbenchLocaleKey } from './locales.ts'
 import css from './WorkbenchPage.module.css'
 
 /** Narrow actions supplied by the browser plugin; the page never reads Cordis directly. */
 export interface WorkbenchPageInjected {
   readonly loadFeed: (refresh: boolean) => Promise<WorkbenchFeedResult>
+  readonly loadEntitlement?: () => Promise<ProEntitlement | null>
 }
 
 /** Props assembled by the global main-panel slot. */
@@ -28,8 +29,9 @@ type FeedViewState =
   | { readonly status: 'ready'; readonly result: WorkbenchFeedResult; readonly refreshing: boolean }
 
 /** Render the responsive Workbench surface. */
-export function WorkbenchPage({ loadFeed, t }: WorkbenchPageProps): ReactNode {
+export function WorkbenchPage({ loadFeed, loadEntitlement = async () => null, t }: WorkbenchPageProps): ReactNode {
   const [state, setState] = useState<FeedViewState>({ status: 'loading' })
+  const [entitlement, setEntitlement] = useState<ProEntitlement | null | undefined>(undefined)
   const generation = useRef(0)
   const query = useCallback(async (refresh: boolean): Promise<void> => {
     const request = ++generation.current
@@ -48,6 +50,15 @@ export function WorkbenchPage({ loadFeed, t }: WorkbenchPageProps): ReactNode {
     void query(false)
     return () => { generation.current += 1 }
   }, [query])
+
+  useEffect(() => {
+    let live = true
+    void loadEntitlement().then(
+      (value) => { if (live) setEntitlement(value) },
+      () => { if (live) setEntitlement(null) },
+    )
+    return () => { live = false }
+  }, [loadEntitlement])
 
   const result = state.status === 'ready' ? state.result : undefined
   const refreshing = state.status === 'ready' && state.refreshing
@@ -75,6 +86,8 @@ export function WorkbenchPage({ loadFeed, t }: WorkbenchPageProps): ReactNode {
             <p>“{t(dailyQuoteKey(new Date()))}”</p>
           </div>
         </section>
+
+        <ProSection entitlement={entitlement} t={t} />
 
         <nav className={css.officialLinks} aria-label={t('officialSite')}>
           <a href="https://qingclaw.com/" target="_blank" rel="noopener noreferrer">
@@ -126,6 +139,55 @@ export function WorkbenchPage({ loadFeed, t }: WorkbenchPageProps): ReactNode {
         )}
       </div>
     </main>
+  )
+}
+
+function ProSection({ entitlement, t }: {
+  readonly entitlement: ProEntitlement | null | undefined
+  readonly t: (key: WorkbenchLocaleKey) => string
+}): ReactNode {
+  const [text, setText] = useState('')
+  const [result, setResult] = useState<string[] | undefined>(undefined)
+  if (entitlement === undefined) {
+    return <section className={css.pro} aria-busy="true"><p className={css.proHint}>{t('proChecking')}</p></section>
+  }
+  if (entitlement === null || !entitlement.active) {
+    return (
+      <section className={css.pro} aria-labelledby="qingclaw-pro-title">
+        <div className={css.proHeader}>
+          <span className={css.proBadge}>PRO</span>
+          <div>
+            <h2 id="qingclaw-pro-title">{t('proTitle')}</h2>
+            <p className={css.proHint}>{t('proLocked')}</p>
+          </div>
+        </div>
+        <a className={css.proAction} href="https://beta.qingclaw.com/top_up" target="_blank" rel="noopener noreferrer">
+          {t('proSubscribe')}
+        </a>
+      </section>
+    )
+  }
+  return (
+    <section className={css.pro} aria-labelledby="qingclaw-pro-title">
+      <div className={css.proHeader}>
+        <span className={css.proBadge}>PRO</span>
+        <div>
+          <h2 id="qingclaw-pro-title">{t('proTitle')}</h2>
+          <p className={css.proHint}>{t('proUnlocked')}</p>
+        </div>
+      </div>
+      <textarea className={css.proInput} value={text} placeholder={t('proPlaceholder')}
+        onChange={(event) => { setText(event.target.value); setResult(undefined) }} rows={4} />
+      <Button variant="primary" size="sm" disabled={text.trim() === ''}
+        onClick={() => { setResult(['合同主体与签署权限', '标的、价款与付款节点', '交付/履行期限与验收标准', '违约责任与解除条件', '争议解决与管辖']) }}>
+        {t('proAction')}
+      </Button>
+      {result !== undefined && (
+        <ul className={css.proResult} aria-label={t('proResult')}>
+          {result.map(item => <li key={item}>{item}</li>)}
+        </ul>
+      )}
+    </section>
   )
 }
 
