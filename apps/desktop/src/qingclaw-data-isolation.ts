@@ -3,6 +3,7 @@
 import { basename, dirname, join } from 'node:path'
 
 const QINGCLAW_USER_DATA_DIRECTORY = 'QingClaw'
+const QINGCLAW_TEST_USER_DATA_DIRECTORY = 'QingClaw Beta'
 const QINGCLAW_DSH_HOME_DIRECTORY = 'dsh-home'
 
 /** Stable QingClaw profile name, intentionally distinct from the upstream Desktop profile. */
@@ -16,7 +17,12 @@ export interface QingClawDesktopPathApp {
   getPath(name: 'appData' | 'userData'): string
   /** Replace one Electron-managed application data path before readiness. */
   setPath(name: 'userData' | 'sessionData', path: string): void
+  /** Resolve the packaged application root, when the Electron version exposes it. */
+  getAppPath?(): string
 }
+
+/** Deployment lane that owns one packaged application's data. */
+export type QingClawDesktopDeploymentName = 'test' | 'production'
 
 /** QingClaw-exclusive roots selected before Desktop runtime initialization. */
 export interface QingClawDesktopDataPaths {
@@ -58,11 +64,12 @@ function installedUpdateQualificationPaths(
 export function resolveQingClawDesktopDataPaths(
   app: QingClawDesktopPathApp,
   environment: NodeJS.ProcessEnv,
+  deployment: QingClawDesktopDeploymentName = 'production',
 ): QingClawDesktopDataPaths {
   const qualification = installedUpdateQualificationPaths(app, environment)
   if (qualification !== undefined) return qualification
   const userData = app.isPackaged
-    ? join(app.getPath('appData'), QINGCLAW_USER_DATA_DIRECTORY)
+    ? join(app.getPath('appData'), deployment === 'test' ? QINGCLAW_TEST_USER_DATA_DIRECTORY : QINGCLAW_USER_DATA_DIRECTORY)
     : app.getPath('userData')
   return { userData, dshHome: join(userData, QINGCLAW_DSH_HOME_DIRECTORY) }
 }
@@ -75,13 +82,15 @@ export function resolveQingClawDesktopDataPaths(
  *
  * @param app - Electron path API available before `app.whenReady()`.
  * @param environment - Main-process environment updated in place.
+ * @param deployment - Packaging lane whose data root this process owns.
  * @returns the installed QingClaw-exclusive roots.
  */
 export function configureQingClawDesktopDataIsolation(
   app: QingClawDesktopPathApp,
   environment: NodeJS.ProcessEnv,
+  deployment: QingClawDesktopDeploymentName = 'production',
 ): QingClawDesktopDataPaths {
-  const paths = resolveQingClawDesktopDataPaths(app, environment)
+  const paths = resolveQingClawDesktopDataPaths(app, environment, deployment)
   app.setPath('userData', paths.userData)
   app.setPath('sessionData', paths.userData)
   environment.DSH_HOME = paths.dshHome

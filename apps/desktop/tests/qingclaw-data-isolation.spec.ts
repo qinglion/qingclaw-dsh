@@ -76,6 +76,21 @@ describe('QingClaw Desktop data isolation', () => {
     expect(directorySnapshot(officialHome)).toEqual(before)
   })
 
+  it('keeps the test deployment out of the production QingClaw data root', () => {
+    const appData = '/application-data'
+    const { app, assigned } = fakeApp({ packaged: true, appData })
+    const environment: NodeJS.ProcessEnv = {}
+
+    const paths = configureQingClawDesktopDataIsolation(app, environment, 'test')
+
+    expect(paths).toEqual({
+      userData: join(appData, 'QingClaw Beta'),
+      dshHome: join(appData, 'QingClaw Beta', 'dsh-home'),
+    })
+    expect(environment.DSH_HOME).toBe(join(appData, 'QingClaw Beta', 'dsh-home'))
+    expect(assigned.get('userData')).toBe(join(appData, 'QingClaw Beta'))
+  })
+
   it('derives unpackaged Harness state below its explicit QingClaw userData', () => {
     const userData = '/development/qingclaw-electron'
     const { app, assigned } = fakeApp({ packaged: false, appData: '/unused', userData })
