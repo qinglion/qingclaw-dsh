@@ -81,7 +81,7 @@ describe('QingClaw distribution bundle', () => {
     const model = composed.find(row => row.id === 'llm-qingclaw-account')
     expect(model?.name).toBe('@qinglion/dsh-llm-qingclaw-account')
     const modelConfig = model?.config as Record<string, unknown> | undefined
-    expect(Object.keys(modelConfig ?? {}).sort()).toEqual(['baseURL', 'maxTokens'])
+    expect(Object.keys(modelConfig ?? {}).sort()).toEqual(['baseURL', 'catalogURL', 'maxTokens'])
     expect(modelConfig?.maxTokens).toBe(8_192)
 
     const workbench = composed.find(row => row.id === 'qingclaw-workbench')

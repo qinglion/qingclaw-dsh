@@ -23,6 +23,8 @@ export interface Config extends Omit<ProtocolConfig, 'models'>, ModelListingConf
   modelOverrides: Volatile<Record<string, ModelOverride>>
   /** Maximum duration of one device-session-to-model-token exchange. */
   modelTokenTimeoutMs: Volatile<number>
+  /** Website-managed model catalog URL; empty derives it from the Messages origin. */
+  catalogURL: Volatile<string>
 }
 
 const { models: _protocolCatalog, ...protocolFields } = deepSeekConfigFields
@@ -37,12 +39,14 @@ export const Config = z.object({
   modelOverrides: z.dict(modelOverride).default({}).volatile(),
   modelTokenTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS)
     .default(DEFAULT_MODEL_TOKEN_TIMEOUT_MS).volatile(),
+  catalogURL: z.string().default('').volatile(),
 })
 
 /** Plain QingClaw options accepted by {@link resolveOptions}. */
 export type Options = Omit<ProtocolOptions, 'models'> & ModelListingOptions & {
   modelOverrides?: Record<string, ModelOverride>
   modelTokenTimeoutMs?: number
+  catalogURL?: string
 }
 
 /** One validated configuration generation of the QingClaw account route. */
@@ -95,7 +99,7 @@ export function resolveOptions(options: Options): ResolvedOptions {
   }
   const {
     modelsTimeoutMs: _timeout, modelsMaxAgeMs: _maxAge, modelOverrides = {},
-    modelTokenTimeoutMs = DEFAULT_MODEL_TOKEN_TIMEOUT_MS, ...protocolOptions
+    modelTokenTimeoutMs = DEFAULT_MODEL_TOKEN_TIMEOUT_MS, catalogURL = '', ...protocolOptions
   } = options
   if (!Number.isFinite(modelTokenTimeoutMs) || modelTokenTimeoutMs <= 0 || modelTokenTimeoutMs > MAX_TIMER_DELAY_MS) {
     throw new Error(`llm-qingclaw-account: modelTokenTimeoutMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`)
@@ -104,7 +108,12 @@ export function resolveOptions(options: Options): ResolvedOptions {
   const protocol = resolveAdapterOptions({ ...protocolOptions, baseURL: protocolOptions.baseURL ?? DEFAULT_BASE_URL })
   return {
     protocol,
-    catalog: { url: new URL('/v1/models', new URL(protocol.baseURL).origin).href, ...timing },
+    catalog: {
+      url: catalogURL.trim().length > 0
+        ? catalogURL
+        : new URL('/auth-api/v0/dsh/models', new URL(protocol.baseURL).origin).href,
+      ...timing,
+    },
     modelOverrides: Object.fromEntries(Object.entries(modelOverrides).map(([id, override]) => [id, resolveOverride(id, override)])),
     modelTokenTimeoutMs,
   }

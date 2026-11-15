@@ -95,11 +95,16 @@ export function apply(ctx: Context, config: Config): void {
       { id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] },
     ],
   }).models
+  const baseSupportedIds = new Set(baseSupported.map(model => model.id))
   const supportedFor = (view: ListingView) => {
     const entries = view.listing?.entries
     if (entries === undefined) return baseSupported
-    const listed = new Set(entries.map(entry => entry.id))
-    return baseSupported.filter(model => listed.has(model.id))
+    const extra = resolveAdapterOptions({
+      models: entries
+        .filter(entry => !baseSupportedIds.has(entry.id))
+        .map(entry => ({ id: entry.id, name: entry.name ?? entry.id, inputModalities: ['text'] })),
+    }).models
+    return [...baseSupported, ...extra]
   }
   const resolveAuth = async (_connection: ResolvedDeepSeekOptions): Promise<DeepSeekRequestAuth> => {
     const apiKey = await keys.resolve()

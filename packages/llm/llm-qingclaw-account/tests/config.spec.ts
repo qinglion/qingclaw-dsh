@@ -5,8 +5,8 @@ import { Config, DEFAULT_BASE_URL, plainOptions, resolveOptions } from '../src/c
 it('defaults Messages to QingClaw and keeps model listing at the gateway root', () => {
   const resolved = resolveOptions({})
   expect(resolved.protocol.baseURL).toBe(DEFAULT_BASE_URL)
-  expect(resolved.catalog).toEqual({ url: 'https://api.qingclaw.com/v1/models', timeoutMs: 5_000, maxAgeMs: 600_000 })
-  expect(resolveOptions({ baseURL: 'http://127.0.0.1:9/custom/messages' }).catalog.url).toBe('http://127.0.0.1:9/v1/models')
+  expect(resolved.catalog).toEqual({ url: 'https://api.qingclaw.com/auth-api/v0/dsh/models', timeoutMs: 5_000, maxAgeMs: 600_000 })
+  expect(resolveOptions({ baseURL: 'http://127.0.0.1:9/custom/messages' }).catalog.url).toBe('http://127.0.0.1:9/auth-api/v0/dsh/models')
 })
 
 it.each([
