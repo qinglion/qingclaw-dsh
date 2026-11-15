@@ -84,8 +84,8 @@ export function apply(ctx: Context, config: Config): void {
   // the offered catalog to chat models we have verified against the gateway.
   const baseSupported = resolveAdapterOptions({
     models: [
-      { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash', inputModalities: ['text'] },
       { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text'] },
+      { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash (1017 snapshot)', inputModalities: ['text'] },
       { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] },
       { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] },
       { id: 'glm-5.3', name: 'GLM 5.3', inputModalities: ['text'] },
