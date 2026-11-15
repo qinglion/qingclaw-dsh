@@ -25,6 +25,10 @@ export interface Config extends Omit<ProtocolConfig, 'models'>, ModelListingConf
   modelTokenTimeoutMs: Volatile<number>
   /** Website-managed model catalog URL; empty derives it from the Messages origin. */
   catalogURL: Volatile<string>
+  /** Default image-generation model. */
+  imageModel: Volatile<string>
+  /** Default video-generation model. */
+  videoModel: Volatile<string>
 }
 
 const { models: _protocolCatalog, ...protocolFields } = deepSeekConfigFields
@@ -40,6 +44,8 @@ export const Config = z.object({
   modelTokenTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS)
     .default(DEFAULT_MODEL_TOKEN_TIMEOUT_MS).volatile(),
   catalogURL: z.string().default('').volatile(),
+  imageModel: z.string().default('qwen-image-3.0').volatile(),
+  videoModel: z.string().default('wan3.0-video-prime').volatile(),
 })
 
 /** Plain QingClaw options accepted by {@link resolveOptions}. */
@@ -47,6 +53,8 @@ export type Options = Omit<ProtocolOptions, 'models'> & ModelListingOptions & {
   modelOverrides?: Record<string, ModelOverride>
   modelTokenTimeoutMs?: number
   catalogURL?: string
+  imageModel?: string
+  videoModel?: string
 }
 
 /** One validated configuration generation of the QingClaw account route. */
@@ -59,6 +67,10 @@ export interface ResolvedOptions {
   readonly modelOverrides: Readonly<Record<string, ModelOverride>>
   /** Deadline for one short-token exchange. */
   readonly modelTokenTimeoutMs: number
+  /** Default image-generation model. */
+  readonly imageModel: string
+  /** Default video-generation model. */
+  readonly videoModel: string
 }
 
 /**
@@ -99,7 +111,8 @@ export function resolveOptions(options: Options): ResolvedOptions {
   }
   const {
     modelsTimeoutMs: _timeout, modelsMaxAgeMs: _maxAge, modelOverrides = {},
-    modelTokenTimeoutMs = DEFAULT_MODEL_TOKEN_TIMEOUT_MS, catalogURL = '', ...protocolOptions
+    modelTokenTimeoutMs = DEFAULT_MODEL_TOKEN_TIMEOUT_MS, catalogURL = '',
+    imageModel = 'qwen-image-3.0', videoModel = 'wan3.0-video-prime', ...protocolOptions
   } = options
   if (!Number.isFinite(modelTokenTimeoutMs) || modelTokenTimeoutMs <= 0 || modelTokenTimeoutMs > MAX_TIMER_DELAY_MS) {
     throw new Error(`llm-qingclaw-account: modelTokenTimeoutMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`)
@@ -116,5 +129,7 @@ export function resolveOptions(options: Options): ResolvedOptions {
     },
     modelOverrides: Object.fromEntries(Object.entries(modelOverrides).map(([id, override]) => [id, resolveOverride(id, override)])),
     modelTokenTimeoutMs,
+    imageModel,
+    videoModel,
   }
 }

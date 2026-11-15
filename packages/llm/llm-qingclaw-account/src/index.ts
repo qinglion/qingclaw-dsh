@@ -167,6 +167,87 @@ export function apply(ctx: Context, config: Config): void {
     return { ...resolved.protocol, models: result.resolution, catalog: result }
   }
 
+  const toolRegistry = ctx.get('tools') as {
+    register(definition: Record<string, unknown>): () => void
+  } | undefined
+  if (toolRegistry !== undefined) {
+    const mediaRequest = async (path: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<string> => {
+      const apiKey = await keys.resolve()
+      if (apiKey === undefined) throw new LlmError('Sign in to QingClaw to generate media.', 'ACCOUNT_SIGN_IN_REQUIRED')
+      const origin = new URL(settings().protocol.baseURL).origin
+      const response = await fetch(`${origin}${path}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        ...(signal === undefined ? {} : { signal }),
+      })
+      const text = await response.text()
+      if (!response.ok) throw new LlmError(`QingClaw media request failed: ${response.status} ${text.slice(0, 300)}`, 'UNKNOWN')
+      return text
+    }
+    const textOutput = {
+      schema: { type: 'string' as const },
+      render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
+    }
+    ctx.effect(() => {
+      const dispose = [
+        toolRegistry.register({
+          name: 'image_generate',
+          description: 'Generate an image with the default QingClaw image model and return the gateway result.',
+          parameters: {
+            prompt: { type: 'string', required: true, description: 'Complete visual description.' },
+            size: { type: 'string', description: 'Image size, for example 1024x1024.' },
+            n: { type: 'integer', description: 'Number of images, 1-4.' },
+          },
+          output: textOutput,
+          timeoutMs: 180_000,
+          execute: async (args: { prompt: string; size?: string; n?: number }) => await mediaRequest('/v1/images/generations', {
+            model: settings().imageModel,
+            prompt: args.prompt,
+            ...(args.size === undefined ? {} : { size: args.size }),
+            ...(args.n === undefined ? {} : { n: args.n }),
+          }),
+        }),
+        toolRegistry.register({
+          name: 'video_generate',
+          description: 'Create a QingClaw video generation task with the default video model.',
+          parameters: {
+            prompt: { type: 'string', required: true, description: 'Video description.' },
+            seconds: { type: 'string', description: 'Duration in seconds.' },
+            size: { type: 'string', description: 'Output size, for example 1280x720.' },
+          },
+          output: textOutput,
+          timeoutMs: 60_000,
+          execute: async (args: { prompt: string; seconds?: string; size?: string }) => await mediaRequest('/v1/videos', {
+            model: settings().videoModel,
+            prompt: args.prompt,
+            ...(args.seconds === undefined ? {} : { seconds: args.seconds }),
+            ...(args.size === undefined ? {} : { size: args.size }),
+          }),
+        }),
+        toolRegistry.register({
+          name: 'video_get',
+          description: 'Read one QingClaw video task by id.',
+          parameters: { id: { type: 'string', required: true, description: 'Video task id.' } },
+          output: textOutput,
+          timeoutMs: 30_000,
+          execute: async (args: { id: string }) => {
+            const apiKey = await keys.resolve()
+            if (apiKey === undefined) throw new LlmError('Sign in to QingClaw to read media.', 'ACCOUNT_SIGN_IN_REQUIRED')
+            const origin = new URL(settings().protocol.baseURL).origin
+            const response = await fetch(`${origin}/v1/videos/${encodeURIComponent(args.id)}`, {
+              headers: { authorization: `Bearer ${apiKey}` },
+            })
+            const text = await response.text()
+            if (!response.ok) throw new LlmError(`QingClaw video status failed: ${response.status} ${text.slice(0, 300)}`, 'UNKNOWN')
+            return text
+          },
+        }),
+      ]
+      return () => { for (const remove of dispose) remove() }
+    }, 'llm-qingclaw-account: media tools')
+  }
+
   const entry = {
     provider: PROVIDER,
     displayName: 'QingClaw Account',

@@ -36,7 +36,7 @@ describe('QingClaw distribution bundle', () => {
       .toBe('@deepseek-ai/dsh-client-ui-brand-official')
 
     const composed = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
-    expect(composed).toHaveLength(web.length + 5)
+    expect(composed).toHaveLength(web.length + 4)
     expect(composed.find(row => row.id === 'ui-brand-official')).toMatchObject({
       name: '@deepseek-ai/dsh-client-ui-brand-official',
       disabled: true,
@@ -61,11 +61,13 @@ describe('QingClaw distribution bundle', () => {
 
     expect(composed.find(row => row.id === 'llm-deepseek-account')?.disabled).toBe(true)
     expect(composed.find(row => row.id === 'llm-deepseek')?.disabled).toBe(true)
-    expect(composed.find(row => row.id === 'agent-preset-registry')?.config).toEqual({ default: 'qingclaw' })
-    const qingclawPreset = composed.find(row => row.id === 'preset-qingclaw')?.config as
+    expect(composed.find(row => row.id === 'agent-preset-registry')?.config).toEqual({ default: 'standard' })
+    expect(composed.find(row => row.id === 'preset-qingclaw')).toBeUndefined()
+    const standard = composed.find(row => row.id === 'preset-standard')?.config as
       { id?: string; order?: number; name?: string; plugins?: { id?: string }[] } | undefined
-    expect(qingclawPreset).toMatchObject({ id: 'qingclaw', order: 0, name: '青狮龙虾' })
-    expect(qingclawPreset?.plugins?.some(row => row.id === 'persona')).toBe(false)
+    expect(standard).toMatchObject({ id: 'standard', order: 1 })
+    expect(standard?.name).toBeUndefined()
+    expect(standard?.plugins?.some(row => row.id === 'persona')).toBe(false)
 
     expect(composed.find(row => row.id === 'agent-default-model')?.config).toEqual({
       provider: 'deepseek-account',
@@ -81,7 +83,7 @@ describe('QingClaw distribution bundle', () => {
     const model = composed.find(row => row.id === 'llm-qingclaw-account')
     expect(model?.name).toBe('@qinglion/dsh-llm-qingclaw-account')
     const modelConfig = model?.config as Record<string, unknown> | undefined
-    expect(Object.keys(modelConfig ?? {}).sort()).toEqual(['baseURL', 'catalogURL', 'maxTokens'])
+    expect(Object.keys(modelConfig ?? {}).sort()).toEqual(['baseURL', 'catalogURL', 'imageModel', 'maxTokens', 'videoModel'])
     expect(modelConfig?.maxTokens).toBe(8_192)
 
     const workbench = composed.find(row => row.id === 'qingclaw-workbench')
@@ -111,14 +113,14 @@ describe('QingClaw distribution bundle', () => {
     expect(composed.find(row => row.id === 'web-fetch-http')?.disabled).not.toBe(true)
   })
 
-  it('layers QingClaw Web policy over the complete upstream preset roster', () => {
+  it('keeps the upstream preset roster while fitting standard to the deployment persona', () => {
     const upstream = composeEntries([bundle('base'), bundle('web-app')])
     const qingclaw = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
 
     expect(qingclaw.find(row => row.id === 'qingclaw-distribution')).toMatchObject({
       name: '@deepseek-ai/dsh-qingclaw-bundle',
     })
-    for (const id of ['preset-standard', 'preset-ptc', 'preset-cordis']) {
+    for (const id of ['preset-ptc', 'preset-cordis']) {
       const upstreamPreset = upstream.find(row => row.id === id)
       const qingclawPreset = qingclaw.find(row => row.id === id)
       expect(qingclawPreset?.config).toEqual(upstreamPreset?.config)
@@ -126,6 +128,14 @@ describe('QingClaw distribution bundle', () => {
       const web = config?.plugins?.find(row => row.id === 'tool-web')
       expect(web?.config).toMatchObject({ fetch: true })
     }
+
+    // The standard override carries every shipped row except the persona, in
+    // shipped order and configuration, so an upstream change fails here.
+    const upstreamStandard = upstream.find(row => row.id === 'preset-standard')?.config as
+      { plugins?: { id?: string }[] } | undefined
+    const standard = qingclaw.find(row => row.id === 'preset-standard')?.config as
+      { plugins?: { id?: string; config?: Record<string, unknown> }[] } | undefined
+    expect(standard?.plugins).toEqual(upstreamStandard?.plugins?.filter(row => row.id !== 'persona'))
 
     const minimal = qingclaw.find(row => row.id === 'preset-minimal')
     const minimalConfig = minimal?.config as { plugins?: { id?: string }[] } | undefined
