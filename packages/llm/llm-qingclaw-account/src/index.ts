@@ -79,25 +79,27 @@ export function apply(ctx: Context, config: Config): void {
 
   // Keep a small, verified catalog in the QingClaw integration plug-in so the
   // upstream client stays untouched even while the gateway has no /models route.
+  // The gateway's /v1/models reflects the upstream catalog, including models
+  // that our Bailian account has not activated and non-chat modalities. Keep
+  // the offered catalog to chat models we have verified against the gateway.
   const baseSupported = resolveAdapterOptions({
     models: [
+      { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash', inputModalities: ['text'] },
+      { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text'] },
+      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] },
+      { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] },
+      { id: 'glm-5.3', name: 'GLM 5.3', inputModalities: ['text'] },
+      { id: 'glm-5.3-prime', name: 'GLM 5.3 Prime', inputModalities: ['text'] },
       { id: 'qwen-plus', name: 'Qwen Plus', inputModalities: ['text'] },
       { id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] },
       { id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] },
-      { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash', inputModalities: ['text'] },
-      { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] },
     ],
   }).models
-  const baseSupportedIds = new Set(baseSupported.map(model => model.id))
   const supportedFor = (view: ListingView) => {
     const entries = view.listing?.entries
     if (entries === undefined) return baseSupported
-    const extra = resolveAdapterOptions({
-      models: entries
-        .filter(entry => !baseSupportedIds.has(entry.id))
-        .map(entry => ({ id: entry.id, name: entry.name ?? entry.id, inputModalities: ['text'] })),
-    }).models
-    return [...baseSupported, ...extra]
+    const listed = new Set(entries.map(entry => entry.id))
+    return baseSupported.filter(model => listed.has(model.id))
   }
   const resolveAuth = async (_connection: ResolvedDeepSeekOptions): Promise<DeepSeekRequestAuth> => {
     const apiKey = await keys.resolve()

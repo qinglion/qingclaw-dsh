@@ -105,11 +105,15 @@ describe('QingClaw account provider', () => {
 
     await expect(ctx.llm.listModels('deepseek-account'))
       .resolves.toEqual([
+        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'glm-5.3', name: 'GLM 5.3', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'glm-5.3-prime', name: 'GLM 5.3 Prime', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'qwen-plus', name: 'Qwen Plus', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] }),
       ])
     await expect(finishOf(ctx)).resolves.toMatchObject({ kind: 'stop' })
 
@@ -150,7 +154,7 @@ describe('QingClaw account provider', () => {
     const { ctx } = await mount(request)
 
     const models = await ctx.llm.listModels('deepseek-account')
-    expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash-1017', 'new-upstream-model'])
+    expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash-1017'])
   })
 
   it('drops only a gateway-rejected API key and exchanges a new one without signing out the device', async () => {
