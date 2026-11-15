@@ -11,6 +11,7 @@ import type {
   DeepSeekRequestAuth, ListedCatalog, ListingView, ModelListing, ResolvedDeepSeekOptions,
 } from '@deepseek-ai/dsh-llm-deepseek'
 import { Config, plainOptions, resolveOptions } from './config.ts'
+import { ModelKeyCache } from './model-key.ts'
 import { ModelTokenCache } from './model-token.ts'
 
 export { Config, plainOptions, resolveOptions } from './config.ts'
@@ -30,8 +31,9 @@ export function apply(ctx: Context, config: Config): void {
   const settings = () => resolveOptions(plainOptions(config))
   settings()
   const tokens = new ModelTokenCache({ account: ctx.deepseekAccount, timeoutMs: () => settings().modelTokenTimeoutMs })
-  ctx.effect(() => () => tokens.dispose(), 'llm-qingclaw-account: model token cache')
-  ctx.on('deepseek-account/signed-out', () => { tokens.clear() })
+  const keys = new ModelKeyCache({ account: ctx.deepseekAccount, timeoutMs: () => settings().modelTokenTimeoutMs })
+  ctx.effect(() => () => Promise.all([tokens.dispose(), keys.dispose()]), 'llm-qingclaw-account: credential caches')
+  ctx.on('deepseek-account/signed-out', () => { tokens.clear(); keys.clear() })
 
   // Keep a small, verified catalog in the QingClaw integration plug-in so the
   // upstream client stays untouched even while the gateway has no /models route.
@@ -45,19 +47,19 @@ export function apply(ctx: Context, config: Config): void {
     ],
   }).models
   const resolveAuth = async (_connection: ResolvedDeepSeekOptions): Promise<DeepSeekRequestAuth> => {
-    const token = await tokens.resolve()
-    if (token === undefined) {
+    const apiKey = await keys.resolve()
+    if (apiKey === undefined) {
       throw new LlmError('Sign in to QingClaw to use the account provider.', 'ACCOUNT_SIGN_IN_REQUIRED')
     }
     return {
-      headers: { [MODEL_TOKEN_HEADER]: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${apiKey}` },
       onRequestError: (error) => {
         if (!(error instanceof LlmError)) return Promise.resolve(error)
         if (error.code === QUOTA_EXCEEDED_CODE) {
           return Promise.resolve(new LlmError(error.message, ACCOUNT_QUOTA_EXCEEDED_CODE, { ...error.failure, cause: error }))
         }
         if (error.failure.status !== 401) return Promise.resolve(error)
-        tokens.reject(token)
+        keys.reject(apiKey)
         return Promise.resolve(new LlmError(error.message, 'ACCOUNT_TOKEN_INVALID', { ...error.failure, cause: error }))
       },
     }

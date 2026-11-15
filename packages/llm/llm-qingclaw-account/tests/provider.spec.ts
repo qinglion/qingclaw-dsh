@@ -28,6 +28,10 @@ function grant(token: string): Response {
   })
 }
 
+function keyGrant(sequence: number): Response {
+  return Response.json({ code: 0, data: { biz_code: 0, biz_data: { api_key: `gateway-key-${sequence}` } } })
+}
+
 function successfulMessages(): Response {
   const events = [
     { type: 'message_start', message: { id: 'msg_qingclaw', model: 'qwen-plus', usage: { input_tokens: 1, output_tokens: 0 } } },
@@ -76,7 +80,9 @@ describe('QingClaw account provider', () => {
   it('survives a missing root /models route with the bundled catalog and still sends Messages with the short JWT', async () => {
     const observed: Request[] = []
     const issued: string[] = []
+    const apiKeys: string[] = []
     let exchanges = 0
+    let keyExchanges = 0
     const request: typeof fetch = async (input, init) => {
       const request = new Request(input, init)
       observed.push(request.clone())
@@ -85,6 +91,11 @@ describe('QingClaw account provider', () => {
         const token = jwt(++exchanges)
         issued.push(token)
         return grant(token)
+      }
+      if (url.pathname === '/auth-api/v0/dsh/model_key') {
+        const apiKey = `gateway-key-${++keyExchanges}`
+        apiKeys.push(apiKey)
+        return keyGrant(keyExchanges)
       }
       if (url.pathname === '/models') return new Response(null, { status: 404 })
       if (url.pathname === '/anthropic/v1/messages') return successfulMessages()
@@ -103,6 +114,7 @@ describe('QingClaw account provider', () => {
     await expect(finishOf(ctx)).resolves.toMatchObject({ kind: 'stop' })
 
     const platform = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/model_token')
+    const modelKey = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/model_key')
     const listing = observed.find(item => new URL(item.url).pathname === '/models')
     const messages = observed.find(item => new URL(item.url).pathname === '/anthropic/v1/messages')
     expect(platform?.headers.get('x-dsh-auth-token')).toBe('long-lived-device-session')
@@ -110,30 +122,32 @@ describe('QingClaw account provider', () => {
     expect(platform?.headers.get('cookie')).toBe('deployment=beta')
     const issuedToken = issued[0]
     if (issuedToken === undefined) throw new Error('model-token exchange did not issue a token')
+    expect(modelKey?.headers.get('x-dsh-auth-token')).toBe('long-lived-device-session')
     expect(listing?.headers.get('authorization')).toBeNull()
     expect(listing?.headers.get('x-dsh-auth-token')).toBe('Bearer ' + issuedToken)
-    expect(messages?.headers.get('authorization')).toBeNull()
-    expect(messages?.headers.get('x-dsh-auth-token')).toBe('Bearer ' + issuedToken)
+    expect(messages?.headers.get('authorization')).toBe('Bearer ' + apiKeys[0])
+    expect(messages?.headers.get('x-dsh-auth-token')).toBeNull()
     expect(exchanges).toBe(1)
+    expect(keyExchanges).toBe(1)
     expect(rejectToken).not.toHaveBeenCalled()
   })
 
-  it('drops only a gateway-rejected short JWT and exchanges a new one without signing out the device', async () => {
-    const messageTokens: string[] = []
-    const issued: string[] = []
-    let exchanges = 0
+  it('drops only a gateway-rejected API key and exchanges a new one without signing out the device', async () => {
+    const messageKeys: string[] = []
+    let keyExchanges = 0
+    let tokenExchanges = 0
     const request: typeof fetch = async (input, init) => {
       const request = new Request(input, init)
       const path = new URL(request.url).pathname
-      if (path === '/auth-api/v0/dsh/model_token') {
-        const token = jwt(++exchanges)
-        issued.push(token)
-        return grant(token)
+      if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(++tokenExchanges))
+      if (path === '/auth-api/v0/dsh/model_key') {
+        const sequence = ++keyExchanges
+        return keyGrant(sequence)
       }
       if (path === '/models') return new Response(null, { status: 404 })
       if (path === '/anthropic/v1/messages') {
-        messageTokens.push(request.headers.get('x-dsh-auth-token') ?? '')
-        return messageTokens.length === 1
+        messageKeys.push(request.headers.get('authorization') ?? '')
+        return messageKeys.length === 1
           ? new Response('Unauthorized', { status: 401 })
           : successfulMessages()
       }
@@ -145,8 +159,8 @@ describe('QingClaw account provider', () => {
       kind: 'error', failure: { code: 'ACCOUNT_TOKEN_INVALID' },
     })
     await expect(finishOf(ctx)).resolves.toMatchObject({ kind: 'stop' })
-    expect(messageTokens).toEqual(issued.map(token => 'Bearer ' + token))
-    expect(exchanges).toBe(2)
+    expect(messageKeys).toEqual(['Bearer gateway-key-1', 'Bearer gateway-key-2'])
+    expect(keyExchanges).toBe(2)
     expect(rejectToken).not.toHaveBeenCalled()
   })
 
