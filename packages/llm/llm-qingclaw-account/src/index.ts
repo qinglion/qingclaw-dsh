@@ -1,14 +1,14 @@
 /** QingClaw short-token authentication, model discovery, and model gating. */
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type { Context } from '@deepseek-ai/cordis'
-import { ACCOUNT_QUOTA_EXCEEDED_CODE, APP_IDENTITY, LlmError, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
+import { ACCOUNT_QUOTA_EXCEEDED_CODE, APP_IDENTITY, attributionHeaders, LlmError, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-deepseek-account'
 import {
-  catalogModelInfo, createModelListingCache, refuseListedModel, registerDeepSeekProvider, requestModelListing,
+  catalogModelInfo, createModelListingCache, refuseListedModel, registerDeepSeekProvider,
   resolveAdapterOptions, resolveListedCatalog,
 } from '@deepseek-ai/dsh-llm-deepseek'
 import type {
-  DeepSeekRequestAuth, ListedCatalog, ListingView, ModelListing, ResolvedDeepSeekOptions,
+  DeepSeekRequestAuth, ListedCatalog, ListingEntry, ListingView, ModelListing, ResolvedDeepSeekOptions,
 } from '@deepseek-ai/dsh-llm-deepseek'
 import { Config, plainOptions, resolveOptions } from './config.ts'
 import { ModelKeyCache } from './model-key.ts'
@@ -27,6 +27,48 @@ interface AccountConnection extends ResolvedDeepSeekOptions {
   readonly catalog: ListedCatalog
 }
 
+async function requestQingclawListing(url: string, token: string, signal: AbortSignal): Promise<ModelListing> {
+  const headers = new Headers(attributionHeaders())
+  headers.set(MODEL_TOKEN_HEADER, `Bearer ${token}`)
+  headers.set('accept', 'application/json')
+  let response: Response
+  try {
+    response = await fetch(url, { headers, signal, redirect: 'error' })
+  } catch (error) {
+    throw new LlmError(`could not reach ${url}`, 'TRANSPORT', { cause: error })
+  }
+  if (!response.ok) {
+    throw new LlmError(`${url} answered HTTP ${response.status}`, `HTTP_${response.status}`, { status: response.status })
+  }
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch (error) {
+    throw new LlmError(`${url} returned invalid JSON`, 'INVALID_RESPONSE', { cause: error })
+  }
+  const data = typeof body === 'object' && body !== null && Array.isArray(Reflect.get(body, 'data'))
+    ? Reflect.get(body, 'data') as unknown[]
+    : []
+  const entries: ListingEntry[] = []
+  let skipped = 0
+  for (const item of data) {
+    if (typeof item !== 'object' || item === null) { skipped += 1; continue }
+    const id = Reflect.get(item, 'id')
+    if (typeof id !== 'string' || id.length === 0) { skipped += 1; continue }
+    const name = Reflect.get(item, 'name')
+    entries.push({
+      id,
+      ...(typeof name === 'string' && name.length > 0 ? { name } : {}),
+      requirement: { kind: 'none' },
+      capabilities: {
+        usable: true,
+        facts: { inputModalities: ['text'], maxOutputTokens: 8192 },
+      },
+    })
+  }
+  return { entries, skipped }
+}
+
 export function apply(ctx: Context, config: Config): void {
   const settings = () => resolveOptions(plainOptions(config))
   settings()
@@ -37,7 +79,7 @@ export function apply(ctx: Context, config: Config): void {
 
   // Keep a small, verified catalog in the QingClaw integration plug-in so the
   // upstream client stays untouched even while the gateway has no /models route.
-  const supported = resolveAdapterOptions({
+  const baseSupported = resolveAdapterOptions({
     models: [
       { id: 'qwen-plus', name: 'Qwen Plus', inputModalities: ['text'] },
       { id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] },
@@ -46,6 +88,17 @@ export function apply(ctx: Context, config: Config): void {
       { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] },
     ],
   }).models
+  const baseSupportedIds = new Set(baseSupported.map(model => model.id))
+  const supportedFor = (view: ListingView) => {
+    const entries = view.listing?.entries
+    if (entries === undefined) return baseSupported
+    const extra = resolveAdapterOptions({
+      models: entries
+        .filter(entry => !baseSupportedIds.has(entry.id))
+        .map(entry => ({ id: entry.id, name: entry.name ?? entry.id, inputModalities: ['text'] })),
+    }).models
+    return [...baseSupported, ...extra]
+  }
   const resolveAuth = async (_connection: ResolvedDeepSeekOptions): Promise<DeepSeekRequestAuth> => {
     const apiKey = await keys.resolve()
     if (apiKey === undefined) {
@@ -70,7 +123,7 @@ export function apply(ctx: Context, config: Config): void {
     credential: async () => await tokens.resolve(),
     load: async (url, token, signal) => {
       try {
-        return await requestModelListing(url, { [MODEL_TOKEN_HEADER]: `Bearer ${token}` }, signal)
+        return await requestQingclawListing(url, token, signal)
       } catch (error) {
         if (error instanceof LlmError && error.failure.status === 401) tokens.reject(token)
         throw error
@@ -82,7 +135,7 @@ export function apply(ctx: Context, config: Config): void {
     const resolved = settings()
     const result = resolveListedCatalog({
       listing: view.listing?.entries,
-      supported,
+      supported: supportedFor(view),
       overrides: resolved.modelOverrides,
       routeMaxTokens: resolved.protocol.maxTokens,
       clientVersion: APP_IDENTITY.version,

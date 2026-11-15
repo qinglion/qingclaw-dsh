@@ -21,7 +21,7 @@
 - id: agent-default-model
   config:
     provider: deepseek-account
-    model: qwen-plus
+    model: deepseek-v4.1-flash-1017
     reasoningEffort: high
 - id: system-prompt
   config:

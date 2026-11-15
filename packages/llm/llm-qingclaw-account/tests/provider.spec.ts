@@ -77,7 +77,7 @@ async function mount(request: typeof fetch) {
 }
 
 describe('QingClaw account provider', () => {
-  it('survives a missing root /models route with the bundled catalog and still sends Messages with the short JWT', async () => {
+  it('survives a missing /v1/models route with the bundled catalog and still sends Messages with the short JWT', async () => {
     const observed: Request[] = []
     const issued: string[] = []
     const apiKeys: string[] = []
@@ -97,7 +97,7 @@ describe('QingClaw account provider', () => {
         apiKeys.push(apiKey)
         return keyGrant(keyExchanges)
       }
-      if (url.pathname === '/models') return new Response(null, { status: 404 })
+      if (url.pathname === '/v1/models') return new Response(null, { status: 404 })
       if (url.pathname === '/anthropic/v1/messages') return successfulMessages()
       throw new Error(`unexpected request ${request.method} ${request.url}`)
     }
@@ -115,7 +115,7 @@ describe('QingClaw account provider', () => {
 
     const platform = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/model_token')
     const modelKey = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/model_key')
-    const listing = observed.find(item => new URL(item.url).pathname === '/models')
+    const listing = observed.find(item => new URL(item.url).pathname === '/v1/models')
     const messages = observed.find(item => new URL(item.url).pathname === '/anthropic/v1/messages')
     expect(platform?.headers.get('x-dsh-auth-token')).toBe('long-lived-device-session')
     expect(platform?.headers.get('authorization')).toBeNull()
@@ -132,6 +132,27 @@ describe('QingClaw account provider', () => {
     expect(rejectToken).not.toHaveBeenCalled()
   })
 
+  it('offers the gateway model list instead of only the bundled fallback', async () => {
+    const request: typeof fetch = async (input, init) => {
+      const request = new Request(input, init)
+      const path = new URL(request.url).pathname
+      if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
+      if (path === '/v1/models') {
+        return Response.json({
+          data: [
+            { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash' },
+            { id: 'new-upstream-model', name: 'New Upstream Model' },
+          ],
+        })
+      }
+      throw new Error(`unexpected request ${request.method} ${request.url}`)
+    }
+    const { ctx } = await mount(request)
+
+    const models = await ctx.llm.listModels('deepseek-account')
+    expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash-1017', 'new-upstream-model'])
+  })
+
   it('drops only a gateway-rejected API key and exchanges a new one without signing out the device', async () => {
     const messageKeys: string[] = []
     let keyExchanges = 0
@@ -144,7 +165,7 @@ describe('QingClaw account provider', () => {
         const sequence = ++keyExchanges
         return keyGrant(sequence)
       }
-      if (path === '/models') return new Response(null, { status: 404 })
+      if (path === '/v1/models') return new Response(null, { status: 404 })
       if (path === '/anthropic/v1/messages') {
         messageKeys.push(request.headers.get('authorization') ?? '')
         return messageKeys.length === 1

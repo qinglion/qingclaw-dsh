@@ -3,7 +3,7 @@ import type { Volatile } from '@deepseek-ai/cordis'
 import { isVolatile } from '@deepseek-ai/cosmokit'
 import z from '@deepseek-ai/schemastery'
 import {
-  catalogModelFields, deepSeekConfigFields, modelListingConfigFields, modelListingURL, resolveAdapterOptions,
+  catalogModelFields, deepSeekConfigFields, modelListingConfigFields, resolveAdapterOptions,
   resolveListingTiming,
 } from '@deepseek-ai/dsh-llm-deepseek'
 import type {
@@ -104,7 +104,7 @@ export function resolveOptions(options: Options): ResolvedOptions {
   const protocol = resolveAdapterOptions({ ...protocolOptions, baseURL: protocolOptions.baseURL ?? DEFAULT_BASE_URL })
   return {
     protocol,
-    catalog: { url: modelListingURL(protocol.baseURL), ...timing },
+    catalog: { url: new URL('/v1/models', new URL(protocol.baseURL).origin).href, ...timing },
     modelOverrides: Object.fromEntries(Object.entries(modelOverrides).map(([id, override]) => [id, resolveOverride(id, override)])),
     modelTokenTimeoutMs,
   }
