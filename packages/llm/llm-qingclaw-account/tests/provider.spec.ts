@@ -145,15 +145,21 @@ describe('QingClaw account provider', () => {
         return Response.json({
           data: [
             { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash' },
-            { id: 'new-upstream-model', name: 'New Upstream Model' },
+            { id: 'new-upstream-model', name: 'New Upstream Model', default: true },
           ],
         })
       }
       throw new Error(`unexpected request ${request.method} ${request.url}`)
     }
     const { ctx } = await mount(request)
+    const saveSelection = vi.fn(async (_selection: { provider: string; model: string }) => {})
+    ctx.provide('agentDefaultModel', {
+      currentSelection: () => ({ provider: 'deepseek-account', model: 'deepseek-v4.1-flash' }),
+      saveSelection,
+    } as never)
 
     const models = await ctx.llm.listModels('deepseek-account')
+    expect(saveSelection).toHaveBeenCalledWith({ provider: 'deepseek-account', model: 'new-upstream-model' })
     expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash-1017', 'new-upstream-model'])
   })
 

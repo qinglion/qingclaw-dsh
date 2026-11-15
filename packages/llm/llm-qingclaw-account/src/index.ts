@@ -56,9 +56,11 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
     const id = Reflect.get(item, 'id')
     if (typeof id !== 'string' || id.length === 0) { skipped += 1; continue }
     const name = Reflect.get(item, 'name')
+    const isDefault = Reflect.get(item, 'default') === true
     entries.push({
       id,
       ...(typeof name === 'string' && name.length > 0 ? { name } : {}),
+      ...(isDefault ? { default: true } : {}),
       requirement: { kind: 'none' },
       capabilities: {
         usable: true,
@@ -147,6 +149,17 @@ export function apply(ctx: Context, config: Config): void {
       routeMaxTokens: resolved.protocol.maxTokens,
       clientVersion: APP_IDENTITY.version,
     })
+    const preferred = view.listing?.entries.find(entry => Reflect.get(entry, 'default') === true)?.id
+    const defaults = ctx.get('agentDefaultModel') as {
+      currentSelection(): { provider: string; model: string }
+      saveSelection(selection: { provider: string; model: string }): Promise<void>
+    } | undefined
+    if (preferred !== undefined && defaults !== undefined) {
+      const current = defaults.currentSelection()
+      if (current.provider === PROVIDER && current.model !== preferred) {
+        void defaults.saveSelection({ provider: PROVIDER, model: preferred })
+      }
+    }
     if (view.listing !== loggedListing) {
       loggedListing = view.listing
       for (const problem of result.problems) console.warn(LOG_TAG, problem)

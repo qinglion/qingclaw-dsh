@@ -61,6 +61,8 @@ export interface ListingEntry {
   readonly id: string
   /** Display name, when the entry declares a non-empty one. */
   readonly name?: string
+  /** Whether the catalog owner marks this as the default model. */
+  readonly default?: boolean
   /** Requirement declared under `client_requirements[APP_IDENTITY.product]`. */
   readonly requirement: ClientRequirement
   /** Declared capabilities. */
