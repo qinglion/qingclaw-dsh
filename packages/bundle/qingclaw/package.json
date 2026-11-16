@@ -40,7 +40,7 @@
     "bundle": {
       "patch": [
         "./cordis.patch.yml",
-        "./presets/qingclaw.patch.yml"
+        "./presets/standard.patch.yml"
       ]
     }
   },
