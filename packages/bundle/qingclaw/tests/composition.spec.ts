@@ -71,7 +71,7 @@ describe('QingClaw distribution bundle', () => {
 
     expect(composed.find(row => row.id === 'agent-default-model')?.config).toEqual({
       provider: 'deepseek-account',
-      model: 'deepseek-v4.1-flash',
+      model: 'deepseek-flash',
       reasoningEffort: 'high',
     })
     const systemPrompt = composed.find(row => row.id === 'system-prompt')?.config as Record<string, unknown> | undefined

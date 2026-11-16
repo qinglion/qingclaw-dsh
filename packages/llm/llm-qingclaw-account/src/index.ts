@@ -57,6 +57,10 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
     if (typeof id !== 'string' || id.length === 0) { skipped += 1; continue }
     const name = Reflect.get(item, 'name')
     const isDefault = Reflect.get(item, 'default') === true
+    const rawModalities = Reflect.get(item, 'input_modalities')
+    const inputModalities = Array.isArray(rawModalities)
+      ? rawModalities.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
+      : []
     entries.push({
       id,
       ...(typeof name === 'string' && name.length > 0 ? { name } : {}),
@@ -64,7 +68,10 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
       requirement: { kind: 'none' },
       capabilities: {
         usable: true,
-        facts: { inputModalities: ['text'], maxOutputTokens: 8192 },
+        facts: {
+          inputModalities: inputModalities.length > 0 ? inputModalities : ['text'],
+          maxOutputTokens: 8192,
+        },
       },
     })
   }
@@ -86,6 +93,7 @@ export function apply(ctx: Context, config: Config): void {
   // the offered catalog to chat models we have verified against the gateway.
   const baseSupported = resolveAdapterOptions({
     models: [
+      { id: 'deepseek-flash', name: 'DeepSeek Flash', inputModalities: ['text', 'image'] },
       { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text'] },
       { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash (1017 snapshot)', inputModalities: ['text'] },
       { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] },

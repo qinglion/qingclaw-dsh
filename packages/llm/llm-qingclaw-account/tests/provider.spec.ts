@@ -105,6 +105,7 @@ describe('QingClaw account provider', () => {
 
     await expect(ctx.llm.listModels('deepseek-account'))
       .resolves.toEqual([
+        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-flash', name: 'DeepSeek Flash', inputModalities: ['text', 'image'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash (1017 snapshot)', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] }),
