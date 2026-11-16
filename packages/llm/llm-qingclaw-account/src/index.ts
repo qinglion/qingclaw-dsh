@@ -171,13 +171,18 @@ export function apply(ctx: Context, config: Config): void {
     register(definition: Record<string, unknown>): () => void
   } | undefined
   if (toolRegistry !== undefined) {
-    const mediaRequest = async (path: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<string> => {
+    const mediaRequest = async (
+      path: string,
+      body: Record<string, unknown>,
+      headers: Record<string, string> = {},
+      signal?: AbortSignal,
+    ): Promise<string> => {
       const apiKey = await keys.resolve()
       if (apiKey === undefined) throw new LlmError('Sign in to QingClaw to generate media.', 'ACCOUNT_SIGN_IN_REQUIRED')
       const origin = new URL(settings().protocol.baseURL).origin
       const response = await fetch(`${origin}${path}`, {
         method: 'POST',
-        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', ...headers },
         body: JSON.stringify(body),
         ...(signal === undefined ? {} : { signal }),
       })
@@ -218,12 +223,31 @@ export function apply(ctx: Context, config: Config): void {
           },
           output: textOutput,
           timeoutMs: 60_000,
-          execute: async (args: { prompt: string; seconds?: string; size?: string }) => await mediaRequest('/v1/videos', {
-            model: settings().videoModel,
-            prompt: args.prompt,
-            ...(args.seconds === undefined ? {} : { seconds: args.seconds }),
-            ...(args.size === undefined ? {} : { size: args.size }),
-          }),
+          execute: async (args: { prompt: string; seconds?: string; size?: string }) => await mediaRequest(
+            '/video/api/v1/services/aigc/video-generation/video-synthesis',
+            {
+              model: settings().videoModel,
+              input: { prompt: args.prompt },
+              parameters: {
+                duration: Number(args.seconds ?? 5),
+                resolution: args.size?.includes('1080') === true ? '1080P' : args.size?.includes('720') === true ? '720P' : '480P',
+              },
+            },
+            { 'X-DashScope-Async': 'enable' },
+          ),
+        }),
+        toolRegistry.register({
+          name: 'audio_generate',
+          description: 'Generate speech with the default QingClaw speech model and return the gateway result.',
+          parameters: {
+            text: { type: 'string', required: true, description: 'Text to synthesize.' },
+          },
+          output: textOutput,
+          timeoutMs: 120_000,
+          execute: async (args: { text: string }) => await mediaRequest(
+            '/audio/api/v1/services/audio/tts/SpeechSynthesizer',
+            { model: settings().audioModel, input: { text: args.text } },
+          ),
         }),
         toolRegistry.register({
           name: 'video_get',
@@ -235,7 +259,7 @@ export function apply(ctx: Context, config: Config): void {
             const apiKey = await keys.resolve()
             if (apiKey === undefined) throw new LlmError('Sign in to QingClaw to read media.', 'ACCOUNT_SIGN_IN_REQUIRED')
             const origin = new URL(settings().protocol.baseURL).origin
-            const response = await fetch(`${origin}/v1/videos/${encodeURIComponent(args.id)}`, {
+            const response = await fetch(`${origin}/video/api/v1/tasks/${encodeURIComponent(args.id)}`, {
               headers: { authorization: `Bearer ${apiKey}` },
             })
             const text = await response.text()

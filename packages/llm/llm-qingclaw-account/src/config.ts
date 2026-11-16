@@ -29,6 +29,8 @@ export interface Config extends Omit<ProtocolConfig, 'models'>, ModelListingConf
   imageModel: Volatile<string>
   /** Default video-generation model. */
   videoModel: Volatile<string>
+  /** Default speech-generation model. */
+  audioModel: Volatile<string>
 }
 
 const { models: _protocolCatalog, ...protocolFields } = deepSeekConfigFields
@@ -46,6 +48,7 @@ export const Config = z.object({
   catalogURL: z.string().default('').volatile(),
   imageModel: z.string().default('qwen-image-3.0').volatile(),
   videoModel: z.string().default('wan3.0-video-prime').volatile(),
+  audioModel: z.string().default('qwen-audio-3.1-tts').volatile(),
 })
 
 /** Plain QingClaw options accepted by {@link resolveOptions}. */
@@ -55,6 +58,7 @@ export type Options = Omit<ProtocolOptions, 'models'> & ModelListingOptions & {
   catalogURL?: string
   imageModel?: string
   videoModel?: string
+  audioModel?: string
 }
 
 /** One validated configuration generation of the QingClaw account route. */
@@ -71,6 +75,8 @@ export interface ResolvedOptions {
   readonly imageModel: string
   /** Default video-generation model. */
   readonly videoModel: string
+  /** Default speech-generation model. */
+  readonly audioModel: string
 }
 
 /**
@@ -112,7 +118,7 @@ export function resolveOptions(options: Options): ResolvedOptions {
   const {
     modelsTimeoutMs: _timeout, modelsMaxAgeMs: _maxAge, modelOverrides = {},
     modelTokenTimeoutMs = DEFAULT_MODEL_TOKEN_TIMEOUT_MS, catalogURL = '',
-    imageModel = 'qwen-image-3.0', videoModel = 'wan3.0-video-prime', ...protocolOptions
+    imageModel = 'qwen-image-3.0', videoModel = 'wan3.0-video-prime', audioModel = 'qwen-audio-3.1-tts', ...protocolOptions
   } = options
   if (!Number.isFinite(modelTokenTimeoutMs) || modelTokenTimeoutMs <= 0 || modelTokenTimeoutMs > MAX_TIMER_DELAY_MS) {
     throw new Error(`llm-qingclaw-account: modelTokenTimeoutMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`)
@@ -131,5 +137,6 @@ export function resolveOptions(options: Options): ResolvedOptions {
     modelTokenTimeoutMs,
     imageModel,
     videoModel,
+    audioModel,
   }
 }

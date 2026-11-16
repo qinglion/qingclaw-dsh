@@ -49,6 +49,7 @@
         catalogURL: !!js "(process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com').replace(/\\/+$/, '') + '/auth-api/v0/dsh/models'"
         imageModel: qwen-image-3.0
         videoModel: wan3.0-video-prime
+        audioModel: qwen-audio-3.1-tts
         maxTokens: 8192
 
 - insert:
