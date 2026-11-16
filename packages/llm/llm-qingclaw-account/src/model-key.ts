@@ -37,9 +37,9 @@ function invalidResponse(message: string, cause?: unknown): LlmError {
   return new LlmError(`QingClaw model-key response ${message}`, 'INVALID_RESPONSE', cause === undefined ? undefined : { cause })
 }
 
-function endpointFailure(status: number): LlmError {
+function endpointFailure(status: number, detail?: string): LlmError {
   if (status === 401) return new LlmError('QingClaw model-key credential was rejected.', 'ACCOUNT_TOKEN_INVALID', { status })
-  if (status === 403) return new LlmError('QingClaw account has no active model entitlement.', 'ACCOUNT_QUOTA', { status })
+  if (status === 403) return new LlmError(detail ?? 'QingClaw account has no active model entitlement.', 'ACCOUNT_QUOTA', { status })
   if (status === 429) return new LlmError('QingClaw model-key exchange was rate limited.', 'RATE_LIMIT', { status })
   if (status >= 500) return new LlmError('QingClaw model-key service is unavailable.', 'SERVER', { status })
   return new LlmError(`QingClaw model-key endpoint answered HTTP ${status}.`, `HTTP_${status}`, { status })
@@ -135,7 +135,13 @@ export class ModelKeyCache {
     } catch (error) {
       throw new LlmError('QingClaw model-key exchange failed.', 'SERVER', { cause: error })
     }
-    if (!response.ok) throw endpointFailure(response.status)
+    if (!response.ok) {
+      const body = await response.json().catch(() => undefined)
+      const detail = typeof body === 'object' && body !== null
+        ? (Reflect.get(body, 'data') as { message?: unknown } | undefined)?.message
+        : undefined
+      throw endpointFailure(response.status, typeof detail === 'string' ? detail : undefined)
+    }
     const parsed = responseEnvelope.safeParse(await readJson(response))
     if (!parsed.success) throw invalidResponse('has an unexpected envelope', parsed.error)
     return parsed.data.data.biz_data.api_key
