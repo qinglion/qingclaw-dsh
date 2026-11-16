@@ -21,9 +21,12 @@ function account(remaining: number, active: boolean) {
 
 function mount(value: ReturnType<typeof account>) {
   const open = vi.fn()
-  render(<AccountQuotaBanner {...({} as never)} useAccount={(select: (snapshot: never) => unknown) => select(value as never)}
-    usePlatformPage={(select: (page: null) => unknown) => select(null)} openPlatformPage={open}
-    t={(key: keyof typeof zh) => zh[key]} />)
+  render(AccountQuotaBanner({
+    useAccount: (select: (snapshot: never) => unknown) => select(value as never),
+    usePlatformPage: (select: (page: null) => unknown) => select(null),
+    openPlatformPage: open,
+    t: (key: keyof typeof zh) => zh[key],
+  } as never))
   return open
 }
 
