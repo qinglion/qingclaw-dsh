@@ -1,0 +1,45 @@
+// @vitest-environment jsdom
+/** Persistent account quota banner beside the composer. */
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, expect, it, vi } from 'vitest'
+import { AccountQuotaBanner } from '../src/client/AccountQuotaBanner.tsx'
+import { zh } from '../src/client/locales.ts'
+
+afterEach(cleanup)
+
+function account(remaining: number, active: boolean) {
+  return {
+    view: { links: { topUpUrl: 'https://example.test/top-up' } },
+    details: {
+      profile: {
+        status: 'ready' as const,
+        value: { id: 'u1', name: '用户', contact: null, quotaRemaining: remaining, quotaLimit: 100_000, subscriptionActive: active },
+      },
+    },
+  }
+}
+
+function mount(value: ReturnType<typeof account>) {
+  const open = vi.fn()
+  render(<AccountQuotaBanner {...({} as never)} useAccount={(select: (snapshot: never) => unknown) => select(value as never)}
+    usePlatformPage={(select: (page: null) => unknown) => select(null)} openPlatformPage={open}
+    t={(key: keyof typeof zh) => zh[key]} />)
+  return open
+}
+
+it('shows the expired notice and opens top-up', () => {
+  const open = mount(account(12_000, false))
+  expect(screen.getByRole('status').textContent).toContain('套餐已到期')
+  fireEvent.click(screen.getByRole('button', { name: '去充值' }))
+  expect(open).toHaveBeenCalledWith('top-up', expect.any(Function))
+})
+
+it('shows the empty notice', () => {
+  mount(account(0, true))
+  expect(screen.getByRole('status').textContent).toContain('额度已用完')
+})
+
+it('stays hidden while quota is healthy', () => {
+  mount(account(80_000, true))
+  expect(screen.queryByRole('status')).toBeNull()
+})

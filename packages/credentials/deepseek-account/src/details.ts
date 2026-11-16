@@ -9,6 +9,14 @@ const user = z.object({
   id_profile: z.object({ name: z.string().nullable(), picture: z.string().nullish() }).nullish(),
   plan: z.string().nullish(),
   subscription_ends_at: z.string().nullish(),
+  quota_remaining: z.number().nullish(),
+  quota_limit: z.number().nullish(),
+  weekly_remaining: z.number().nullish(),
+  weekly_limit: z.number().nullish(),
+  topup_tokens: z.number().nullish(),
+  trial_tokens: z.number().nullish(),
+  subscription_active: z.boolean().nullish(),
+  quota_reset_at: z.string().nullish(),
 })
 // balance and amount arrive as strings that Platform's Web client passes to big.js, whose decimal
 // grammar also accepts an omitted integer or fraction part and a decimal exponent (0E-16, 1e+3).
@@ -35,6 +43,14 @@ function projectProfile(value: z.infer<typeof user>): AccountProfile {
     name: identity?.name || null, contact: mobile || mobileNumber || email || null,
     ...(value.plan == null ? {} : { plan: value.plan }),
     ...(value.subscription_ends_at == null ? {} : { subscriptionEndsAt: value.subscription_ends_at }),
+    ...(value.quota_remaining == null ? {} : { quotaRemaining: value.quota_remaining }),
+    ...(value.quota_limit == null ? {} : { quotaLimit: value.quota_limit }),
+    ...(value.weekly_remaining == null ? {} : { weeklyRemaining: value.weekly_remaining }),
+    ...(value.weekly_limit == null ? {} : { weeklyLimit: value.weekly_limit }),
+    ...(value.topup_tokens == null ? {} : { topupTokens: value.topup_tokens }),
+    ...(value.trial_tokens == null ? {} : { trialTokens: value.trial_tokens }),
+    ...(value.subscription_active == null ? {} : { subscriptionActive: value.subscription_active }),
+    ...(value.quota_reset_at == null ? {} : { quotaResetAt: value.quota_reset_at }),
   }
 }
 

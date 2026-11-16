@@ -1,0 +1,32 @@
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  /* Match the composer card: its available width is 26px narrower than the
+     shared max-width expression at the docked layout. */
+  max-width: calc(var(--dsh-composer-card-max-width, 100%) - 26px);
+  margin: 0 auto 8px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--dsh-warning, #d97706) 35%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dsh-warning, #d97706) 9%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  color: var(--dsh-text, #1f2937);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.text { min-width: 0; }
+.action {
+  flex: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 4px 9px;
+  background: var(--dsh-warning, #d97706);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.action:hover { filter: brightness(1.06); }

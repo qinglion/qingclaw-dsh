@@ -15,6 +15,22 @@ import css from './AccountMenu.module.css'
 /** Account launcher composed by the settings shell. */
 export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSlots<'settings.launcher.notifications'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 
+function compactQuota(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+  return String(value)
+}
+
+function planLabel(plan: string): string {
+  return plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)
+}
+
+function weeklyPercent(value: { quotaRemaining?: number | null; weeklyRemaining?: number | null; weeklyLimit?: number | null }): number {
+  const remaining = value.weeklyRemaining ?? value.quotaRemaining ?? 0
+  const limit = value.weeklyLimit ?? 0
+  return limit > 0 ? Math.min(100, Math.max(0, Math.round((remaining / limit) * 100))) : 0
+}
+
 /** The signed-in label stays empty while the profile loads.
  * @param props - sidebar geometry, settings navigation and account operations.
  * @returns account menu launcher.
@@ -23,7 +39,7 @@ export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
   useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, renderSlot,
   contactUs, showLogin, start, cancel, avatarFailed, t,
-  allowApiKey,
+  allowApiKey, openPlatformPage,
 }: AccountMenuProps) {
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
   // re-renders, section switches and tab switches inside one open must not read again.
@@ -73,6 +89,15 @@ export function AccountMenu({
         {wide && <span className={css.label}>{signedIn ? label : t('more')}</span>}
       </button>}
       items={[
+        ...(profile?.status === 'ready' && profile.value.quotaRemaining != null ? [
+          { type: 'label' as const, id: 'quota-source', text: `${t('quotaSource')} ${planLabel(profile.value.plan ?? 'Free')} 套餐` },
+          { type: 'separator' as const, id: 'quota-separator' },
+          ...(profile.value.weeklyLimit != null && profile.value.weeklyLimit > 0
+            ? [{ id: 'quota-weekly', label: `${t('quotaWeekly')} ${weeklyPercent(profile.value)}%`, disabled: true }]
+            : []),
+          { id: 'quota-remaining', label: `${t('quotaRemaining')} ${compactQuota(profile.value.quotaRemaining)}`, disabled: true },
+          { id: 'usage', label: t('quotaManage'), icon: <IconSettingsOutlineMedium size={16} /> },
+        ] : []),
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
           ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
         { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineMedium size={16} /> },
@@ -82,6 +107,11 @@ export function AccountMenu({
       onClose={() => { setOpen(false) }}
       onSelect={(id) => {
         if (id === 'settings') { setOpen(false); trigger.current?.focus(); openSettings() }
+        else if (id === 'usage') {
+          setOpen(false)
+          if (openPlatformPage !== undefined) openPlatformPage('usage', () => undefined)
+          else openSettings('account')
+        }
         else if (id === 'contact') { setOpen(false); contactUs() }
         else if (id === 'signin') beginSignIn()
         else void requestSignOut()
