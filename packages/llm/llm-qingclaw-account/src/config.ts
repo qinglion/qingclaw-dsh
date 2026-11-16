@@ -48,7 +48,7 @@ export const Config = z.object({
   catalogURL: z.string().default('').volatile(),
   imageModel: z.string().default('qwen-image-3.0').volatile(),
   videoModel: z.string().default('wan3.0-video-prime').volatile(),
-  audioModel: z.string().default('qwen-audio-3.1-tts').volatile(),
+  audioModel: z.string().default('qwen3-tts-flash').volatile(),
 })
 
 /** Plain QingClaw options accepted by {@link resolveOptions}. */
@@ -118,7 +118,7 @@ export function resolveOptions(options: Options): ResolvedOptions {
   const {
     modelsTimeoutMs: _timeout, modelsMaxAgeMs: _maxAge, modelOverrides = {},
     modelTokenTimeoutMs = DEFAULT_MODEL_TOKEN_TIMEOUT_MS, catalogURL = '',
-    imageModel = 'qwen-image-3.0', videoModel = 'wan3.0-video-prime', audioModel = 'qwen-audio-3.1-tts', ...protocolOptions
+    imageModel = 'qwen-image-3.0', videoModel = 'wan3.0-video-prime', audioModel = 'qwen3-tts-flash', ...protocolOptions
   } = options
   if (!Number.isFinite(modelTokenTimeoutMs) || modelTokenTimeoutMs <= 0 || modelTokenTimeoutMs > MAX_TIMER_DELAY_MS) {
     throw new Error(`llm-qingclaw-account: modelTokenTimeoutMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`)

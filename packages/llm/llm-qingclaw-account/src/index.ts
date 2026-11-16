@@ -241,12 +241,16 @@ export function apply(ctx: Context, config: Config): void {
           description: 'Generate speech with the default QingClaw speech model and return the gateway result.',
           parameters: {
             text: { type: 'string', required: true, description: 'Text to synthesize.' },
+            voice: { type: 'string', description: 'Voice name, default Cherry.' },
           },
           output: textOutput,
           timeoutMs: 120_000,
-          execute: async (args: { text: string }) => await mediaRequest(
-            '/audio/api/v1/services/audio/tts/SpeechSynthesizer',
-            { model: settings().audioModel, input: { text: args.text } },
+          execute: async (args: { text: string; voice?: string }) => await mediaRequest(
+            '/audio/api/v1/services/aigc/multimodal-generation/generation',
+            {
+              model: settings().audioModel,
+              input: { text: args.text, voice: args.voice ?? 'Cherry' },
+            },
           ),
         }),
         toolRegistry.register({
