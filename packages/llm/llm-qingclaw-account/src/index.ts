@@ -190,21 +190,6 @@ export function apply(ctx: Context, config: Config): void {
       if (!response.ok) throw new LlmError(`QingClaw media request failed: ${response.status} ${text.slice(0, 300)}`, 'UNKNOWN')
       return text
     }
-    const chargeMedia = async (kind: string, units: number): Promise<void> => {
-      const apiKey = await keys.resolve()
-      if (apiKey === undefined) return
-      const origin = new URL(settings().catalog.url).origin
-      try {
-        const response = await fetch(`${origin}/auth-api/v0/dsh/media_charge`, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ kind, units }),
-        })
-        if (!response.ok) console.warn(LOG_TAG, `media charge failed: ${response.status}`)
-      } catch (error) {
-        console.warn(LOG_TAG, `media charge failed: ${String(error)}`)
-      }
-    }
     const textOutput = {
       schema: { type: 'string' as const },
       render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
@@ -221,16 +206,12 @@ export function apply(ctx: Context, config: Config): void {
           },
           output: textOutput,
           timeoutMs: 180_000,
-          execute: async (args: { prompt: string; size?: string; n?: number }) => {
-            const result = await mediaRequest('/v1/images/generations', {
-              model: settings().imageModel,
-              prompt: args.prompt,
-              ...(args.size === undefined ? {} : { size: args.size }),
-              ...(args.n === undefined ? {} : { n: args.n }),
-            })
-            await chargeMedia('image', args.n ?? 1)
-            return result
-          },
+          execute: async (args: { prompt: string; size?: string; n?: number }) => await mediaRequest('/v1/images/generations', {
+            model: settings().imageModel,
+            prompt: args.prompt,
+            ...(args.size === undefined ? {} : { size: args.size }),
+            ...(args.n === undefined ? {} : { n: args.n }),
+          }),
         }),
         toolRegistry.register({
           name: 'video_generate',
@@ -242,23 +223,18 @@ export function apply(ctx: Context, config: Config): void {
           },
           output: textOutput,
           timeoutMs: 60_000,
-          execute: async (args: { prompt: string; seconds?: string; size?: string }) => {
-            const seconds = Number(args.seconds ?? 5)
-            const result = await mediaRequest(
-              '/video/api/v1/services/aigc/video-generation/video-synthesis',
-              {
-                model: settings().videoModel,
-                input: { prompt: args.prompt },
-                parameters: {
-                  duration: seconds,
-                  resolution: args.size?.includes('1080') === true ? '1080P' : args.size?.includes('720') === true ? '720P' : '480P',
-                },
+          execute: async (args: { prompt: string; seconds?: string; size?: string }) => await mediaRequest(
+            '/video/api/v1/services/aigc/video-generation/video-synthesis',
+            {
+              model: settings().videoModel,
+              input: { prompt: args.prompt },
+              parameters: {
+                duration: Number(args.seconds ?? 5),
+                resolution: args.size?.includes('1080') === true ? '1080P' : args.size?.includes('720') === true ? '720P' : '480P',
               },
-              { 'X-DashScope-Async': 'enable' },
-            )
-            await chargeMedia('video_second', seconds)
-            return result
-          },
+            },
+            { 'X-DashScope-Async': 'enable' },
+          ),
         }),
         toolRegistry.register({
           name: 'audio_generate',
@@ -269,17 +245,13 @@ export function apply(ctx: Context, config: Config): void {
           },
           output: textOutput,
           timeoutMs: 120_000,
-          execute: async (args: { text: string; voice?: string }) => {
-            const result = await mediaRequest(
-              '/audio/api/v1/services/aigc/multimodal-generation/generation',
-              {
-                model: settings().audioModel,
-                input: { text: args.text, voice: args.voice ?? 'Cherry' },
-              },
-            )
-            await chargeMedia('audio_character', args.text.length)
-            return result
-          },
+          execute: async (args: { text: string; voice?: string }) => await mediaRequest(
+            '/audio/api/v1/services/aigc/multimodal-generation/generation',
+            {
+              model: settings().audioModel,
+              input: { text: args.text, voice: args.voice ?? 'Cherry' },
+            },
+          ),
         }),
         toolRegistry.register({
           name: 'video_get',
