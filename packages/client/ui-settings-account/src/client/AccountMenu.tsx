@@ -1,7 +1,7 @@
 /** Sidebar account launcher and locally authoritative sign-out action. */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Toast, Menu, IconEllipsisOutlineMedium, IconPaperPlaneOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
+  Toast, Menu, MenuItemButton, IconEllipsisOutlineMedium, IconPaperPlaneOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSectionInjected } from './AccountSection.tsx'
@@ -13,23 +13,7 @@ import type {} from './account-ui.ts'
 import css from './AccountMenu.module.css'
 
 /** Account launcher composed by the settings shell. */
-export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSlots<'settings.launcher.notifications'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
-
-function compactQuota(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
-  return String(value)
-}
-
-function planLabel(plan: string): string {
-  return plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)
-}
-
-function weeklyPercent(value: { quotaRemaining?: number | null; weeklyRemaining?: number | null; weeklyLimit?: number | null }): number {
-  const remaining = value.weeklyRemaining ?? value.quotaRemaining ?? 0
-  const limit = value.weeklyLimit ?? 0
-  return limit > 0 ? Math.min(100, Math.max(0, Math.round((remaining / limit) * 100))) : 0
-}
+export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSlots<'settings.launcher.notifications' | 'settings.launcher.actions' | 'settings.launcher.tools'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 
 /** The signed-in label stays empty while the profile loads.
  * @param props - sidebar geometry, settings navigation and account operations.
@@ -39,7 +23,7 @@ export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
   useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, renderSlot,
   contactUs, showLogin, start, cancel, avatarFailed, t,
-  allowApiKey, openPlatformPage,
+  allowApiKey,
 }: AccountMenuProps) {
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
   // re-renders, section switches and tab switches inside one open must not read again.
@@ -72,7 +56,7 @@ export function AccountMenu({
   // The plugin's start publishes `loginFailed` before it rejects, so the dialog owns the report.
   const beginSignIn = (): void => { setOpen(false); void start().catch(() => undefined) }
   const openAccount = useCallback(() => { openSettings('account') }, [openSettings])
-  return <div className={css.root} data-inset={signedIn && wide}>
+  return <div className={css.root} data-inset={signedIn && wide} data-wide={wide}>
     {signInNotice > 0 && <Toast key={signInNotice} text={t('modelSignInRequired')} onDone={() => { setSignInNotice(0) }} />}
     {expiryNotice && <Toast text={t('sessionExpired')} onDone={() => { setExpiryNotice(false) }} />}
     <div className={css.notifications} hidden={!wide}>{renderSlot('settings.launcher.notifications', {
@@ -89,33 +73,27 @@ export function AccountMenu({
         {wide && <span className={css.label}>{signedIn ? label : t('more')}</span>}
       </button>}
       items={[
-        ...(profile?.status === 'ready' && profile.value.quotaRemaining != null ? [
-          { type: 'label' as const, id: 'quota-source', text: `${t('quotaSource')} ${planLabel(profile.value.plan ?? 'Free')} 套餐` },
-          { type: 'separator' as const, id: 'quota-separator' },
-          ...(profile.value.weeklyLimit != null && profile.value.weeklyLimit > 0
-            ? [{ id: 'quota-weekly', label: `${t('quotaWeekly')} ${weeklyPercent(profile.value)}%`, disabled: true }]
-            : []),
-          { id: 'quota-remaining', label: `${t('quotaRemaining')} ${compactQuota(profile.value.quotaRemaining)}`, disabled: true },
-          { id: 'usage', label: t('quotaManage'), icon: <IconSettingsOutlineMedium size={16} /> },
-        ] : []),
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
           ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
-        { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineMedium size={16} /> },
-        ...(signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
-          : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
       ]}
       onClose={() => { setOpen(false) }}
       onSelect={(id) => {
         if (id === 'settings') { setOpen(false); trigger.current?.focus(); openSettings() }
-        else if (id === 'usage') {
-          setOpen(false)
-          if (openPlatformPage !== undefined) openPlatformPage('usage', () => undefined)
-          else openSettings('account')
-        }
-        else if (id === 'contact') { setOpen(false); contactUs() }
-        else if (id === 'signin') beginSignIn()
-        else void requestSignOut()
-      }} />
+
+      }}>
+      {open && signedIn && renderSlot('settings.launcher.actions', { onDismiss: () => { setOpen(false) } })}
+      <MenuItemButton icon={<IconPaperPlaneOutlineMedium size={16} />} onSelect={() => { setOpen(false); contactUs() }}>
+        {t('contactUs')}
+      </MenuItemButton>
+      {signedIn
+        ? <MenuItemButton icon={<LogoutIcon />} disabled={busy} onSelect={() => { void requestSignOut() }}>
+          {t('signOut')}
+        </MenuItemButton>
+        : <MenuItemButton icon={<IconUserOutlineMedium size={16} />} onSelect={beginSignIn}>
+          {t('signIn')}
+        </MenuItemButton>}
+    </Menu>
+    <div className={css.tools}>{renderSlot('settings.launcher.tools', { wide })}</div>
     {account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
       start={start} cancel={cancel} t={t} allowApiKey={allowApiKey}
       close={() => { showLogin(false) }} useApiKey={() => { showLogin(false); openOnboarding('deepseek-official') }} />}

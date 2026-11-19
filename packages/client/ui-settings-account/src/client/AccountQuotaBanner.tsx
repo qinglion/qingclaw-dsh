@@ -2,6 +2,7 @@
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PlatformPageClaim, PlatformPages } from './platform-pages.ts'
 import type { AccountSnapshot } from './AccountSection.tsx'
+import { formatQuota } from './formatBalance.ts'
 import css from './AccountQuotaBanner.module.css'
 
 /** Injected account data and the top-up page channel. */
@@ -16,12 +17,6 @@ export interface AccountQuotaBannerInjected {
 type AccountQuotaBannerProps = PropsRuntime<'conversation.input.dock'>
   & PropsLocale<'settings.account'>
   & InjectFace<AccountQuotaBannerInjected>
-
-function compact(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
-  return String(value)
-}
 
 /** Show a red-ish banner only when the wallet is empty, the subscription lapsed, or quota is low. */
 export function AccountQuotaBanner({ useAccount, usePlatformPage, openPlatformPage, t }: AccountQuotaBannerProps) {
@@ -40,8 +35,8 @@ export function AccountQuotaBanner({ useAccount, usePlatformPage, openPlatformPa
   const text = remaining <= 0
     ? t('quotaBannerEmpty')
     : expired
-      ? `${t('quotaBannerExpired')} ${compact(remaining)}`
-      : `${t('quotaBannerLow')} ${compact(remaining)}`
+      ? `${t('quotaBannerExpired')} ${formatQuota(remaining)}`
+      : `${t('quotaBannerLow')} ${formatQuota(remaining)}`
   const openTopUp = () => {
     if (openPlatformPage !== undefined) {
       openPlatformPage('top-up', () => undefined)

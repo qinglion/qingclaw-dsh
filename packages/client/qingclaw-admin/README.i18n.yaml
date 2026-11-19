@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/qingclaw-admin/README.md
+/qingclaw-management:
+  en: 74ef9fe7ec0800bf
+  zh: 3950ce1803d006cc
+/qingclaw-management/summary:
+  en: eeb1f9860ab4d46e
+  zh: af6faf477ef715d6
+/qingclaw-management/model-experience:
+  en: d0b0639acf354a8e
+  zh: 07b4f18c2ac4d296
+/qingclaw-management/model-experience/kv-cache-effect:
+  en: e5f0df71efc63834
+  zh: e54dbabbf8c218ea
+/qingclaw-management/known-limitations-and-deferred-work:
+  en: e9673f2d74f125ee
+  zh: e4b0a73ca740800a

@@ -1,5 +1,5 @@
 ---
-description: "Add the QingClaw learning workbench, public Feed v1 cache, and official links to a DSH product bundle."
+description: "Browse, install, and open QingClaw workbenches from the DSH sidebar."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,9 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package adds a QingClaw Workbench entry to the DSH sidebar. Its Host half validates and caches the public QingClaw Feed v1 response; its Client half renders a daily quote, latest public videos, featured courses, and links to the official website through DSH slots.
+The Workbenches sidebar entry shows the official QingClaw catalog. In Market, My favorites, or Installed, search by workbench name, package name, author, or category. Install a workbench to open its main panel and pin it to the sidebar.
+
+Select a card to read its summary and the README for the listed version, when available. Returning to the catalog preserves your tab, search, and category filter.
 
 ## Table of Contents
 
@@ -23,39 +25,27 @@ This package adds a QingClaw Workbench entry to the DSH sidebar. Its Host half v
 <a id="use-this-package"></a>
 ## Use this package
 
-Add the package as a Host plugin and include its Client row in the product bundle. The Client mounts this package's generated Remote contribution itself, so the central DSH Remote assembly does not need a QingClaw-specific import.
+Include the Host plugin and its Client contribution in the product bundle. The Host reads `/workbenches/index.json` from `QINGCLAW_PLATFORM_ORIGIN`, which defaults to `https://qingclaw.com`. Each catalog entry identifies an exact `@qinglion` package version at `https://npm.qingclaw.com/` and its `panelId`. The native plugin manager installs the package and reports its installed state. Once the plugin registers that `main` panel, users can open it directly. Installed panels appear in the sidebar automatically. The native sidebar provides the pin controls. With caching enabled, a previously verified directory from the same website can restore installed panels when the client is offline. Installing a new package requires the online directory.
 
-The default public feed is `https://qingclaw.com/api/workbench-feed`. For durable last-good behavior, configure an absolute owner-private path:
-
-```yaml
-- name: '@qinglion/dsh-qingclaw-workbench'
-  config:
-    cacheFile: !!js dshPath('cache', 'qingclaw-workbench', 'feed.json')
-```
-
-`feedUrl`, `cacheTtlMs`, `fetchTimeoutMs`, and `maxResponseBytes` are also configurable. The Host accepts only HTTP(S) feed and card URLs, bounds the response before JSON parsing, limits Feed v1 to 30 videos and four courses, and writes cache replacements atomically with owner-only file permissions. A failed refresh shows a validated last-good result as stale. Without one, the page presents an inline Retry action.
-
-The page registers through the root-scoped `main` and `sidebar.panellist` slots. It does not access `window.Clacky`, old OpenClacky user data, the skill store, or legacy agent mappings.
+Existing integrations can still call `getFeed(refresh)` for Feed v1 at `https://qingclaw.com/api/workbench-feed`. This API retains its validated last good feed if a refresh fails. Set `cacheFile` to an absolute owner-private path to retain it across restarts. `feedUrl` overrides the legacy feed URL. The catalog and feed share the `cacheTtlMs`, `fetchTimeoutMs`, and `maxResponseBytes` settings.
 
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as the Workbench only fetches public content for browser presentation and does not modify model context.
+None, as the catalog and navigation operate outside model context.
 
 #### KV Cache effect
 
-None. The package contributes only a Host content Remote and browser UI.
+None. Catalog and feed reads add no tokens to model requests.
 
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Feed v1 exposes public learning content only; authentication-gated courses are not surfaced here.
-- The daily quote is selected deterministically from the local date and changes after the page remounts on a new day; no midnight timer is retained.
-- User avatar, favorites, legacy extension state, skill-market features, and old agent mappings are intentionally excluded from this first version.
-- Non-Chinese locales currently use the English copy while product translations are prepared.
+- Favorites are saved in this client’s local browser storage.
+- A workbench displays “Restart to open” while its package is installed and its main panel is unavailable.
 
 <a id="dev-note"></a>
 ### Dev Note
 
-Keep product composition in the QingClaw bundle. This package owns only its Host/Client protocol, cache, and slots.
+Use `getWorkbenchCatalog(refresh)` for the directory. Keep the legacy `getFeed(refresh)` response compatible for integrations that display learning content.

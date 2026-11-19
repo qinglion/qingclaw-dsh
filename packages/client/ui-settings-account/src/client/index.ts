@@ -19,6 +19,7 @@ import { authorizeUrlWithTheme } from './authorize-url.ts'
 import { BrowserLogin } from './browser-login.ts'
 import { AccountOnboarding } from './AccountOnboarding.tsx'
 import { AccountPlatformHost, type AccountPlatformHostInjected } from './AccountPlatformHost.tsx'
+import { AccountQuotaTool } from './AccountQuotaTool.tsx'
 import { AccountMenu } from './AccountMenu.tsx'
 import { AccountColdStart } from './AccountColdStart.tsx'
 import { createPlatformPages, type PlatformPages } from './platform-pages.ts'
@@ -323,8 +324,17 @@ export function apply(ctx: Context): void {
   }
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher', () => ctx.slots.register({
     name: 'settings.launcher', locale: 'settings.account', inject: () => operations,
-    children: { 'settings.launcher.notifications': { kind: 'single', scope: 'root' } },
+    children: {
+      'settings.launcher.notifications': { kind: 'single', scope: 'root' },
+      'settings.launcher.actions': { kind: 'list', scope: 'root' },
+      'settings.launcher.tools': { kind: 'list', scope: 'root' },
+    },
   }, AccountMenu)))
+  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher.tools', () => ctx.slots.register({
+    name: 'settings.launcher.tools', id: 'account-quota', order: 10, locale: 'settings.account',
+    inject: () => ({ hooks: { account: operations.hooks.account }, refreshAccount,
+      ...(nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) }) }),
+  }, AccountQuotaTool)))
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock', id: 'account-quota-banner', order: 100, locale: 'settings.account',
     inject: (): AccountQuotaBannerInjected => ({

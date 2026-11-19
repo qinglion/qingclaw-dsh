@@ -26,3 +26,13 @@ it('projects the QingClaw WeChat identity used by the shared account menu', () =
     avatarUrl: 'https://thirdwx.qlogo.cn/mmopen/avatar/132',
   })
 })
+
+it('projects QingClaw role and market capabilities without leaking other user fields', () => {
+  expect(profile({
+    id: 'qcu_admin', email: 'masked@example.test', role: 'admin',
+    capabilities: { publish_plugins: true, manage_plugin_market: true, manage_users: true }, ignored_secret: 'must-not-cross-the-client-boundary',
+  })).toEqual({
+    id: 'qcu_admin', name: null, contact: 'masked@example.test', avatarUrl: null,
+    role: 'admin', capabilities: { publishPlugins: true, managePluginMarket: true, manageUsers: true },
+  })
+})

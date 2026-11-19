@@ -51,6 +51,15 @@ it('routes original-file requests through the trusted application bridge', async
   ])
 })
 
+it('opens pairing from the application with no credentials or caller-supplied arguments', async () => {
+  vi.stubGlobal('location', new URL('dsh-app://app/'))
+  electron.ipcRenderer.invoke.mockResolvedValueOnce(undefined)
+  await import('../src/preload-app.ts')
+  const api = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1] as DshDesktopProductApi
+  await expect(api.mobilePairing.open()).resolves.toBeUndefined()
+  expect(electron.ipcRenderer.invoke).toHaveBeenCalledExactlyOnceWith(DESKTOP_IPC.mobilePairingOpen)
+})
+
 it('limits product documents to update status and a native confirmation action', async () => {
   vi.stubGlobal('location', new URL('dsh-app://app/index.html'))
   await import('../src/preload-app.ts')

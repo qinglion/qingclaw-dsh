@@ -57,6 +57,14 @@ export interface AccountProfile {
   readonly contact: string | null
   /** Profile image URL supplied by Platform, absent when no picture is configured. */
   readonly avatarUrl?: string | null
+  /** Product role returned by QingClaw's control plane. */
+  readonly role?: 'user' | 'creator' | 'admin' | null
+  /** Server-authoritative QingClaw product capabilities. */
+  readonly capabilities?: {
+    readonly publishPlugins: boolean
+    readonly managePluginMarket: boolean
+    readonly manageUsers: boolean
+  }
   /** QingClaw model entitlement plan, when the deployment supplies one. */
   readonly plan?: string | null
   /** ISO timestamp when the current subscription ends. */

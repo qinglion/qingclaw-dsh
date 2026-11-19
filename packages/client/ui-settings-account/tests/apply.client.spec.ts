@@ -19,6 +19,7 @@ import type { AccountSectionInjected } from '../src/client/AccountSection.tsx'
 import { CONTACT_CONFIG_GLOBAL } from '../src/contact-config.ts'
 import { AccountPlatformHost } from '../src/client/AccountPlatformHost.tsx'
 import type { AccountPlatformHostInjected } from '../src/client/AccountPlatformHost.tsx'
+import { AccountQuotaTool } from '../src/client/AccountQuotaTool.tsx'
 import { AccountQuotaNotice } from '../src/client/AccountQuotaNotice.tsx'
 import type { AccountQuotaNoticeInjected } from '../src/client/AccountQuotaNotice.tsx'
 import { AccountColdStart } from '../src/client/AccountColdStart.tsx'
@@ -62,6 +63,7 @@ it('registers account sign-in in a plain browser without the Desktop-only surfac
     if (reload) await c.reload(SELF)
     await c.mock.streams.opened('account/watch', reload ? 2 : 1)
     expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1)
+    expect(c.ctx.slots.entries('settings.launcher.tools').map(entry => entry.component)).toContain(AccountQuotaTool)
     expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(1)
     expect(quotaNoticeEntry(c)).toBeDefined()
     expect(platformHostEntry(c)).toBeUndefined()

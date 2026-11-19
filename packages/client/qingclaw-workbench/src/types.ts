@@ -47,3 +47,23 @@ export interface ProEntitlement {
   readonly plan: string | null
   readonly endsAt: string | null
 }
+
+/** An official desktop workbench already adapted to the Cordis bundle protocol. */
+export interface WorkbenchCatalogEntry {
+  readonly packageName: string
+  readonly version: string
+  readonly panelId: string
+  readonly title: string
+  readonly description: string
+  readonly author: string
+  readonly category: string
+  readonly registry: string
+  readonly previewUrl?: string
+  readonly repositoryUrl?: string
+}
+
+/** Entries may be shown offline. New installation requires a successful refresh. */
+export interface WorkbenchCatalogResult {
+  readonly entries: WorkbenchCatalogEntry[]
+  readonly stale: boolean
+}

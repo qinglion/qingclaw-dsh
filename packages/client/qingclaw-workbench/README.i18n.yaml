@@ -3,29 +3,29 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/qingclaw-workbench/README.md
 /:
-  en: 6346f7234bfffa54
-  zh: bd63d1e47482d9d0
+  en: 92416d396177cbe1
+  zh: 701f670ce8dd148c
 /qinglion-dsh-qingclaw-workbench:
   en: 6acfd8058f0e692d
   zh: c6369e45dd024d30
 /qinglion-dsh-qingclaw-workbench/summary:
-  en: ecacffd94fde211d
-  zh: ea837369d9374cd5
+  en: a503528270d704ec
+  zh: 7e045266082f1944
 /qinglion-dsh-qingclaw-workbench/table-of-contents:
   en: 4e53164159b5ce41
   zh: bd61ce1bef78579b
 /qinglion-dsh-qingclaw-workbench/use-this-package:
-  en: fe0a137ec9fbb078
-  zh: ae1dad080ec1456c
+  en: fc5deb09c7a2dcd0
+  zh: dc3fbc73b2d4c59a
 /qinglion-dsh-qingclaw-workbench/model-experience:
-  en: eb5625d7fbec0ad2
-  zh: b7bcdd7faebfaf45
+  en: aada52ecdde91c46
+  zh: f6961cb06a163f6f
 /qinglion-dsh-qingclaw-workbench/model-experience/kv-cache-effect:
-  en: 48dc23dd8eb3bb20
-  zh: 07591bf3f8bc6182
+  en: ba61ddb7f39f6d5b
+  zh: b842985c7d0481fc
 /qinglion-dsh-qingclaw-workbench/known-limitations-and-deferred-work:
-  en: ac8da7bf0d6529b3
-  zh: f961ef2a796b2967
+  en: d4ae07ce1fa0261a
+  zh: 4162bd3305f862b3
 /qinglion-dsh-qingclaw-workbench/known-limitations-and-deferred-work/dev-note:
-  en: 8b3e28e33360c691
-  zh: 566ee351751c39f7
+  en: 29438d357cef140d
+  zh: f2178934a6afc8b1

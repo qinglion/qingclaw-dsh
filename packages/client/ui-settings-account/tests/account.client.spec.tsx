@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, act, within } from '@testing-library/react'
 import { useMemo, useSyncExternalStore } from 'react'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
-import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+import type { GlobalStandardProps, SlotMap } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountDetails, AccountView, SignInAttemptId } from '@deepseek-ai/dsh-deepseek-account/types'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { PlatformBridge } from '../src/client/PlatformOverlay.tsx'
@@ -180,6 +180,33 @@ it.each([en, zh])('updates the Settings menu keycaps and accessible combination 
   expect(settings.querySelector('kbd')).toBeNull()
   fireEvent.click(settings)
   expect(props.openSettings).toHaveBeenCalledOnce()
+})
+
+it('places contributed actions next to Settings and keeps sign-out last', async () => {
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  const { MenuItemButton } = await import('@deepseek-ai/dsh-client-ui-primitives')
+  const operations = operationsOf({ status: 'credential-stored', attempt: null })
+  const selected = vi.fn()
+  const renderAction: AccountMenuProps['renderSlot'] = (slot, value) => {
+    if (slot !== 'settings.launcher.actions') return null
+    const owner: object = value
+    const { onDismiss } = owner as SlotMap['settings.launcher.actions']['owner']
+    return <MenuItemButton onSelect={() => { selected(); onDismiss() }}>Management</MenuItemButton>
+  }
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} renderSlot={renderAction} wide
+    settingsOpen={false} openSettings={vi.fn()} openOnboarding={vi.fn()}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())}
+    t={key => key in en ? en[key as AccountKey] : key} />)
+  fireEvent.click(screen.getByRole('button', { name: en.menu }))
+  expect(screen.getAllByRole('menuitem').map(row => row.textContent)).toEqual([en.settings, 'Management', en.contactUs, en.signOut])
+  const manage = screen.getByRole('menuitem', { name: 'Management' })
+  screen.getByRole('menuitem', { name: en.settings }).focus()
+  fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(manage)
+  fireEvent.click(manage)
+  expect(selected).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('menu')).toBeNull()
 })
 
 it.each([en, zh])('offers settings, contact and sign-in from the signed-out account menu', async (copy) => {
@@ -758,7 +785,7 @@ it.each(['desktopOnboardingVisible', 'onboarding'] as const)('hides the notifica
   let openAccount: (() => void) | undefined
   const openSettings = vi.fn()
   const renderSlot: AccountMenuProps['renderSlot'] = (name, owner) => {
-    expect(name).toBe('settings.launcher.notifications')
+    if (name !== 'settings.launcher.notifications') return null
     const value: object = owner
     const props = value as AccountNotificationsOwnerProps
     active = props.active
@@ -777,7 +804,7 @@ it.each(['desktopOnboardingVisible', 'onboarding'] as const)('hides the notifica
 it('keeps notification DOM inside the launcher while the collapsed rail hides it', async () => {
   const operations = operationsOf({ status: 'credential-stored', attempt: null })
   const snapshot = () => operations.hooks.account.getSnapshot()
-  const renderSlot: AccountMenuProps['renderSlot'] = () => <div role="status">Notification</div>
+  const renderSlot: AccountMenuProps['renderSlot'] = name => name === 'settings.launcher.notifications' ? <div role="status">Notification</div> : null
   const view = render(await accountMenu(operations, snapshot, false, renderSlot))
   const notice = screen.getByRole('status')
   expect(view.container.contains(notice)).toBe(true)

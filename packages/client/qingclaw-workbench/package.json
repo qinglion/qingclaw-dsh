@@ -1,6 +1,6 @@
 {
   "name": "@qinglion/dsh-qingclaw-workbench",
-  "description": "QingClaw learning workbench with a Host-cached official feed and native DSH sidebar surface",
+  "description": "QingClaw workbench catalog with native plugin installation, favorites, and sidebar launchers",
   "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
@@ -40,6 +40,7 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar"
@@ -56,6 +57,7 @@
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
+    "tar": "7.5.22",
     "zod": "4.6.6"
   },
   "peerDependencies": {
@@ -64,6 +66,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-api-gateway": "workspace:*",
+    "@deepseek-ai/dsh-api-remotes": "workspace:*",
     "@deepseek-ai/dsh-client-locale": "workspace:*",
     "@deepseek-ai/dsh-client-ui-layout": "workspace:*",
     "@deepseek-ai/dsh-client-ui-primitives": "workspace:*",

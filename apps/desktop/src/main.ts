@@ -36,6 +36,9 @@ import { installMicrophonePermissions } from './microphone-permissions.ts'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
 import { readDeviceInfo } from './device-info.ts'
+import { RemoteMobileBridge } from './mobile/remote-mobile-bridge.ts'
+import { DesktopMobileAccount, registerMobileRoom } from './mobile-account.ts'
+import { MobilePairingWindow } from './mobile-pairing-window.ts'
 import { desktopUpdateReadyConfirmation, formatDesktopMessage, resolveDesktopLocale, resolveDesktopStartupLocale } from './locale.ts'
 import type { DesktopMessages } from './locale.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
@@ -540,12 +543,30 @@ async function main(): Promise<void> {
   const platformView = new DesktopPlatformView(join(app.getAppPath(), 'lib', 'preload-platform-account.cjs'),
     () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US', process.platform === 'win32' ? 'win32' : 'darwin',
     owner => isMandatory() || updateOverlays.input(owner).blocked)
+  const phoneAccount = new DesktopMobileAccount((account) => {
+    const origin = sealedDeployment?.platformOrigin ?? hostEnvironment.QINGCLAW_PLATFORM_ORIGIN
+      ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test
+    return new MobilePairingWindow(new RemoteMobileBridge({
+      platformOrigin: origin,
+      createRoom: signal => registerMobileRoom(origin, account, signal),
+      harnessUrl: () => {
+        if (!hostUrl || !hostCookie || backend.state.phase !== 'ready') return undefined
+        const url = new URL(hostUrl)
+        return ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname) ? url.origin : undefined
+      },
+      harnessCookie: () => backend.state.phase === 'ready' ? hostCookie : undefined,
+      locale: () => locale.id.startsWith('zh') ? 'zh' : 'en',
+    }))
+  })
   const backend = new DesktopBackendController((onFailure) => {
     const hostInspectPort = developmentHostInspectPort(development)
     const host = new DesktopHostProcess(resources.node, resources.dsh, activeProject,
       hostInspectPort, { ...hostEnvironment, DSH_CLIENT_VERSION: desktopClientVersion() }, onFailure,
       primaryRuntime,
-      resources, (next) => { platformView.setSession(next) }, (record) => {
+      resources, (next) => {
+        platformView.setSession(next)
+        phoneAccount.setSession(next)
+      }, (record) => {
         operationJournal ??= new OperationJournal(join(app.getPath('userData'), 'plugin-operations'), {
           segmentBytes: 256 * 1024, recordBytes: 4096, queuedBytes: 64 * 1024,
         })
@@ -580,6 +601,7 @@ async function main(): Promise<void> {
           }
           if (state.status === 'credential-stored' && attempt?.phase === 'succeeded' && welcomeWindow !== undefined) void enterWorkspace({ activate: false }).catch(() => undefined)
           if (previousAccountStatus === 'credential-stored' && state.status === 'signed-out') {
+            phoneAccount.setSession(null)
             void readWelcomeState().then(async (value) => {
               if (needsWelcome(value) && !quitting) {
                 enteredWorkspace = false
@@ -593,6 +615,7 @@ async function main(): Promise<void> {
         }, () => {
           // The stream reconnects; a transport failure does not change account state.
         }, () => {
+          phoneAccount.setSession(null)
           void readWelcomeState().then(async (value) => {
             if (!needsWelcome(value) || quitting) return
             pendingWelcomeNotice = 'session-expired'
@@ -870,6 +893,13 @@ async function main(): Promise<void> {
       || !event.senderFrame.url.startsWith('dsh-app://app/')) throw new Error('Rejected Platform command')
     return owner
   }
+  const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
+    : join(process.resourcesPath, 'icon.png')
+  ipcMain.handle(DESKTOP_IPC.mobilePairingOpen, async (event) => {
+    const owner = assertMainApplication(event)
+    if (backend.state.phase !== 'ready' || !hostCookie || !hostUrl || shuttingDown) throw new Error('Desktop Host unavailable')
+    await phoneAccount.open(owner, locale.id.startsWith('zh') ? '连接手机' : 'Connect phone')
+  })
   installFileActions(assertMainApplication, () => hostUrl)
   ipcMain.on(PLATFORM_IPC.bootstrap, (event) => {
     try { event.returnValue = platformView.bootstrap(event) }
@@ -1163,8 +1193,6 @@ async function main(): Promise<void> {
     updates.dispose()
   })
 
-  const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
-    : join(process.resourcesPath, 'icon.png')
   app.setAboutPanelOptions({
     applicationName: QINGCLAW_DESKTOP_DISTRIBUTION.productName,
     applicationVersion: app.getVersion(),
@@ -1522,7 +1550,10 @@ async function main(): Promise<void> {
     updateSchedule.dispose()
     updateDialog.dispose()
     mandatoryUI?.dispose()
-    void Promise.all([stopOperationReports(), Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
+    void Promise.all([
+      phoneAccount.close(),
+      stopOperationReports(),
+      Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
       backend.close().then(async () => { await operationJournal?.drain(500) }, async (error: unknown) => {
         await operationJournal?.drain(500)
         throw error
@@ -1541,6 +1572,7 @@ async function main(): Promise<void> {
       tray?.dispose()
       updateDialog.dispose()
       mandatoryUI?.dispose()
+      void phoneAccount.close().catch(() => undefined)
       // Installation preparation already awaited Platform storage cleanup.
       void platformView.dispose().catch((error: unknown) => { console.error(error) })
       return

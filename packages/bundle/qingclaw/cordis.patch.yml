@@ -59,6 +59,24 @@
         cacheFile: !!js dshPath('cache', 'qingclaw-workbench', 'feed.json')
 
 - insert:
+    - id: plugin-market
+      name: '@deepseek-ai/dsh-plugin-market'
+      disabled: !!js "!ctx.get('profileContext')"
+    - id: ui-plugin-market
+      name: '@deepseek-ai/dsh-client-ui-plugin-market'
+    - id: ui-qingclaw-admin
+      name: '@qinglion/dsh-client-ui-qingclaw-admin'
+
+# Creator sessions inherit this bundled provider alongside their own local skills.
+- id: skill-filesystem
+  disabled: false
+  config:
+    providerName: qingclaw-market
+    includeDefaultRoots: false
+    watch: false
+    bundledSkillDir: !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@qinglion/dsh-client-ui-qingclaw-admin/package.json')), 'skills')
+
+- insert:
     # Preset declarations remain owned by dsh-web-app. This QingClaw-only
     # policy masks Web Search in each Agent scope without copying those lists.
     - id: qingclaw-distribution

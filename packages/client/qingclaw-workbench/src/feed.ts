@@ -156,7 +156,7 @@ function parseCourse(value: unknown): WorkbenchCourse | undefined {
   }
 }
 
-async function readBoundedBody(response: Response, limit: number): Promise<Uint8Array> {
+export async function readBoundedBody(response: Response, limit: number): Promise<Uint8Array> {
   const declared = Number(response.headers.get('content-length'))
   if (Number.isFinite(declared) && declared > limit) throw new Error('QingClaw Feed response exceeds the byte limit')
   const reader = response.body?.getReader()

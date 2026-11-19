@@ -38,6 +38,7 @@ export const DESKTOP_IPC = {
   updatesChannelSet: 'dsh-desktop:updates-channel-set',
   updatesChannelChanged: 'dsh-desktop:updates-channel-changed',
   updatesStatus: 'dsh-desktop:updates-status',
+  mobilePairingOpen: 'qingclaw-desktop:mobile-pairing-open',
   updatesOpen: 'dsh-desktop:updates-open',
   updatesPresentation: 'dsh-desktop:updates-presentation',
   nativeThemeSet: 'dsh-desktop:native-theme-set',
@@ -91,6 +92,7 @@ export interface DesktopUpdatePresentation {
 
 /** Product documents cannot supply update versions, package URLs, or installation authorization. */
 export interface DshDesktopProductApi {
+  readonly mobilePairing: { open(): Promise<void> }
   readonly fileActions: DesktopFileActions
   readonly protocolVersion: 1
   readonly browser: DesktopBrowserBridge

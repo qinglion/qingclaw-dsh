@@ -91,13 +91,17 @@ function renderTab(state: Partial<DiscoverState> = {}, dictionary: Record<Plugin
   const install = vi.fn()
   const update = vi.fn()
   const openPackage = vi.fn()
-  const props = {
+  const unused = () => { throw new Error('unused standard prop') }
+  const props: DiscoverSectionProps = Object.assign({
     t: translator(dictionary), install, update, openPackage, ...actions,
-    resolveText: (text: string | Record<string, string>) => typeof text === 'string' ? text : text[language] ?? text.en,
+    resolveText: (text: string | Record<string, string>) => typeof text === 'string' ? text : text[language] ?? text.en ?? '',
     useDiscover: bindSnapshotSelector(store),
     useLocale: bindSnapshotSelector(locale),
     useDetails: bindSnapshotSelector(createSnapshotStore<DetailsState>({})),
-  } as DiscoverSectionProps
+    usePanelInfo: unused, useRemoteAccess: unused, useSessions: unused, useSessionRetainInfo: unused,
+    useSessionStatus: unused, useResource: unused, useWorkspaces: unused, useWorkspaceAccess: unused,
+    useSessionAccess: unused, useContextMenu: unused,
+  })
   render(<DiscoverSection {...props} />)
   const set = (next: Partial<DiscoverState>): void => { act(() => { store.set({ ...store.getSnapshot(), ...next }) }) }
   /** Show the selected listing answering `query`, as the Controller publishes it. */

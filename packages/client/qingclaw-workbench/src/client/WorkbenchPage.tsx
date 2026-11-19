@@ -1,268 +1,260 @@
-/** QingClaw Workbench page: daily quote, official links, and the public Feed v1 catalog. */
-
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+/** The built-in QingClaw workbench directory. */
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Button, IconGlobeOutlineRegular, IconPlayOutlineRegular, IconRefreshOutlineRegular,
-  IconSparkleRegular, IconWarningOutlineRegular,
+  Button, IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconDownloadOutlineRegular, PluginArtworkDefault, Tag,
+  IconRefreshOutlineRegular, IconSearchOutlineRegular, Input, SegmentedControl,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { ProEntitlement, WorkbenchCourse, WorkbenchFeedResult, WorkbenchVideo } from '../types.ts'
-import { dailyQuoteKey } from './daily-quote.ts'
+import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
 import type { NS, WorkbenchLocaleKey } from './locales.ts'
+import type { WorkbenchPluginItem, WorkbenchPluginStore } from './workbench-plugin-store.ts'
+import { WorkbenchReadme } from './WorkbenchReadme.tsx'
 import css from './WorkbenchPage.module.css'
 
-/** Narrow actions supplied by the browser plugin; the page never reads Cordis directly. */
 export interface WorkbenchPageInjected {
-  readonly loadFeed: (refresh: boolean) => Promise<WorkbenchFeedResult>
-  readonly loadEntitlement?: () => Promise<ProEntitlement | null>
+  readonly pluginStore: WorkbenchPluginStore
+  readonly hooks: { readonly locale: HostObservable<LocaleSnapshot> }
 }
 
-/** Props assembled by the global main-panel slot. */
 export type WorkbenchPageProps = PropsRuntime<'main'>
   & PropsLocale<typeof NS>
   & InjectFace<WorkbenchPageInjected>
 
-type FeedViewState =
-  | { readonly status: 'loading' }
-  | { readonly status: 'error' }
-  | { readonly status: 'ready'; readonly result: WorkbenchFeedResult; readonly refreshing: boolean }
+const tabs = ['market', 'favorites', 'installed'] as const
+type Tab = (typeof tabs)[number]
 
-/** Render the responsive Workbench surface. */
-export function WorkbenchPage({ loadFeed, loadEntitlement = async () => null, t }: WorkbenchPageProps): ReactNode {
-  const [state, setState] = useState<FeedViewState>({ status: 'loading' })
-  const [entitlement, setEntitlement] = useState<ProEntitlement | null | undefined>(undefined)
-  const generation = useRef(0)
-  const query = useCallback(async (refresh: boolean): Promise<void> => {
-    const request = ++generation.current
-    setState(current => current.status === 'ready'
-      ? { ...current, refreshing: true }
-      : { status: 'loading' })
-    try {
-      const result = await loadFeed(refresh)
-      if (generation.current === request) setState({ status: 'ready', result, refreshing: false })
-    } catch {
-      if (generation.current === request) setState({ status: 'error' })
-    }
-  }, [loadFeed])
-
-  useEffect(() => {
-    void query(false)
-    return () => { generation.current += 1 }
-  }, [query])
-
-  useEffect(() => {
-    let live = true
-    void loadEntitlement().then(
-      (value) => { if (live) setEntitlement(value) },
-      () => { if (live) setEntitlement(null) },
-    )
-    return () => { live = false }
-  }, [loadEntitlement])
-
-  const result = state.status === 'ready' ? state.result : undefined
-  const refreshing = state.status === 'ready' && state.refreshing
-  const allCourses = result?.feed.links.allCourses ?? 'https://qingclaw.com/courses'
-  return (
-    <main className={css.page} aria-busy={state.status === 'loading' || refreshing}>
-      <div className={css.content}>
-        <header className={css.header}>
-          <div className={css.headerCopy}>
-            <h1>{t('title')}</h1>
-            <p>{t('subtitle')}</p>
-          </div>
-          <Button variant="outline" size="sm" className={css.refresh}
-            icon={<IconRefreshOutlineRegular size={14} />}
-            disabled={state.status === 'loading' || refreshing}
-            onClick={() => { void query(true) }}>
-            {refreshing ? t('refreshing') : t('refresh')}
-          </Button>
-        </header>
-
-        <section className={css.quote} aria-labelledby="qingclaw-workbench-quote">
-          <span className={css.quoteIcon}><IconSparkleRegular size={18} /></span>
-          <div>
-            <h2 id="qingclaw-workbench-quote">{t('dailyQuote')}</h2>
-            <p>“{t(dailyQuoteKey(new Date()))}”</p>
-          </div>
-        </section>
-
-        <ProSection entitlement={entitlement} t={t} />
-
-        <nav className={css.officialLinks} aria-label={t('officialSite')}>
-          <a href="https://qingclaw.com/" target="_blank" rel="noopener noreferrer">
-            <IconGlobeOutlineRegular size={16} />
-            <span>{t('officialSite')}</span>
-          </a>
-          <a href={allCourses} target="_blank" rel="noopener noreferrer">
-            <IconPlayOutlineRegular size={16} />
-            <span>{t('courseCenter')}</span>
-          </a>
-        </nav>
-
-        {state.status === 'error' ? (
-          <section className={css.error} role="alert">
-            <IconWarningOutlineRegular size={24} />
-            <h2>{t('unavailableTitle')}</h2>
-            <p>{t('unavailableDescription')}</p>
-            <Button variant="primary" size="sm" onClick={() => { void query(true) }}>{t('retry')}</Button>
-          </section>
-        ) : (
-          <>
-            {result?.stale === true && (
-              <p className={css.stale} role="status">
-                <IconWarningOutlineRegular size={15} />
-                <span>{t('stale')}</span>
-              </p>
-            )}
-            <FeedSection title={t('latestVideos')} description={t('latestVideosDescription')}>
-              {state.status === 'loading'
-                ? <CardSkeleton count={3} label={t('loading')} />
-                : result?.feed.latestVideos.length === 0
-                  ? <p className={css.empty}>{t('emptyVideos')}</p>
-                  : <div className={css.grid}>{result?.feed.latestVideos.map(video => (
-                    <VideoCard key={video.id} video={video} action={t('watchVideo')} />
-                  ))}</div>}
-            </FeedSection>
-            <FeedSection title={t('featuredCourses')} description={t('featuredCoursesDescription')}
-              trailing={<a className={css.allCourses} href={allCourses} target="_blank" rel="noopener noreferrer">{t('allCourses')}</a>}>
-              {state.status === 'loading'
-                ? <CardSkeleton count={2} label={t('loading')} />
-                : result?.feed.featuredCourses.length === 0
-                  ? <p className={css.empty}>{t('emptyCourses')}</p>
-                  : <div className={css.grid}>{result?.feed.featuredCourses.map(course => (
-                    <CourseCard key={course.id} course={course} action={t('openCourse')}
-                      lessons={t('lessons', { count: course.lessonCount })} />
-                  ))}</div>}
-            </FeedSection>
-          </>
-        )}
-      </div>
-    </main>
-  )
+interface ItemActions {
+  item: WorkbenchPluginItem
+  t: TranslateNS<typeof NS>
+  installing: boolean
+  busy: boolean
+  onInstall(): void
+  onOpen(): void
+  onFavorite(): void
 }
 
-function ProSection({ entitlement, t }: {
-  readonly entitlement: ProEntitlement | null | undefined
-  readonly t: (key: WorkbenchLocaleKey) => string
+function WorkbenchActions({ item, t, installing, busy, onInstall, onOpen, onFavorite }: ItemActions): ReactNode {
+  const favoriteLabel = t(item.favorite ? 'unfavorite' : 'favorite')
+  return <div className={css.actions}>
+    <button type="button" className={css.favorite} aria-label={favoriteLabel}
+      aria-pressed={item.favorite} title={favoriteLabel} onClick={onFavorite}>
+      <span className={css.star} aria-hidden="true">{item.favorite ? '★' : '☆'}</span>
+      {t(item.favorite ? 'saved' : 'favorite')}
+    </button>
+    {item.installed
+      ? item.openable
+        ? <Button variant="outline" size="sm" onClick={onOpen}>{t('open')}</Button>
+        : <span className={css.installed}><IconCheckOutlineRegular size={14} />{t(item.restartRequired ? 'restartRequired' : 'installed')}</span>
+      : <Button variant="primary" size="sm" disabled={busy || !item.installable} onClick={onInstall}
+        title={busy && !installing ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
+        {t(installing ? 'installing' : item.installable ? 'install' : 'offlineInstall')}
+      </Button>}
+  </div>
+}
+
+function WorkbenchPreview({ url, label, className }: { url: string; label: string; className: string | undefined }): ReactNode {
+  const [failed, setFailed] = useState<string>()
+  if (failed === url) return null
+  return <div className={className}>
+    <img src={url} alt={label} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(url)} />
+  </div>
+}
+
+function WorkbenchCard({ onDetails, ...actions }: ItemActions & {
+  onDetails(button: HTMLButtonElement): void
 }): ReactNode {
-  const [text, setText] = useState('')
-  const [result, setResult] = useState<string[] | undefined>(undefined)
-  if (entitlement === undefined) {
-    return <section className={css.pro} aria-busy="true"><p className={css.proHint}>{t('proChecking')}</p></section>
-  }
-  if (entitlement === null || !entitlement.active) {
-    return (
-      <section className={css.pro} aria-labelledby="qingclaw-pro-title">
-        <div className={css.proHeader}>
-          <span className={css.proBadge}>PRO</span>
-          <div>
-            <h2 id="qingclaw-pro-title">{t('proTitle')}</h2>
-            <p className={css.proHint}>{t('proLocked')}</p>
-          </div>
-        </div>
-        <a className={css.proAction} href="https://beta.qingclaw.com/top_up" target="_blank" rel="noopener noreferrer">
-          {t('proSubscribe')}
-        </a>
-      </section>
-    )
-  }
-  return (
-    <section className={css.pro} aria-labelledby="qingclaw-pro-title">
-      <div className={css.proHeader}>
-        <span className={css.proBadge}>PRO</span>
-        <div>
-          <h2 id="qingclaw-pro-title">{t('proTitle')}</h2>
-          <p className={css.proHint}>{t('proUnlocked')}</p>
-        </div>
+  const { item, t } = actions
+  const [failedIcon, setFailedIcon] = useState<string>()
+  return <article className={css.card} aria-label={item.title}>
+    {item.previewUrl && <WorkbenchPreview url={item.previewUrl} label={t('preview', { name: item.title })} className={css.preview} />}
+    <div className={css.cardBody}>
+      <div className={css.cardHeading}>
+        {item.iconUrl && failedIcon !== item.iconUrl && <img className={css.icon} src={item.iconUrl} alt="" loading="lazy"
+          referrerPolicy="no-referrer" onError={() => setFailedIcon(item.iconUrl)} />}
+        <h2><button type="button" className={css.cardLink} aria-label={t('viewDetails', { name: item.title })}
+          onClick={event => onDetails(event.currentTarget)}>{item.title}</button></h2>
+        {item.version && <span className={css.version}>{item.version}</span>}
       </div>
-      <textarea className={css.proInput} value={text} placeholder={t('proPlaceholder')}
-        onChange={(event) => { setText(event.target.value); setResult(undefined) }} rows={4} />
-      <Button variant="primary" size="sm" disabled={text.trim() === ''}
-        onClick={() => { setResult(['合同主体与签署权限', '标的、价款与付款节点', '交付/履行期限与验收标准', '违约责任与解除条件', '争议解决与管辖']) }}>
-        {t('proAction')}
-      </Button>
-      {result !== undefined && (
-        <ul className={css.proResult} aria-label={t('proResult')}>
-          {result.map(item => <li key={item}>{item}</li>)}
-        </ul>
-      )}
-    </section>
-  )
-}
-
-function FeedSection({ title, description, trailing, children }: {
-  readonly title: string
-  readonly description: string
-  readonly trailing?: ReactNode
-  readonly children: ReactNode
-}): ReactNode {
-  return (
-    <section className={css.section}>
-      <div className={css.sectionHeader}>
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-        {trailing}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function VideoCard({ video, action }: { readonly video: WorkbenchVideo; readonly action: string }): ReactNode {
-  const meta = [video.courseTitle, video.duration].filter((value): value is string => value !== undefined)
-  return (
-    <a className={css.card} href={video.watchUrl} target="_blank" rel="noopener noreferrer" aria-label={`${action}: ${video.title}`}>
-      <Cover image={video.coverUrl} />
-      <span className={css.cardBody}>
-        <strong>{video.title}</strong>
-        {meta.length > 0 && <span className={css.meta}>{meta.join(' · ')}</span>}
-        <span className={css.cardAction}>{action}</span>
-      </span>
-    </a>
-  )
-}
-
-function CourseCard({ course, action, lessons }: {
-  readonly course: WorkbenchCourse
-  readonly action: string
-  readonly lessons: string
-}): ReactNode {
-  return (
-    <a className={css.card} href={course.courseUrl} target="_blank" rel="noopener noreferrer" aria-label={`${action}: ${course.title}`}>
-      <Cover image={course.coverUrl} />
-      <span className={css.cardBody}>
-        <strong>{course.title}</strong>
-        <span className={css.meta}>{lessons}</span>
-        <span className={css.cardAction}>{action}</span>
-      </span>
-    </a>
-  )
-}
-
-function Cover({ image }: { readonly image: string | undefined }): ReactNode {
-  return (
-    <span className={css.cover}>
-      {image === undefined
-        ? <IconPlayOutlineRegular size={28} aria-hidden="true" />
-        : <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" />}
-    </span>
-  )
-}
-
-function CardSkeleton({ count, label }: { readonly count: number; readonly label: string }): ReactNode {
-  return (
-    <div className={css.grid} aria-label={label}>
-      <span className={css.srOnly}>{label}</span>
-      {Array.from({ length: count }, (_, index) => (
-        <div className={css.skeleton} aria-hidden="true" key={index}>
-          <span className={css.skeletonCover} />
-          <span className={css.skeletonLine} />
-          <span className={css.skeletonShort} />
-        </div>
-      ))}
+      {item.author && <span className={css.author}>{item.author}</span>}
+      {item.description && <p className={css.description}>{item.description}</p>}
+      {item.category && <span className={css.category}>{item.category}</span>}
+      <WorkbenchActions {...actions} />
     </div>
+  </article>
+}
+
+function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
+  item: WorkbenchPluginItem
+  t: TranslateNS<typeof NS>
+  actions: ItemActions
+  store: WorkbenchPluginStore
+  language: string
+  onBack(): void
+  error?: WorkbenchLocaleKey
+}): ReactNode {
+  const heading = useRef<HTMLHeadingElement>(null)
+  const titleId = useId()
+  useLayoutEffect(() => { heading.current?.focus({ preventScroll: true }) }, [item.id])
+  return <section className={css.detail} aria-labelledby={titleId}>
+    <button type="button" className={css.back} onClick={onBack}>
+      <IconChevronDownOutlineRegular size={14} aria-hidden="true" />{t('backToWorkbench')}
+    </button>
+    <header className={css.detailHeader}>
+      <span className={css.detailIcon} aria-hidden="true"><PluginArtworkDefault size={42} /></span>
+      <div className={css.identity}>
+        <div className={css.titleLine}><h1 id={titleId} ref={heading} tabIndex={-1}>{item.title}</h1><Tag tone="neutral">{item.version}</Tag></div>
+        <span className={css.packageName}>{item.packageName}</span>
+      </div>
+      <WorkbenchActions {...actions} />
+    </header>
+    {item.description && <p className={css.summary}>{item.description}</p>}
+    {error && <p className={css.error} role="alert">{t(error)}</p>}
+    {item.previewUrl && <WorkbenchPreview url={item.previewUrl} label={t('preview', { name: item.title })} className={css.detailPreview} />}
+    <WorkbenchReadme item={item} pluginStore={store} language={language} t={t} />
+    <section className={css.detailSection}>
+      <h2>{t('versionsTitle')}</h2>
+      <div className={css.release}><strong>{item.version}</strong><span>{t('catalogVersion')}</span></div>
+    </section>
+    <section className={css.detailSection}>
+      <h2>{t('sourceTitle')}</h2>
+      <dl className={css.facts}>
+        {item.author && <div><dt>{t('author')}</dt><dd>{item.author}</dd></div>}
+        {item.repositoryUrl && <div><dt>{t('homepage')}</dt><dd>
+          <a href={item.repositoryUrl} target="_blank" rel="noopener noreferrer">{item.repositoryUrl}</a>
+        </dd></div>}
+        <div><dt>{t('packageName')}</dt><dd><code>{item.packageName}</code></dd></div>
+        <div><dt>{t('registry')}</dt><dd><code>{item.registry}</code></dd></div>
+        {item.category && <div><dt>{t('category')}</dt><dd>{item.category}</dd></div>}
+      </dl>
+    </section>
+  </section>
+}
+
+/** Keep the current catalog visible during refresh and discard out-of-order responses. */
+export function WorkbenchPage({ pluginStore, t, useLocale }: WorkbenchPageProps): ReactNode {
+  const [items, setItems] = useState<readonly WorkbenchPluginItem[] | undefined>()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<WorkbenchLocaleKey>()
+  const [installing, setInstalling] = useState<string>()
+  const [tab, setTab] = useState<Tab>('market')
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('')
+  const [detailId, setDetailId] = useState<string>()
+  const page = useRef<HTMLElement>(null)
+  const listHeading = useRef<HTMLHeadingElement>(null)
+  const returnTo = useRef<{ button: HTMLButtonElement; scroll: number }>()
+  const language = useLocale(snapshot => snapshot.active)
+  const generation = useRef(0)
+  const tabsId = useId()
+  const load = useCallback(async (refresh = false) => {
+    const request = ++generation.current
+    setLoading(true)
+    try {
+      const result = await pluginStore.load(refresh)
+      if (request === generation.current) {
+        setItems(result)
+        setError(current => current === 'loadError' ? undefined : current)
+      }
+    } catch {
+      if (request === generation.current) setError('loadError')
+    } finally {
+      if (request === generation.current) setLoading(false)
+    }
+  }, [pluginStore])
+
+  useEffect(() => {
+    const unsubscribe = pluginStore.subscribe(() => { void load() })
+    void load()
+    return () => { generation.current++; unsubscribe() }
+  }, [pluginStore, load])
+
+  const act = async (action: () => void | Promise<void>, failure: WorkbenchLocaleKey, installId?: string) => {
+    setError(undefined)
+    if (installId) setInstalling(installId)
+    try {
+      await action()
+      await load()
+    } catch {
+      setError(failure)
+    } finally {
+      if (installId) setInstalling(undefined)
+    }
+  }
+
+  const all = items ?? []
+  const detail = detailId ? all.find(item => item.id === detailId) : undefined
+  useLayoutEffect(() => {
+    if (detail) {
+      if (page.current) page.current.scrollTop = 0
+    } else if (returnTo.current) {
+      const { button, scroll } = returnTo.current
+      if (page.current) page.current.scrollTop = scroll
+      const target = button.isConnected ? button : listHeading.current
+      target?.focus({ preventScroll: true })
+      returnTo.current = undefined
+      setDetailId(undefined)
+    }
+  }, [detail?.id])
+
+  function actions(item: WorkbenchPluginItem): ItemActions {
+    return { item, t, installing: installing === item.id, busy: installing !== undefined,
+      onInstall: () => { void act(() => pluginStore.install(item.id), 'installError', item.id) },
+      onOpen: () => { void act(() => pluginStore.open(item.id), 'openError') },
+      onFavorite: () => { void act(() => pluginStore.setFavorite(item.id, !item.favorite), 'preferenceError') },
+    }
+  }
+  const categories = [...new Set(all.map(item => item.category).filter(Boolean))].sort()
+  const selectedCategory = categories.includes(category) ? category : ''
+  const needle = query.trim().toLocaleLowerCase()
+  const visible = all.filter(item =>
+    (tab !== 'favorites' || item.favorite) && (tab !== 'installed' || item.installed)
+    && (!selectedCategory || item.category === selectedCategory)
+    && (!needle || [item.title, item.author, item.category, item.packageName].some(value => value?.toLocaleLowerCase().includes(needle))),
   )
+  const filtered = Boolean(needle || selectedCategory)
+  const emptyKey = filtered ? 'noMatches'
+    : tab === 'favorites' ? 'emptyFavorites' : tab === 'installed' ? 'emptyInstalled' : 'emptyMarket'
+  return <main className={css.page} ref={page}>
+    {detail && <div className={css.content}><WorkbenchDetail item={detail} t={t} actions={actions(detail)}
+      store={pluginStore} language={language} onBack={() => { setError(undefined); setDetailId(undefined) }}
+      {...(error && { error })} /></div>}
+    <div className={css.content} hidden={Boolean(detail)}>
+      <header className={css.header}>
+        <h1 ref={listHeading} tabIndex={-1}>{t('title')}</h1>
+        <Input type="search" className={css.search as string} icon={<IconSearchOutlineRegular size={16} />}
+          value={query} onChange={event => setQuery(event.target.value)} aria-label={t('search')} placeholder={t('search')} />
+      </header>
+      <div className={css.toolbar}>
+        <SegmentedControl id={tabsId} value={tab} onChange={setTab} label={t('title')}
+          options={tabs.map(value => ({ value, label: t(value) }))} />
+        <div className={css.filters}>
+          {categories.length > 0 && <select value={selectedCategory} aria-label={t('category')}
+            onChange={event => setCategory(event.target.value)}>
+            <option value="">{t('allCategories')}</option>
+            {categories.map(name => <option key={name}>{name}</option>)}
+          </select>}
+          <Button variant="ghost" size="sm" aria-label={t('refresh')} title={t('refresh')}
+            disabled={loading} onClick={() => { setError(undefined); void load(true) }}
+            icon={<IconRefreshOutlineRegular size={15} />} />
+        </div>
+      </div>
+      {error && <p className={css.error} role="alert">{t(error)}</p>}
+      <section className={css.results} id={`${tabsId}-${tab}-panel`} role="tabpanel"
+        aria-labelledby={`${tabsId}-${tab}`} aria-busy={loading}>
+        {loading && items === undefined && <p className={css.empty} role="status">{t('loading')}</p>}
+        {items !== undefined && !visible.length && <div className={css.empty}>
+          <p>{t(emptyKey)}</p>
+          {filtered && <Button size="sm" variant="outline" onClick={() => { setQuery(''); setCategory('') }}>{t('resetFilters')}</Button>}
+        </div>}
+        <div className={css.grid}>
+          {visible.map(item => <WorkbenchCard key={item.id} {...actions(item)} onDetails={(button) => {
+            returnTo.current = { button, scroll: page.current?.scrollTop ?? 0 }
+            setError(undefined)
+            setDetailId(item.id)
+          }} />)}
+        </div>
+      </section>
+    </div>
+  </main>
 }

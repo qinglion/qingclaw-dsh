@@ -9,7 +9,9 @@ import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typer
 import {
   fetchOfficialFeed, parseCacheRecord, serializeCacheRecord, type WorkbenchCacheRecord,
 } from './feed.ts'
-import type { ProEntitlement, WorkbenchFeedResult } from './types.ts'
+import type { ProEntitlement, WorkbenchCatalogResult, WorkbenchFeedResult } from './types.ts'
+import { readRegistryReadme } from './readme.ts'
+import { WorkbenchDirectory } from './catalog.ts'
 
 export type * from './types.ts'
 
@@ -64,11 +66,32 @@ export default class QingClawWorkbench extends TypertRemoteService {
   private cacheRead: Promise<void> | undefined
   private lastGood: WorkbenchCacheRecord | undefined
   private pending: Promise<WorkbenchFeedResult> | undefined
+  private readonly directory: WorkbenchDirectory
+
+  /** Fetch the public directory of desktop-compatible workbenches. */
+  @Remote
+  async getWorkbenchCatalog(refresh: boolean): Promise<WorkbenchCatalogResult> {
+    this.assertOpen()
+    return this.directory.get(refresh)
+  }
+
+  /** Read the document of a version currently listed by the product directory. */
+  @Remote
+  async getWorkbenchReadme(name: string, version: string, language: string): Promise<string | null> {
+    this.assertOpen()
+    const { entries } = await this.directory.get(false)
+    const entry = entries.find(item => item.packageName === name && item.version === version)
+    if (!entry) throw new Error('Unknown workbench version')
+    const signal = AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(this.config.fetchTimeoutMs)])
+    return readRegistryReadme(entry, language, signal)
+  }
 
   /** @param ctx - Host context supplying logging and effect ownership. @param config - validated plugin settings. */
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'qingclawWorkbench')
     this.feedUrl = publicHttpUrl(config.feedUrl)
+    const origin = publicHttpUrl(process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com')
+    this.directory = new WorkbenchDirectory(new URL('/workbenches/index.json', origin), config, this.lifetime.signal)
     if (config.cacheFile !== undefined && !isAbsolute(config.cacheFile)) {
       throw new Error('qingclaw-workbench: cacheFile must be absolute')
     }

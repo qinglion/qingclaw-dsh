@@ -51,6 +51,7 @@ describe('desktop macOS release signature', () => {
     const config = createElectronBuilderConfig(RELEASE_ENVIRONMENT, 'darwin', 'arm64')
     expect(config.protocols).toEqual([{ name: '青狮龙虾', schemes: ['qingclaw'] }])
     expect(portablePath(config.directories.output)).toContain('/.desktop-build/targets/mac-arm64/artifacts')
+    expect(config.mac.extendInfo).not.toHaveProperty('NSLocalNetworkUsageDescription')
     expect(config.mac.extendInfo.NSMicrophoneUsageDescription).toContain('麦克风')
     expect(config.mac.extendInfo.CFBundleLocalizations).toEqual(SHIPPED_LOCALE_IDS.map(id => id === 'zh' ? 'zh_CN' : id))
     expect(config.mac.entitlementsInherit).toBe(config.mac.entitlements)
@@ -59,7 +60,7 @@ describe('desktop macOS release signature', () => {
       'com.apple.security.cs.disable-library-validation', 'com.apple.security.device.audio-input']) {
       expect(entitlements).toContain(`<key>${key}</key>\n    <true/>`)
     }
-    expect(config.extraResources).toHaveLength(2)
+    expect(config.extraResources.map(resource => resource.to)).toEqual(['runtime', 'licenses/dsh-desktop-mobile.txt', 'icon.png'])
     expect(config.extraResources[0]?.to).toBe('runtime')
     expect(portablePath(config.extraResources[0]?.from ?? '')).toContain('/.desktop-build/targets/mac-arm64/runtime')
     const [dshFiles, dshNodeModules] = config.files.slice(-2)

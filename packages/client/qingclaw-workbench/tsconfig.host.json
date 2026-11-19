@@ -7,6 +7,8 @@
   },
   "files": [
     "src/feed.ts",
+    "src/catalog.ts",
+    "src/readme.ts",
     "src/index.ts",
     "src/types.ts"
   ],

@@ -1,0 +1,31 @@
+.section {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: auto;
+  padding: calc(32px + var(--dsh-frame-top-clearance, 0px)) clamp(20px, 4vw, 64px) 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+}
+.section > * { flex-shrink: 0; }
+.group { display: grid; gap: 12px; width: 100%; max-width: 800px; }
+.navigation { display: flex; gap: 6px; }
+.section .navigation button { border-color: transparent; }
+.section .navigation button[aria-current=page] { background: var(--dsw-alias-bg-layer-1); font-weight: 600; }
+.section h1, .section h3, .section p { margin: 0; }
+.section p { line-height: 1.5; color: var(--dsw-alias-label-secondary); }
+.section label { display: grid; gap: 4px; }
+.section button, .section select, .section input { font: inherit; }
+.section button, .section select, .section input:not([type=file]) {
+  border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px;
+  background: var(--dsw-alias-bg-base); color: inherit; padding: 5px 9px;
+}
+.section button { justify-self: start; cursor: pointer; }
+.section button:disabled { cursor: default; opacity: .6; }
+.section header, .row, .row form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.section header { justify-content: space-between; }
+.section article { display: grid; gap: 6px; padding-block: 8px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+.section article, .section p { overflow-wrap: anywhere; }
