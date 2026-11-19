@@ -107,6 +107,8 @@ describe('ui-sidebar-documentpreview apply', () => {
     ])
     expect(Object.keys(registered[0]!.children!)).toEqual([
       'sidebar.right.tab.document', 'sidebar.right.tab.document.actions',
+      'sidebar.right.tab.document.contentActions',
+      'sidebar.right.tab.document.captureAction',
       'sidebar.right.tab.document.unpreviewable', 'sidebar.right.tab.document.action',
     ])
     expect(registered[0]?.store).toBeDefined()

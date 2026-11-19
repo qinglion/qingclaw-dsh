@@ -36,8 +36,23 @@ export interface StartSessionOptions extends DraftInitializationOptions {
   readonly agentPreset?: string
 }
 
+/** Identity policy for a dedicated Workspace workflow. */
+interface WorkspaceSessionMode {
+  /** Identify Sessions that belong to this mode. */
+  readonly matches: (sessionId: SessionId) => boolean
+  /** Allocate a fresh Session identity for this mode. */
+  readonly createId: () => SessionId
+}
+
 /** Workspace archive and directory operations consumed by Client UI domains. */
 export interface UiWorkspace {
+  /**
+   * Carry a visible dedicated conversation's mode into New Session in the same Workspace.
+   * Registered mode Sessions are excluded from ordinary blank reuse.
+   * @param mode - identity matcher and allocator for the dedicated workflow.
+   * @returns disposer for the caller's registration.
+   */
+  registerSessionMode(mode: WorkspaceSessionMode): () => void
   /**
    * Select a Session and show its Conversation as one UI navigation action.
    * @param target - known Session identity or durable direct-parent subagent address to display.
@@ -81,9 +96,9 @@ export interface UiWorkspace {
    */
   connectWorkspace(workspaceId: WorkspaceId, options?: Pick<StartSessionOptions, 'agentPreset'>): Promise<SessionId>
   /**
-   * Open the Workspace blank `connectWorkspace` resolves, so New Session returns to that blank's
-   * unsent draft. A creation the Host refuses is shown through the Workspace notice and leaves the
-   * selection as it was.
+   * Open the Workspace blank `connectWorkspace` resolves, or create a fresh Session in the
+   * visible conversation's registered mode for a plain request in the same Workspace.
+   * A refused creation is shown through the Workspace notice and preserves the selection.
    * @param workspaceId - explicit target; absent inherits the current or most recent Workspace.
    * @param options - initial content, the blank's preset, and `whenDraftExists`, which decides
    * whether existing text or attachments are kept, replaced, or followed by the prompt.
@@ -164,6 +179,7 @@ export class DirectoryBrowseError extends Error {
 
 /** Implements Workspace archive and directory UI operations. */
 class UiWorkspaceService extends Service implements UiWorkspace {
+  private readonly sessionModes = new Set<WorkspaceSessionMode>()
   /** The latest in-flight connection per Workspace; a request joins it only when both name the same preset. */
   private readonly connecting = new Map<WorkspaceId, {
     readonly agentPreset: string | undefined
@@ -209,6 +225,11 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     return this.connectBlank(workspaceId, options)
   }
 
+  registerSessionMode(mode: WorkspaceSessionMode): () => void {
+    this.sessionModes.add(mode)
+    return () => { this.sessionModes.delete(mode) }
+  }
+
   /**
    * @param reuse - preset for the reused or created blank.
    */
@@ -235,11 +256,12 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   private createInWorkspace(workspace: WorkspaceView, options: Pick<StartSessionOptions, 'agentPreset'>): Promise<SessionId> {
     const archived = this.workspaces.list.getSnapshot().archivedSessionIds
     const sessions = this.sessions.list.getSnapshot()
+    const modes = Array.from(this.sessionModes)
     const blank = sessions.ids.find((id) => {
       const summary = sessions.byId[id]
       const listed = summary?.projectionValues?.agentPreset
       return summary !== undefined && summary.blank && summary.cwd === workspace.path
-        && workspace.sessionIds.includes(id) && !archived.includes(id)
+        && workspace.sessionIds.includes(id) && !archived.includes(id) && !modes.some(mode => mode.matches(id))
         && (options.agentPreset === undefined || typeof listed !== 'string' || listed === options.agentPreset)
     })
     return this.createNamed({
@@ -306,18 +328,21 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     workspaceId: WorkspaceId,
     beforeOpen: ((sessionId: SessionId) => void) | undefined,
     reuse: Pick<StartSessionOptions, 'agentPreset'>,
+    mode?: WorkspaceSessionMode,
   ): Promise<void> {
     const navigation = AbortSignal.any([this.ctx.layout.beginNavigation(), this.lifetime.signal])
     let sessionId: SessionId
     try {
-      sessionId = await this.connectBlank(workspaceId, reuse)
+      sessionId = mode === undefined
+        ? await this.connectBlank(workspaceId, reuse)
+        : await this.createNamed({ workspaceId, sessionId: mode.createId() })
     } catch (error: unknown) {
       // Reported here, not in connectWorkspace: startup restoration calls that
       // directly and stays console-only.
       if (!navigation.aborted) this.notify({ kind: 'createFailed', message: creationFailureMessage(error) })
       throw error
     }
-    if (navigation.aborted) return
+    if (navigation.aborted || (mode !== undefined && !this.sessionModes.has(mode))) return
     this.replaceMain(sessionId, navigation, 'reveal', beforeOpen)
   }
 
@@ -357,11 +382,18 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       this.clearMain()
       return
     }
-    const opening = this.openWorkspace(target, initializeDraft ? (id) => {
+    const mode = options === undefined && current !== undefined && currentWorkspaceId === target && this.sessionModes.size > 0
+      && this.ctx.layout.panelInfo.getSnapshot().activePanelId === null
+      ? Array.from(this.sessionModes).find(candidate => candidate.matches(current))
+      : undefined
+    const beforeOpen = initializeDraft ? (id: SessionId) => {
       const binding = this.sessions.binding(id)
       if (binding === undefined) this.draftPreparationFailed()
       this.prepareDraft(binding, draftOptions)
-    } : undefined, agentPreset === undefined ? {} : { agentPreset })
+    } : undefined
+    const opening = mode === undefined
+      ? this.openWorkspace(target, beforeOpen, agentPreset === undefined ? {} : { agentPreset })
+      : this.openWorkspaceSession(target, undefined, {}, mode)
     void opening.catch(
       (reason: unknown) => { console.warn('new session failed:', reason) },
     )

@@ -89,7 +89,8 @@ const harness = await vi.hoisted(async () => {
       openDevTools: vi.fn(),
       getURL: () => this.urls.at(-1) ?? '',
       mainFrame: { url: '' },
-      getZoomFactor: () => 1,
+      getZoomFactor: vi.fn(() => 1),
+      capturePage: vi.fn(),
       isDestroyed: () => this.destroyed,
       setIgnoreMenuShortcuts: vi.fn(),
       focus: vi.fn(),
@@ -131,6 +132,7 @@ const harness = await vi.hoisted(async () => {
     static getAllWindows() { return windows.filter(window => !window.destroyed) }
     setMenu() {}
     getContentBounds() { return { x: 0, y: 0, width: 900, height: 650 } }
+    getContentSize() { return [900, 650] }
     setBounds() {}
     setTitle = vi.fn()
     destroy() { this.destroyed = true; this.emit('closed') }
@@ -1549,6 +1551,31 @@ describe('desktop main startup', () => {
     expect(harness.dialog.showOpenDialog).toHaveBeenCalledExactlyOnceWith(window, { properties: ['openDirectory', 'createDirectory'] })
     window.webContents.mainFrame.url = 'https://other.example/'
     await expect(handler(event)).rejects.toThrow('unowned renderer')
+  })
+
+  it('captures a zoomed region only for the owned application frame', async () => {
+    await import('../src/main.ts')
+    await harness.preparing.promise
+    const window = harness.windows[0]!
+    const handler = harness.handlers.get(DESKTOP_IPC.capturePageRegion)!
+    const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
+    const region = { x: 12.5, y: 20, width: 80.25, height: 45 }
+    const png = new Uint8Array([137, 80, 78, 71])
+    window.webContents.getZoomFactor.mockReturnValue(1.25)
+    window.webContents.capturePage.mockResolvedValue({ isEmpty: () => false, toPNG: () => png })
+    expect(() => handler({ ...event, senderFrame: { url: 'dsh-app://app/' } }, region)).toThrow('unowned renderer')
+    await expect(handler(event, { ...region, width: 900 })).rejects.toThrow('invalid page capture region')
+    await expect(handler(event, { ...region, x: Number.NaN })).rejects.toThrow('invalid page capture region')
+    await expect(handler(event, region)).resolves.toEqual(png)
+    expect(window.webContents.capturePage).toHaveBeenCalledExactlyOnceWith(
+      { x: 15, y: 25, width: 101, height: 57 }, { stayHidden: true },
+    )
+    await expect(handler(event, { x: 710, y: 510, width: 10.25, height: 10.25 })).resolves.toEqual(png)
+    expect(window.webContents.capturePage).toHaveBeenLastCalledWith(
+      { x: 887, y: 637, width: 13, height: 13 }, { stayHidden: true },
+    )
+    window.webContents.capturePage.mockResolvedValueOnce({ isEmpty: () => true })
+    await expect(handler(event, region)).rejects.toThrow('no pixels returned')
   })
 
   it('holds boot injections until the Host is ready and rejects foreign boot callers', async () => {

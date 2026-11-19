@@ -195,6 +195,13 @@ export interface SessionInput extends InputTarget {
   setDraft(text: string): void
   /** Append ordered browser-owned attachment ids; busy admission phases refuse. */
   addAttachments(ids: readonly DraftAttachmentId[]): boolean
+  /**
+   * Append text and attachments to the editable composer draft.
+   * @param text - plain text to append.
+   * @param ids - browser-owned attachment ids in source order.
+   * @returns whether the draft accepted the content.
+   */
+  stageDraft(text: string, ids: readonly DraftAttachmentId[]): boolean
   /** Remove one browser-owned attachment id; busy admission phases refuse. @returns whether the id was removed. */
   removeAttachment(id: DraftAttachmentId): boolean
   /** Drop ids whose browser-owned objects no longer exist. */

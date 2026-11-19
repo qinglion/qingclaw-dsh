@@ -1,7 +1,22 @@
 /** Document renderer slot: the owner supplies shared file state, renderers own their presentation. */
 import type { PropsRuntime, SlotHookFactory } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { SidebarRightTabActions, UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { RefCallback } from 'react'
+import type { DocumentCaptureLocation, DocumentCaptureRect } from './capture-location.ts'
+
+/** Identifies a Session-scoped capture action and its record. */
+export interface DocumentCaptureTarget {
+  /** Key of the action registered in the document capture slot. */
+  readonly key: string
+  /** Record identifier understood by that action. */
+  readonly id: number
+}
+
+/** A saved outline and its action in the source preview. */
+export interface DocumentCaptureFrame {
+  readonly location: DocumentCaptureLocation
+  readonly target: DocumentCaptureTarget
+}
 
 /** One loaded text window, retaining source line positions. */
 export interface DocumentTextPage {
@@ -69,6 +84,35 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       owner: {
         /** Absolute path in the file's execution environment; native actions must verify a Host mapping. */
         readonly absolutePath: string
+      }
+    }
+    /** Toolbar contributions that act on the rendered document body. */
+    'sidebar.right.tab.document.contentActions': {
+      kind: 'list'
+      scope: 'session'
+      owner: {
+        readonly resourceAddress: string
+        readonly fileName: string
+        /** Current body bounds in viewport CSS pixels. Absent when the body is detached. */
+        readonly getBounds: () => DOMRectReadOnly | undefined
+        /** Resolve a selected viewport rectangle against the displayed source. @param region - selected rectangle. */
+        readonly captureLocation: (region: DocumentCaptureRect) => DocumentCaptureLocation | undefined
+        /** Show a committed capture. @param location - committed coordinates. @param target - optional action for the frame. */
+        readonly markCapture: (location: DocumentCaptureLocation, target?: DocumentCaptureTarget) => void
+        /** Supply the saved outlines for this file. @param frames - captures in saved order. */
+        readonly reportCaptureFrames: (frames: readonly DocumentCaptureFrame[]) => void
+        /** Hide the outlines during pixel capture. @param hidden - whether capture is in progress. */
+        readonly hideCaptureFrame: (hidden: boolean) => void
+        readonly openTab: SidebarRightTabActions['openTab']
+      }
+    }
+    /** Optional action inside the document capture frame. The action owns its pointer hit area. */
+    'sidebar.right.tab.document.captureAction': {
+      kind: 'keyed'
+      scope: 'session'
+      owner: {
+        readonly id: number
+        readonly openTab: SidebarRightTabActions['openTab']
       }
     }
     /**

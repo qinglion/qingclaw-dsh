@@ -46,6 +46,14 @@ export interface IConversation {
    */
   readonly blocks: ComposerBlocks
   /**
+   * Append content to a Session's composer and focus it.
+   * @param sessionId - target retained Session.
+   * @param text - plain text to append after the existing draft.
+   * @param image - image to attach using the composer's draft attachment flow.
+   * @returns whether the composer accepted the unsent draft.
+   */
+  stageImageDraft(sessionId: SessionId, text: string, image: File): boolean
+  /**
    * Send a prompt into the caller scope's session (queued turn).
    * @param text - prompt text, sent verbatim as one text block.
    * @returns completion; business failures reject (and land in promptError).
@@ -345,6 +353,21 @@ export class ConversationController extends Service implements IConversation {
       this.beginFileUpload(sessionId, attachment)
       return attachment
     })
+  }
+
+  stageImageDraft(sessionId: SessionId, text: string, image: File): boolean {
+    const binding = this.requireSessions().binding(sessionId)
+    if (binding === undefined || this.blocks.storeFor(sessionId).getSnapshot() !== undefined) return false
+    const state = binding.session.getSnapshot()
+    if (state.removed) return false
+    const input = this.input.for(binding.ctx)
+    const attachments = this.createDrafts(sessionId, [image], state.subagent === null)
+    if (!input.stageDraft(text, attachments.map(attachment => attachment.id))) {
+      this.releaseDraftAttachments(attachments)
+      return false
+    }
+    input.focus()
+    return true
   }
 
   /**

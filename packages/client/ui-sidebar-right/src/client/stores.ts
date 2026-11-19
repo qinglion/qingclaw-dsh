@@ -90,6 +90,8 @@ export interface OpenContentIntent {
   readonly paneId?: PaneId
   /** Split the target pane and put new content alone in the new pane. */
   readonly preferNewPane?: boolean
+  /** Use the other docked pane, or split when `preferNewPane` permits it. */
+  readonly beside?: boolean
   /** Land new content in this tab's place and close it in the same entry; a reveal keeps it. See `SidebarRightPlacement.replaceTab`. */
   readonly replaceTab?: TabId
   /** Resource tabs reveal an existing identity by default; `false` permits duplicates. Pages always deduplicate within the target pane. */
@@ -151,6 +153,36 @@ function planOpenIn(state: LayoutState, mint: Mint, intent: OpenContentIntent, d
   const index = pane.activeTabId === undefined ? 0 : pane.tabs.indexOf(pane.activeTabId) + 1
   const opened = planOpenContent(state, mint, { kind, contentId, title, paneId, index, revealIfOpened: false })
   return { ops: [...opened.ops, ...planFloatTab(state, mint, opened.tabId).ops], tabId: opened.tabId }
+}
+
+/** Settle companion content while keeping the source pane populated. */
+function planOpenBeside(state: LayoutState, mint: Mint, intent: OpenContentIntent): PlannedTab | undefined {
+  const source = getPane(state, intent.paneId ?? activeDockPaneId(state))
+  const other = dockPaneIds(state).find(id => id !== source.id)
+  if (other === undefined && intent.preferNewPane !== true) return undefined
+  const { kind, contentId, title } = intent
+  const matches = contentId === pageAddress(kind) || intent.revealIfOpened !== false
+  const matching = (pane: PaneId): TabId | undefined => matches ? findPaneContentTab(state, pane, contentId, kind) : undefined
+  const existing = matching(source.id)
+  if (other !== undefined) {
+    const there = matching(other)
+    if (there !== undefined) return { ops: [{ type: 'focusTab', tabId: there }], tabId: there }
+    if (existing !== undefined && source.tabs.length > 1) {
+      return { ops: planPlaceTab(state, existing, other, getPane(state, other).tabs.length), tabId: existing }
+    }
+    if (existing !== undefined) return undefined
+    return planOpenContent(state, mint, { kind, contentId, title, paneId: other, revealIfOpened: false })
+  }
+  if (existing !== undefined) {
+    if (source.tabs.length === 1) return undefined
+    return { ops: planDropTab(state, mint, existing, source.id, 'right'), tabId: existing }
+  }
+  let tabId: TabId | undefined
+  const ops = planSplitPane(state, mint, source.id, (id) => {
+    tabId = id
+    return { id, kind, contentId, title }
+  })
+  return tabId === undefined ? undefined : { ops, tabId }
 }
 
 /** A mint that counts, so the surface can carry its position forward. */
@@ -370,6 +402,13 @@ export function createSidebarRightStore(
             const planned = planOpenIn(state, mint, intent, intent.destination)
             settled(planned.tabId)
             return planned.ops
+          }
+          if (intent.beside === true) {
+            const planned = planOpenBeside(state, mint, intent)
+            if (planned !== undefined) {
+              settled(planned.tabId)
+              return [...planSetExpanded(state, true), ...planned.ops]
+            }
           }
           const { kind, contentId, title } = intent
           // A `replaceTab` tab that has closed since names no place, as the controller reads it.

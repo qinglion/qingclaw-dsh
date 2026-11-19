@@ -51,6 +51,17 @@ it('routes original-file requests through the trusted application bridge', async
   ])
 })
 
+it('forwards page capture through the application main-frame bridge', async () => {
+  vi.stubGlobal('location', new URL('dsh-app://app/'))
+  const png = new Uint8Array([137, 80, 78, 71])
+  electron.ipcRenderer.invoke.mockResolvedValueOnce(png)
+  await import('../src/preload-app.ts')
+  const api = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1] as DshDesktopProductApi
+  const region = { x: 12, y: 20, width: 80, height: 45 }
+  await expect(api.capturePageRegion(region)).resolves.toEqual(png)
+  expect(electron.ipcRenderer.invoke).toHaveBeenCalledExactlyOnceWith(DESKTOP_IPC.capturePageRegion, region)
+})
+
 it('limits product documents to update status and a native confirmation action', async () => {
   vi.stubGlobal('location', new URL('dsh-app://app/index.html'))
   await import('../src/preload-app.ts')
