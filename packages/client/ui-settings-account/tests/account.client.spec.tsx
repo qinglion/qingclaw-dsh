@@ -814,3 +814,12 @@ it('keeps notification DOM inside the launcher while the collapsed rail hides it
   view.rerender(await accountMenu(operations, snapshot, false, renderSlot))
   expect(screen.getByRole('status')).toBe(notice)
 })
+
+it('displays fractional QingClaw credits when the Platform currency wallets are empty', () => {
+  mount({ status: 'credential-stored', attempt: null }, zh, {
+    profile: { status: 'ready', value: { id: null, name: null, contact: null, plan: 'free', quotaRemaining: 9_999.123456 } },
+    balance: { status: 'ready', value: [], bonusWallets: [] },
+  })
+  expect(screen.getByText('可用积分').nextElementSibling?.textContent).toBe('9,999.123456')
+  expect(screen.queryByText('充值余额')).toBeNull()
+})

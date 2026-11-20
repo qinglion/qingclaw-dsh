@@ -7,13 +7,13 @@ import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
-function account(remaining: number, active: boolean) {
+function account(remaining: number, active: boolean, plan = 'pro', limit = 100_000) {
   return {
     view: { links: { topUpUrl: 'https://example.test/top-up' } },
     details: {
       profile: {
         status: 'ready' as const,
-        value: { id: 'u1', name: '用户', contact: null, quotaRemaining: remaining, quotaLimit: 100_000, subscriptionActive: active },
+        value: { id: 'u1', name: '用户', contact: null, quotaRemaining: remaining, quotaLimit: limit, plan, subscriptionActive: active },
       },
     },
   }
@@ -39,10 +39,20 @@ it('shows the expired notice and opens top-up', () => {
 
 it('shows the empty notice', () => {
   mount(account(0, true))
-  expect(screen.getByRole('status').textContent).toContain('额度已用完')
+  expect(screen.getByRole('status').textContent).toContain('积分已用完')
 })
 
 it('stays hidden while quota is healthy', () => {
   mount(account(80_000, true))
   expect(screen.queryByRole('status')).toBeNull()
+})
+
+it('keeps a newly funded free account out of the expired and low-credit states', () => {
+  mount(account(1_000, false, 'free', 1_000))
+  expect(screen.queryByRole('status')).toBeNull()
+})
+
+it('shows the actual fractional balance when credits run low', () => {
+  mount(account(0.162, false, 'free', 1_000))
+  expect(screen.getByRole('status').textContent).toContain('积分快用完了，剩余： 0.162')
 })

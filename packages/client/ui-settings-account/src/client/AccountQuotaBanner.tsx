@@ -2,7 +2,7 @@
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PlatformPageClaim, PlatformPages } from './platform-pages.ts'
 import type { AccountSnapshot } from './AccountSection.tsx'
-import { formatQuota } from './formatBalance.ts'
+import { formatCredits } from './formatBalance.ts'
 import css from './AccountQuotaBanner.module.css'
 
 /** Injected account data and the top-up page channel. */
@@ -24,19 +24,17 @@ export function AccountQuotaBanner({ useAccount, usePlatformPage, openPlatformPa
   const topUpUrl = useAccount(snapshot => snapshot.view?.links.topUpUrl)
   const page = usePlatformPage(current => current)
   if (profile?.status !== 'ready' || page !== null) return null
-  const value = profile.value
-  const remaining = Reflect.get(value, 'quotaRemaining') as number | null | undefined
+  const { quotaRemaining: remaining, quotaLimit: limit, subscriptionActive, plan } = profile.value
   if (remaining == null) return null
-  const limit = (Reflect.get(value, 'quotaLimit') as number | null | undefined) ?? 0
-  const expired = Reflect.get(value, 'subscriptionActive') === false
-  const low = limit > 0 && remaining <= Math.max(5_000, Math.floor(limit * 0.05))
+  const expired = subscriptionActive === false && plan != null && plan !== 'free'
+  const low = limit != null && limit > 0 && remaining <= limit * 0.05
   if (remaining > 0 && !expired && !low) return null
 
   const text = remaining <= 0
     ? t('quotaBannerEmpty')
     : expired
-      ? `${t('quotaBannerExpired')} ${formatQuota(remaining)}`
-      : `${t('quotaBannerLow')} ${formatQuota(remaining)}`
+      ? `${t('quotaBannerExpired')} ${formatCredits(remaining)}`
+      : `${t('quotaBannerLow')} ${formatCredits(remaining)}`
   const openTopUp = () => {
     if (openPlatformPage !== undefined) {
       openPlatformPage('top-up', () => undefined)

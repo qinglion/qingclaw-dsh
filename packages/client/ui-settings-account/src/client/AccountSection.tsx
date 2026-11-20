@@ -6,7 +6,7 @@ import type { AccountDetails, AccountView, SignInAttemptId } from '@deepseek-ai/
 import type { PropsRuntime, PropsLocale, InjectFace, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { PlatformPage, PlatformPages } from './platform-pages.ts'
-import { formatBalance } from './formatBalance.ts'
+import { formatBalance, formatCredits } from './formatBalance.ts'
 import { AccountAvatar } from './AccountAvatar.tsx'
 import type { AccountAvatarSnapshot } from './account-avatar.ts'
 import { authorizeUrlWithTheme } from './authorize-url.ts'
@@ -95,6 +95,7 @@ export function AccountSection({
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const profile = details?.profile?.status === 'ready' ? details.profile.value : undefined
+  const hasCreditAccount = profile?.plan != null || profile?.quotaRemaining != null
   const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
   const bonusWallets = details?.balance?.status === 'ready'
     ? details.balance.bonusWallets.filter(wallet => new Big(wallet.balance).gt(0)) : []
@@ -182,7 +183,12 @@ export function AccountSection({
           onClick={() => { void run(() => cancel(attempt.id)) }}>{t('cancel')}</Button>
       </div>}
       <div className={css.balanceCard}>
-        <div className={css.row}>
+        {hasCreditAccount ? <div className={css.row}>
+          <span>{t('quotaRemaining')}</span>
+          {profile.quotaRemaining == null
+            ? platformLink(t('balanceUnavailable'), css.unavailableLink)
+            : <span className={css.amount}>{formatCredits(profile.quotaRemaining)}</span>}
+        </div> : <div className={css.row}>
           <span>{t('balance')}</span>
           {signedIn && wallets !== undefined && wallets.length > 0
             ? <span className={css.amount}>{wallets.map(wallet => <span key={wallet.currency}>
@@ -191,8 +197,8 @@ export function AccountSection({
             : !signedIn || details?.balance === undefined
               ? <span className={css.unavailable}>{t(!signedIn ? 'balanceSignedOut' : 'loading')}</span>
               : platformLink(t('balanceUnavailable'), css.unavailableLink)}
-        </div>
-        {signedIn && showBonusRow && <>
+        </div>}
+        {signedIn && !hasCreditAccount && showBonusRow && <>
           <div className={css.divider} />
           <div className={css.row}>
             <span>{t('bonusBalance')}</span>

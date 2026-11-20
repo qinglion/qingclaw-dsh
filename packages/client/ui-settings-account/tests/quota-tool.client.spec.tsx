@@ -49,7 +49,7 @@ it.each([true, false])('shows weekly allowance separately from total and opens u
   const menu = within(screen.getByRole('menu'))
   expect(menu.getByText(/Pro 套餐/)).toBeTruthy()
   expect(menu.getByText('22%')).toBeTruthy()
-  expect(menu.getByText('56K')).toBeTruthy()
+  expect(menu.getByText('56,173')).toBeTruthy()
   expect(refreshAccount).toHaveBeenCalledOnce()
   fireEvent.click(menu.getByRole('menuitem', { name: '管理用量' }))
   expect(openPlatformPage).toHaveBeenCalledWith('usage', expect.any(Function))
@@ -58,12 +58,12 @@ it.each([true, false])('shows weekly allowance separately from total and opens u
 
 it.each([
   [{ weeklyLimit: 5000, quotaRemaining: 2900 }, '暂不可用'],
-  [{ weeklyLimit: 0, weeklyRemaining: 0 }, '无每周额度'],
+  [{ weeklyLimit: 0, weeklyRemaining: 0 }, '无每周积分'],
   [{ weeklyLimit: 5000, weeklyRemaining: 0, quotaRemaining: 2900 }, '0%'],
 ] as const)('shows the paid plan even with missing or exhausted weekly allowance', (wallet, text) => {
   mount({ subscriptionActive: true, ...wallet })
-  fireEvent.click(screen.getByRole('button', { name: `额度 · 本周剩余 · ${text}` }))
-  expect(within(screen.getByRole('menu')).getByText('每周限额').nextElementSibling?.textContent).toBe(text)
+  fireEvent.click(screen.getByRole('button', { name: `可用积分 · 本周剩余 · ${text}` }))
+  expect(within(screen.getByRole('menu')).getByText('每周积分').nextElementSibling?.textContent).toBe(text)
 })
 
 it.each([

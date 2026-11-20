@@ -4,7 +4,7 @@ import { Menu, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primit
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSnapshot } from './AccountSection.tsx'
 import type { PlatformPages } from './platform-pages.ts'
-import { formatQuota } from './formatBalance.ts'
+import { formatCredits } from './formatBalance.ts'
 import css from './AccountQuotaTool.module.css'
 
 interface QuotaToolFace {
@@ -66,7 +66,7 @@ function PaidQuotaMenu({ wallet, usageUrl, wide, t, refreshAccount, openPlatform
       <div className={css.source}>{t('quotaSource')} {sources.join(' + ') || unknown}</div>
       <dl className={css.rows}>
         <div><dt>{t('quotaWeekly')}</dt><dd>{weekly}</dd></div>
-        <div><dt>{t('quotaRemaining')}</dt><dd title={wallet.quotaRemaining?.toLocaleString()}>{wallet.quotaRemaining == null ? unknown : formatQuota(wallet.quotaRemaining)}</dd></div>
+        <div><dt>{t('quotaRemaining')}</dt><dd>{wallet.quotaRemaining == null ? unknown : formatCredits(wallet.quotaRemaining)}</dd></div>
       </dl>
     </div>
     <MenuItemButton disabled={!openPlatformPage && !usageUrl} onSelect={() => {
