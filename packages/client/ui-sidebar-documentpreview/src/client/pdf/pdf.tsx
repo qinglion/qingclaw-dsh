@@ -44,6 +44,8 @@ const FIT_WIDTH: ZoomPreference = { kind: 'fit-width' }
  */
 export function PdfBody(props: PdfBodyProps & { readonly loading: ReactNode }): ReactNode {
   const { tab } = props.useTabInfo()
+  const params = tab.navigation.params
+  const captureArea = params !== undefined && 'captureLocation' in params ? params.captureLocation.area : undefined
   const view = props.useStore(state => state.byTab[tab.id] ?? DEFAULT_PDF_VIEW)
   const data = props.content.kind === 'bytes' ? props.content.data : undefined
   const [load, setLoad] = useState<LoadState>()
@@ -90,11 +92,13 @@ export function PdfBody(props: PdfBodyProps & { readonly loading: ReactNode }): 
     </div>
   }
   const pages = <section className={css.body} data-pdf-preview>
-    {Array.from({ length: load.document.numPages }, (_, index) => (
-      <PdfPage key={index} document={load.document} page={index + 1}
-        requested={index === 0 || view.page === index + 1} onVisible={pageVisible} signal={tab.signal}
-        onWidth={index === 0 ? setPageWidth : undefined} zoom={renderZoom} zoomSurfaceClass={zoomSurfaceClass} t={t} />
-    ))}
+    {Array.from({ length: load.document.numPages }, (_, index) => {
+      const page = index + 1
+      const capturePage = captureArea?.kind === 'surface' && (page === captureArea.first.page || page === captureArea.last.page)
+      return <PdfPage key={page} document={load.document} page={page}
+        requested={page === 1 || view.page === page || capturePage} onVisible={pageVisible} signal={tab.signal}
+        onWidth={page === 1 ? setPageWidth : undefined} zoom={renderZoom} zoomSurfaceClass={zoomSurfaceClass} t={t} />
+    })}
   </section>
   return <ZoomViewport preference={preference} intrinsicWidth={pageWidth} horizontalInset={24} labels={labels}
     signal={tab.signal} scrollportRef={props.scrollportRef} onPreference={setPreference} onRenderZoom={setRenderZoom}>
@@ -150,7 +154,7 @@ function PdfPage({ document, page, requested: initiallyRequested, onVisible, sig
   }, [page, onVisible, state])
   useEffect(() => () => { textTask.current?.cancel() }, [])
   useEffect(() => {
-    if (!requested) return
+    if (!requested && !initiallyRequested) return
     setFailure(undefined)
     if (renderedZoom.current !== undefined && (!visible || renderedZoom.current === zoom)) return
     const node = canvas.current as HTMLCanvasElement
@@ -188,7 +192,7 @@ function PdfPage({ document, page, requested: initiallyRequested, onVisible, sig
       }
     }).catch((error: unknown) => { if (!renderSignal.aborted) setFailure({ error }) })
     return () => { lifetime.abort(); newText?.cancel() }
-  }, [document, page, requested, visible, zoom, signal, attempt, onWidth])
+  }, [document, page, requested, initiallyRequested, visible, zoom, signal, attempt, onWidth])
   return <div ref={host} className={css.page} data-pdf-page={page}>
     {failure === undefined && state !== 'ready' && (requested
       ? <div className={css.placeholder} role="status" aria-label={t('rendering')} />

@@ -30,7 +30,8 @@ import { createReadPage } from './rpc.ts'
 import { createTextStore } from './store.ts'
 import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 import { DocumentPreviewRegistry } from './document/registry.ts'
-import { documentTabInfoFactory } from './document/contract.ts'
+import { documentTabInfoFactory, type DocumentCaptureTarget } from './document/contract.ts'
+import type { DocumentCaptureLocation } from './document/capture-location.ts'
 import { apply as registerText } from './text/index.ts'
 import { apply as registerMarkdown } from './markdown/index.ts'
 import { apply as registerHtml } from './html/index.ts'
@@ -49,7 +50,8 @@ export type { TextPreviewProps } from './TextPreview.tsx'
 export type { TextInjected } from './face.ts'
 export type { ReadDocumentBytes, DocumentFileBytes, ReadWorkspaceFilePage, SessionFile, WorkspaceFilesReadRemote } from './rpc.ts'
 export type { TextPage, TextState, TextStore, TextTabState } from './store.ts'
-export type { DocumentContent, DocumentPreviewProps, DocumentTextPage } from './document/contract.ts'
+export type { DocumentCaptureFrame, DocumentContent, DocumentPreviewProps, DocumentTextPage } from './document/contract.ts'
+export type { DocumentCaptureLocation } from './document/capture-location.ts'
 export type { DocumentLoadMode, DocumentPreviewDefinition } from './document/registry.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -64,8 +66,11 @@ const NS = 'sidebarDocumentPreview'
 
 declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
   interface SidebarRightResourceParamsMap {
-    /** File line navigation supported by the text preview. */
-    file: WorkspaceFileParams
+    /** Source-line or capture-region navigation supported by the document preview. */
+    file: WorkspaceFileParams & {
+      readonly captureLocation?: DocumentCaptureLocation
+      readonly captureTarget?: DocumentCaptureTarget
+    }
   }
 }
 
@@ -107,6 +112,8 @@ export function apply(ctx: ClientContext): void {
       children: {
         'sidebar.right.tab.document': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: documentTabInfoFactory } } },
         'sidebar.right.tab.document.actions': { kind: 'list', scope: 'session' },
+        'sidebar.right.tab.document.contentActions': { kind: 'list', scope: 'session' },
+        'sidebar.right.tab.document.captureAction': { kind: 'keyed', scope: 'session' },
         'sidebar.right.tab.document.unpreviewable': { kind: 'list', scope: 'session' },
         'sidebar.right.tab.document.action': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: documentTabInfoFactory } } },
       },

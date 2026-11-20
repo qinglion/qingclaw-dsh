@@ -17,6 +17,7 @@ function createProductApi(): DshDesktopProductApi {
   return {
     protocolVersion: 1,
     mobilePairing: { open: () => ipcRenderer.invoke(DESKTOP_IPC.mobilePairingOpen) as Promise<void> },
+    capturePageRegion: region => ipcRenderer.invoke(DESKTOP_IPC.capturePageRegion, region) as Promise<Uint8Array<ArrayBuffer>>,
     fileActions: {
       save: request => ipcRenderer.invoke(DESKTOP_IPC.fileSave, request) as Promise<FileSaveResult>,
       readClipboardImage: url => ipcRenderer.invoke(DESKTOP_IPC.clipboardImageRead, url) as

@@ -92,9 +92,9 @@ function harness() {
     const props = {
       resourceAddress: 'dsh-resource://file/session/s/report.pdf',
       content: kind === 'bytes' ? { kind, data: bytes } : { kind, text: '', pages: [], eof: true }, wrap: false,
-      useTabInfo: () => ({ tab: { id: tabId, signal: controller.signal } }),
+      useTabInfo: () => ({ tab: { id: tabId, signal: controller.signal, navigation: { params: undefined } } }),
       useStore, actions: instance.actions, retainTab: vi.fn(), t: makeTranslate(en),
-    } as unknown as PdfBodyProps
+    } as PdfBodyProps
     return <PdfBody {...props} loading={<LoadingIndicator label={en.loading} />} scrollportRef={scrollportRef}
       ZoomViewport={ZoomViewport} zoomSurfaceClass={zoomSurfaceClass} />
   }
