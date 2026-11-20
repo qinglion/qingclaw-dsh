@@ -41,7 +41,7 @@ it('installs the exact private package, opens a registered panel, and restores f
     expect(installBundle).toHaveBeenCalledWith('https://npm.qingclaw.com/@qinglion/dsh-media-desk/-/dsh-media-desk-2.7.2.tgz',
       expect.objectContaining({ expected: { name: entry.packageName, version: '2.7.2' }, enabled: true }))
     expect(await store.readReadme(entry.packageName, entry.version, 'zh')).toMatchObject({ markdown: 'installed document' })
-    expect(readBundleDetail).toHaveBeenCalledWith(entry.packageName, 'zh')
+    expect(readBundleDetail).toHaveBeenCalledWith(entry.packageName, 'zh', { npmFileSources: [] })
     installedVersion = '2.6.0'
     await store.load()
     expect(await store.readReadme(entry.packageName, entry.version, 'zh')).toEqual({ markdown: 'private registry document' })

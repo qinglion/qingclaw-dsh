@@ -82,8 +82,7 @@ export default class QingClawWorkbench extends TypertRemoteService {
     const { entries } = await this.directory.get(false)
     const entry = entries.find(item => item.packageName === name && item.version === version)
     if (!entry) throw new Error('Unknown workbench version')
-    const signal = AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(this.config.fetchTimeoutMs)])
-    return readRegistryReadme(entry, language, signal)
+    return readRegistryReadme(entry, language, this.lifetime.signal)
   }
 
   /** @param ctx - Host context supplying logging and effect ownership. @param config - validated plugin settings. */

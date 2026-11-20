@@ -9,6 +9,8 @@ const bootstrap = 'http://127.0.0.1:34001/desktop?k=fixture'
 class TestWindow extends EventEmitter {
   readonly show = vi.fn()
   readonly focus = vi.fn()
+  readonly getContentSize = vi.fn(() => [420, 252])
+  readonly setContentSize = vi.fn()
   readonly loadURL = vi.fn().mockResolvedValue(undefined)
   readonly webContents = Object.assign(new EventEmitter(), {
     setWindowOpenHandler: vi.fn(),
@@ -63,6 +65,17 @@ it('opens one isolated local management page only after the desktop requests it'
   await pairing.open(parent, '连接手机')
   expect(windows).toHaveLength(1)
   expect(win.focus).toHaveBeenCalledTimes(2)
+  await pairing.dispose()
+})
+
+it('fits short connection states and the QR page without changing the window width', async () => {
+  const { pairing, parent } = kit()
+  await pairing.open(parent, '连接手机')
+  const win = windows[0]!
+  expect(win.options?.webPreferences?.enablePreferredSizeMode).toBe(true)
+  win.webContents.emit('preferred-size-changed', {}, { width: 100, height: 235 })
+  win.webContents.emit('preferred-size-changed', {}, { width: 900, height: 1200 })
+  expect(win.setContentSize.mock.calls).toEqual([[420, 235], [420, 600]])
   await pairing.dispose()
 })
 

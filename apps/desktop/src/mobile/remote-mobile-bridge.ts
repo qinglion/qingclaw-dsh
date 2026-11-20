@@ -9,6 +9,7 @@ import { MobileRelay, parseRoom, type RemoteRoom } from './mobile-relay.ts'
 
 export interface RemoteMobileBridgeOptions extends MobileHostOptions {
   platformOrigin: string
+  desktopTheme: string
   createRoom(signal: AbortSignal): Promise<unknown>
   locale?: 'en' | 'zh' | (() => 'en' | 'zh')
 }
@@ -242,7 +243,7 @@ export class RemoteMobileBridge {
     if (req.method === 'GET' && url.pathname === '/desktop') {
       const lang = this.options.locale
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      res.end(desktopPairingPage(typeof lang === 'function' ? lang() : (lang ?? 'en')))
+      res.end(desktopPairingPage(typeof lang === 'function' ? lang() : (lang ?? 'en'), this.options.desktopTheme))
     } else if (req.method === 'GET' && url.pathname === '/desktop/status') {
       const room = this.relay?.room
       if (room && this.relay?.ready && !this.relay.denied && !this.relay.paired && room.pairingExpiresAt <= Date.now()) void this.refresh()

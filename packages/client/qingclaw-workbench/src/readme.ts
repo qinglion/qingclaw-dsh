@@ -7,6 +7,8 @@ import type { WorkbenchCatalogEntry } from './types.ts'
 
 const DOCUMENT_LIMIT = 512 * 1024
 const UNPACKED_LIMIT = 128 * 1024 * 1024
+// A version's README is inside its npm tarball, which may be up to 25 MiB.
+const ARCHIVE_DOWNLOAD_TIMEOUT_MS = 120_000
 const unpackGzip = promisify(gunzip)
 
 /** Read the locale files and Markdown documents from the reviewed npm archive.
@@ -70,8 +72,9 @@ function selectDocument(files: ReadonlyMap<string, Buffer | null>, language: str
 }
 
 /** Read the exact reviewed version from the catalog's validated private registry. */
-export async function readRegistryReadme(entry: WorkbenchCatalogEntry, language: string, signal: AbortSignal): Promise<string | null> {
+export async function readRegistryReadme(entry: WorkbenchCatalogEntry, language: string, lifetime: AbortSignal): Promise<string | null> {
   if (!/^[a-z]{2,8}(?:-[a-z0-9]{1,8})*$/iu.test(language) || language.length > 64) throw new Error('Invalid workbench locale')
+  const signal = AbortSignal.any([lifetime, AbortSignal.timeout(ARCHIVE_DOWNLOAD_TIMEOUT_MS)])
   const leaf = entry.packageName.split('/')[1]
   const url = new URL(`${entry.packageName}/-/${leaf}-${entry.version}.tgz`, entry.registry)
   const response = await fetch(url, { signal, redirect: 'error', credentials: 'omit' })

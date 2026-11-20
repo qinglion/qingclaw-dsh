@@ -1,6 +1,6 @@
 {
   "name": "@qinglion/dsh-client-ui-qingclaw-admin",
-  "description": "In-client QingClaw creator publishing and administrator control plane",
+  "description": "QingClaw registry package review and account administration",
   "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
@@ -70,7 +70,6 @@
     "lib/types/**/*.d.ts",
     "lib/types/**/*.d.ts.map",
     "lib/**/*.js.map",
-    "src",
-    "skills"
+    "src"
   ]
 }

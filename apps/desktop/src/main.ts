@@ -7,6 +7,7 @@ import { DesktopUpdateSettings } from './update-settings.ts'
 import { isDesktopUpdateChannel } from './settings-file.ts'
 import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-product-analytics/types'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
+import { readFileSync } from 'node:fs'
 import { access, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -548,6 +549,7 @@ async function main(): Promise<void> {
       ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test
     return new MobilePairingWindow(new RemoteMobileBridge({
       platformOrigin: origin,
+      desktopTheme: readFileSync(join(app.getAppPath(), 'lib/welcome/design-platform.css'), 'utf8'),
       createRoom: signal => registerMobileRoom(origin, account, signal),
       harnessUrl: () => {
         if (!hostUrl || !hostCookie || backend.state.phase !== 'ready') return undefined

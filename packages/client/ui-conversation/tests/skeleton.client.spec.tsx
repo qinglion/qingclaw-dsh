@@ -615,6 +615,21 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByText('Selected Folder')).toBeTruthy()
   })
 
+  it('opens an opted-in view before the first message and returns to its original draft', () => {
+    const viewTabs = [
+      { id: 'chat', label: 'Chat' }, { id: 'trajectory', label: 'Trajectory' },
+      { id: 'release', label: 'Release', supportsBlankSession: true },
+    ]
+    const b = mount(sessionSnapshotOf({ blank: true }), undefined, undefined, { viewTabs })
+    act(() => { b.wiring.setDraft('unsent') })
+    expect(b.view.queryByRole('tab', { name: 'Trajectory' })).toBeNull()
+    fireEvent.click(b.view.getByRole('tab', { name: 'Release' }))
+    expect(b.view.getByTestId('view-release').closest('[data-blank-session-view]')).toBeTruthy()
+    fireEvent.click(b.view.getByRole('tab', { name: 'Chat' }))
+    expect(b.view.queryByTestId('view-release')).toBeNull()
+    expect(b.store.store.getSnapshot().draft).toEqual({ text: 'unsent', references: [] })
+  })
+
   it('keeps a rejected first prompt engaging instead of returning to the Hero', () => {
     const failed = sessionSnapshotOf({
       blank: true,

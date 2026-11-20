@@ -46,7 +46,7 @@ export function apply(ctx: Context): void {
       if (disposed || current !== generation) return
       const profile = result?.ok && result.value?.status === 'ready' ? result.value.value : undefined
       const role = profile?.role
-      if (!profile || (role !== 'creator' && role !== 'admin')) { clear(); return }
+      if (!profile || role !== 'admin') { clear(); return }
       const key = JSON.stringify([profile.id, role])
       if (identity === key) return
       clear()

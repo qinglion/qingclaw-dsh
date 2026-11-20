@@ -14,12 +14,27 @@ export interface PluginPublication {
   readonly title: string
   readonly version: string
   readonly resource_type: 'plugin' | 'skill'
-  readonly state: 'pending' | 'publishing' | 'published' | 'failed' | 'rejected'
+  readonly state: 'pending' | 'publishing' | 'published' | 'failed' | 'rejected' | 'delisted' | 'superseded'
   readonly submitted_by?: { readonly id: number; readonly name: string | null; readonly role: QingClawUserRole }
+  readonly listing_blocked_by_version?: boolean
+  readonly current?: boolean
   readonly submitted_at?: string
   readonly published_at?: string
   readonly error?: string
 }
 
+export interface RegistryPackage {
+  readonly package_name: string
+  readonly owner_id: number | null
+  readonly current_market_version?: string | null
+  readonly highest_market_version?: string | null
+  readonly latest_version: string | null
+  readonly description: string
+  readonly versions: ReadonlyArray<{
+    readonly version: string
+    readonly listing_blocked_by_version?: boolean
+    readonly published_at: string | null
+  }>
+}
+
 export const CONTROL_PATH = '/api/qingclaw-market/manage'
-export const MAX_PACKAGE_BYTES = 25 * 1024 * 1024

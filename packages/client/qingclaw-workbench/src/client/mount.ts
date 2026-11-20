@@ -26,7 +26,10 @@ export function registerWorkbenchUi(ctx: Context): void {
   const t = ctx.locale.bind(NS)
   const pluginStore = createWorkbenchPluginStore(ctx)
   ctx.effect(() => () => { pluginStore.dispose() }, 'qingclaw-workbench: catalog')
-  const injected = (): WorkbenchPageInjected => ({ pluginStore, hooks: { locale: ctx.locale } })
+  const injected = (): WorkbenchPageInjected => ({
+    pluginStore,
+    hooks: { locale: ctx.locale },
+  })
   // Keep the navigation entry and its target transactional across late slot declarations.
   ctx.slots.inject('main', () => ctx.slots.inject('sidebar.panellist', function* () {
     yield ctx.slots.register({

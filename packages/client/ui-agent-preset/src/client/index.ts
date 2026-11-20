@@ -43,7 +43,7 @@ import type { AgentPresetSectionInjected } from './AgentPresetSection.tsx'
 import { AgentPresetSeatController, type AgentPresetStage } from './seat-store.ts'
 import { AgentPresetSectionController } from './section-store.ts'
 import { en, ja, es, fr, de, ru, pt, zh, type AgentPresetSettingsKey } from './locales.ts'
-import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController } from './settings-store.ts'
+import { AGENT_PRESET_SETTINGS_NS, presetVisible, AgentPresetSettingsController } from './settings-store.ts'
 import { analyticsMode } from './analytics.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -243,7 +243,7 @@ export function apply(ctx: ClientContext): void {
       }
     }, 'ui-agent-preset: new-session chip and header label')
 
-    scope.slots.inject('plugins.add.actions', () => scope.slots.register({
+    if (presetVisible('cordis')) scope.slots.inject('plugins.add.actions', () => scope.slots.register({
       name: 'plugins.add.actions',
       id: 'create-plugin',
       locale: 'settings.agentPreset',

@@ -66,15 +66,8 @@
       name: '@deepseek-ai/dsh-client-ui-plugin-market'
     - id: ui-qingclaw-admin
       name: '@qinglion/dsh-client-ui-qingclaw-admin'
-
-# Creator sessions inherit this bundled provider alongside their own local skills.
-- id: skill-filesystem
-  disabled: false
-  config:
-    providerName: qingclaw-market
-    includeDefaultRoots: false
-    watch: false
-    bundledSkillDir: !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@qinglion/dsh-client-ui-qingclaw-admin/package.json')), 'skills')
+    - id: qingclaw-creator
+      name: '@qinglion/dsh-qingclaw-creator'
 
 - insert:
     # Preset declarations remain owned by dsh-web-app. This QingClaw-only

@@ -4,9 +4,9 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The account menu opens QingClaw management for administrators and Creator center for creators. Both open a dedicated panel. The client submits npm package tarballs and shows publication status. Admins can publish or return a submission and change user roles.
+Administrators open Plugin management from the QingClaw management account menu. All packages published to the QingClaw registry are visible, including versions without a listing request. Administrators can confirm a maintainer for legacy packages, review requested versions, delist a version and manage user roles.
 
-The Host authenticates requests to the QingClaw website API using the signed-in account. Package storage and npm publishing run on the website backend.
+Creators use their separate Creator center to request a listing for a version they maintain. Delisting a version removes it from the market and preserves the npm artifact.
 
 ## Model Experience
 
@@ -18,4 +18,4 @@ None. Marketplace activity uses the account API.
 
 ## Known Limitations and Deferred Work
 
-- Submissions accept the .tgz output of npm pack, up to 25 MB.
+- Listings accept exact versions of packages in the QingClaw registry’s `@qinglion/` scope.

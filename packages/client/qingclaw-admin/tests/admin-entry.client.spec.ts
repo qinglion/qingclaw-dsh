@@ -65,7 +65,7 @@ it('keeps native phone pairing available to ordinary users alongside their accou
   expect(c.ctx.slots.entries('settings.launcher.actions').some(entry => entry.options.id === 'qingclaw-admin')).toBe(false)
 }, 120_000)
 
-it('registers Creator center for a creator account', async ({ start }) => {
+it('keeps the administration panel out of a creator account', async ({ start }) => {
   const c = await start()
   c.mock.remote.account.getProfile.mockResolvedValue(ok({
     status: 'ready',
@@ -73,7 +73,7 @@ it('registers Creator center for a creator account', async ({ start }) => {
   }))
   c.mock.streams.push('account/watch', { type: 'snapshot', state: signedIn })
   await vi.waitFor(() => {
-    const entry = c.ctx.slots.entries('main').find(candidate => candidate.options.key === 'qingclaw-admin')
-    expect(entry?.inject?.()).toEqual({ role: 'creator', userId: 'creator' })
+    expect(c.mock.remote.account.getProfile).toHaveBeenCalled()
+    expect(c.ctx.slots.entries('main').some(candidate => candidate.options.key === 'qingclaw-admin')).toBe(false)
   })
 }, 120_000)

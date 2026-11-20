@@ -222,8 +222,10 @@ export function WorkbenchPage({ pluginStore, t, useLocale }: WorkbenchPageProps)
     <div className={css.content} hidden={Boolean(detail)}>
       <header className={css.header}>
         <h1 ref={listHeading} tabIndex={-1}>{t('title')}</h1>
-        <Input type="search" className={css.search as string} icon={<IconSearchOutlineRegular size={16} />}
-          value={query} onChange={event => setQuery(event.target.value)} aria-label={t('search')} placeholder={t('search')} />
+        <div className={css.headerActions}>
+          <Input type="search" className={css.search as string} icon={<IconSearchOutlineRegular size={16} />}
+            value={query} onChange={event => setQuery(event.target.value)} aria-label={t('search')} placeholder={t('search')} />
+        </div>
       </header>
       <div className={css.toolbar}>
         <SegmentedControl id={tabsId} value={tab} onChange={setTab} label={t('title')}

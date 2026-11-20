@@ -52,6 +52,7 @@ const origin = 'https://site.example'
 function fixture(createRoom = vi.fn(async () => room())) {
   return new RemoteMobileBridge({
     platformOrigin: origin,
+    desktopTheme: 'body { --test-shared-theme: 1; }',
     createRoom,
     locale: 'zh',
     harnessUrl: () => undefined,
@@ -98,6 +99,7 @@ it('creates a remote-only code, serves management exclusively on loopback, and d
     expect((await client('/api/rpc', 'POST')).status).toBe(404)
     const html = await (await client('/desktop')).text()
     expect(html).toContain('青狮官网')
+    expect(html).toContain('body { --test-shared-theme: 1; }')
     expect(html).not.toMatch(/cloudflare|pinggy|wi-fi/i)
     const command = { type: 'request', id: 'r1', method: 'workspace.unlisted', payload: {} }
     receive(command)

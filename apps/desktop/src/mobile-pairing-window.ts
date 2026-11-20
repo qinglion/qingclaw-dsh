@@ -43,14 +43,20 @@ export class MobilePairingWindow {
         throw new Error('Invalid pairing origin')
       }
       const win = new BrowserWindow({
-        parent, width: 500, height: 640, minWidth: 380, minHeight: 540, title, show: false,
+        parent, width: 420, height: 252, minWidth: 340, useContentSize: true, title, show: false,
         backgroundColor: nativeTheme.shouldUseDarkColors ? '#141416' : '#ffffff',
         webPreferences: {
           partition: 'qingclaw-pairing-' + randomUUID(), sandbox: true, contextIsolation: true,
-          nodeIntegration: false, webSecurity: true, devTools: false,
+          nodeIntegration: false, webSecurity: true, devTools: false, enablePreferredSizeMode: true,
         },
       })
       this.window = win
+      // Fit the scanned/paired state as well as the taller QR, without changing the user's chosen width.
+      win.webContents.on('preferred-size-changed', (_event, size) => {
+        const [width, current] = win.getContentSize()
+        const height = Math.max(200, Math.min(600, size.height))
+        if (width && height !== current) win.setContentSize(width, height)
+      })
       win.on('page-title-updated', (event) => { event.preventDefault() })
       win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
       win.webContents.on('will-attach-webview', (event) => { event.preventDefault() })

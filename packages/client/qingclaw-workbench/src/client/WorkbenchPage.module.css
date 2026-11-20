@@ -57,6 +57,7 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+.headerActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .search { width: min(310px, 100%); }
 
 .page button:focus-visible,
@@ -273,6 +274,7 @@
   .content { padding-inline: 18px; }
   .grid { grid-template-columns: 1fr; }
   .header { align-items: stretch; flex-direction: column; gap: 14px; margin-bottom: 16px; }
-  .search { width: 100%; }
+  .headerActions { width: 100%; }
+  .search { flex: 1 1 160px; min-width: 0; }
   .toolbar { gap: 10px; }
 }

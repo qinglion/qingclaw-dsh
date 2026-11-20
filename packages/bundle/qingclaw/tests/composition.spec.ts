@@ -28,6 +28,7 @@ describe('QingClaw distribution bundle', () => {
     expect(manifest.dependencies?.['@qinglion/dsh-llm-qingclaw-account']).toBe('workspace:*')
     expect(manifest.dependencies?.['@qinglion/dsh-qingclaw-workbench']).toBe('workspace:*')
     expect(manifest.dependencies?.['@qinglion/dsh-client-ui-qingclaw-admin']).toBe('workspace:*')
+    expect(manifest.dependencies?.['@qinglion/dsh-qingclaw-creator']).toBe('workspace:*')
     expect(manifest.dependencies?.['@deepseek-ai/dsh-plugin-market']).toBe('workspace:*')
     expect(manifest.dependencies?.['@deepseek-ai/dsh-client-ui-plugin-market']).toBe('workspace:*')
     expect(manifest.dependencies?.['@deepseek-ai/dsh-client-ui-brand-official']).toBe('workspace:*')
@@ -39,7 +40,7 @@ describe('QingClaw distribution bundle', () => {
       .toBe('@deepseek-ai/dsh-client-ui-brand-official')
 
     const composed = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
-    expect(composed).toHaveLength(web.length + 7)
+    expect(composed).toHaveLength(web.length + 8)
     expect(composed.find(row => row.id === 'ui-brand-official')).toMatchObject({
       name: '@deepseek-ai/dsh-client-ui-brand-official',
       disabled: true,

@@ -43,6 +43,13 @@ function setup(initial = [media, notes]) {
   return { store, page }
 }
 
+it('keeps project creation out of the market', async () => {
+  const { page } = setup([])
+  page()
+  await screen.findByText(zh.emptyMarket)
+  expect(screen.queryByRole('button', { name: '制作工作台' })).toBeNull()
+})
+
 it('filters by author and category, then clears unmatched searches', async () => {
   const { page } = setup()
   page()

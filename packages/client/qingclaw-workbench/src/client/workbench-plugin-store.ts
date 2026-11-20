@@ -163,7 +163,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       const entry = find(id)
       if (entry.version !== version) throw new Error('工作台版本已变更')
       if (installed.get(id) === version) {
-        const answer = await ctx.remote.pluginManager.readBundleDetail(id, language)
+        const answer = await ctx.remote.pluginManager.readBundleDetail(id, language, { npmFileSources: [] })
         if (!answer.ok) throw new Error(answer.error.message)
         if (answer.value.status !== 'found') return null
         const { markdown, path } = answer.value
