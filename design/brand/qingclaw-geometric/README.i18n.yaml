@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write design/brand/qingclaw-geometric/README.md
+/qingclaw-geometric-brand-extension:
+  en: 0463645b7ead86a7
+  zh: 291a87174039c250
+/qingclaw-geometric-brand-extension/design-rule:
+  en: 9220ed5c3b76acec
+  zh: 75c0279b084c6973
+/qingclaw-geometric-brand-extension/files:
+  en: 206fb71e480d0de0
+  zh: 0a2f2e8aabd8309a

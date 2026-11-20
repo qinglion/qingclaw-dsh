@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
+import { QINGCLAW_DESKTOP_DISTRIBUTION } from '../src/distribution.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import type { DesktopRelease } from '../src/release.ts'
 import { developmentRuntimeDirectory, resolveDesktopBuildTarget } from './desktop-build-paths.mjs'
@@ -65,9 +66,17 @@ async function launchElectron(): Promise<void> {
   const hostPort = debugPort('DSH_DESKTOP_HOST_INSPECT_PORT', 9230)
   const home = resolve(process.env.DSH_HOME ?? join(DEVELOPMENT_ROOT, 'home'))
   const userData = resolve(process.env.DSH_DESKTOP_USER_DATA_DIR ?? join(DEVELOPMENT_ROOT, 'electron-user-data'))
+  // Local development defaults to the beta platform so a developer session
+  // never consumes the production account or its model quota by accident.
+  const platformOrigin = process.env.QINGCLAW_PLATFORM_ORIGIN
+    ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test
+  const inferenceOrigin = process.env.QINGCLAW_INFERENCE_ORIGIN
+    ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.inferenceOrigin
   const environment: NodeJS.ProcessEnv = {
     ...process.env,
     DSH_HOME: home,
+    QINGCLAW_PLATFORM_ORIGIN: platformOrigin,
+    QINGCLAW_INFERENCE_ORIGIN: inferenceOrigin,
     DSH_DESKTOP_PRIMARY_RUNTIME_DIR: process.env.DSH_DESKTOP_PRIMARY_RUNTIME_DIR ?? developmentRuntimeDirectory(),
     DSH_DESKTOP_HOST_INSPECT_PORT: String(hostPort),
     DSH_DESKTOP_OPEN_DEVTOOLS: process.env.DSH_DESKTOP_OPEN_DEVTOOLS ?? '1',
@@ -78,7 +87,10 @@ async function launchElectron(): Promise<void> {
   console.log(`desktop development: inspectors main=${String(mainPort)}, renderer=${String(rendererPort)}, host=${String(hostPort)}`)
   if (process.platform === 'darwin') {
     const executable = prepareDevelopmentApp({ electron, appRoot: APP_ROOT, directory: DEVELOPMENT_ROOT, home, userData,
-      mainPort, rendererPort, hostPort, openDevtools: environment.DSH_DESKTOP_OPEN_DEVTOOLS! })
+      mainPort, rendererPort, hostPort, openDevtools: environment.DSH_DESKTOP_OPEN_DEVTOOLS!,
+      primaryRuntime: environment.DSH_DESKTOP_PRIMARY_RUNTIME_DIR!,
+      platformOrigin,
+      inferenceOrigin })
     await run(executable, [], APP_ROOT, environment)
     return
   }

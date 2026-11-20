@@ -38,6 +38,8 @@ kind: "package-reference"
 
 `loading: 'text-pages'` 和 `'bytes-complete'` 使用共享文件读取器。选择 `'renderer'` 时，所选正文在读取任何字节前挂载，并接收 `content: { kind: 'renderer', revision, loaded, failed, reload }`。其注入 face 负责内容加载、错误、store 更新和取消。`loaded(version)` 记录已展示的源版本并结束加载。`failed()` 结束加载但不记录成功版本，使后续文件变化可以重试；已被替换的 revision 所发出的报告会被忽略。`reload()` 增加 revision，正文据此取消并替换当前请求。正文也在卸载和 tab 关闭时取消请求，将已完成内容保留在自己声明的 tab store 中，并在 tab 结束时释放。[Office 预览](#office-preview) 使用此模式，转换后的字节和字体元数据不会进入共享文件 store。
 
+Session 作用域的 list slot `sidebar.right.tab.document.contentActions` 在标签页可见且文档内容可用时提供工具栏控件。控件接收原文件资源地址、文件名、用于读取当前预览正文视口 CSS 像素边界的回调，以及标签页现有的页面打开操作。
+
 <a id="addresses"></a>
 ## 地址
 
@@ -127,7 +129,7 @@ Office Remote 通过 Connection 的 multipart 二进制传输返回原生 `Uint8
 
 `ctx.sidebarRight.openResource(address, { params: { line } })` 通过 `file` 参数携带 1 起算的源码行号。在 `text-pages` 模式下，owner 顺序加载到该行或 EOF。纯文本与代码渲染器声明 `sourceLines`；Markdown 不声明。未声明 `sourceLines` 的渲染器直接响应导航、不移动正文，之后切换到纯文本或代码也不会重放。`sourceLines` 渲染器尚未画出该行时，导航保持待处理。代码导航直接滚动内部源码视口。落定的行显示一条高亮带，停留 0.6 秒后在 1.4 秒内渐隐；切换换行或调整预览尺寸会提前移除它；重新挂载的 tab 恢复滚动位置时不显示高亮带。字节模式渲染器不消费源码行导航。每个完成的导航 revision 只响应一次。不带 `revealIfOpened: false` 打开同一文件时聚焦已有 tab，并送达新 revision。
 
-文档路径标签提供文件[右键菜单](../ui-context-menu/README.zh.md)，保留选中行号与当前窗格。
+文档工具栏扩展可以提供当前文件已保存的截图框。文件导航也可携带要定位的截图位置和可选的操作目标。预览在对应文件版本上绘制红色截图框，并在 `sidebar.right.tab.document.captureAction` 中渲染对应的操作。PDF 和图片的位置随页面或图片缩放，文本的位置随源码行或 Markdown 内容块移动。文档路径标签提供文件[右键菜单](../ui-context-menu/README.zh.md)，保留选中行号与当前窗格。
 
 <a id="model-experience"></a>
 ## 模型体验

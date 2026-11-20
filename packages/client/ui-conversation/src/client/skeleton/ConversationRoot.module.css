@@ -639,6 +639,16 @@
   overflow-y: auto;
 }
 
+/* A plugin view may occupy the empty session before a first message.
+   Keep the input mounted so returning to Chat restores its draft. */
+.root[data-phase='hero'] .scrollBody:has([data-blank-session-view]) {
+  justify-content: flex-start;
+}
+
+.scrollBody:has([data-blank-session-view]) > .composerSeat {
+  display: none;
+}
+
 /* Settling (session replaying, hero/docked unknown): keep the composer seat
    mounted but invisible so no wrong layout flashes before the phase lands. */
 .root[data-phase='settling'] .composerSeat,

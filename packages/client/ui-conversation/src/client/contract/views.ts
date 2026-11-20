@@ -5,7 +5,12 @@ import type { DraftInput } from './draft-editor.ts'
  * One conversation view tab, projected from a 'conversation.view' slot
  * entry's registration options (label falls back to the entry id).
  */
-export interface ViewTab { id: string; label: string }
+export interface ViewTab {
+  id: string
+  label: string
+  /** The view can be opened before any conversation history exists. */
+  supportsBlankSession?: boolean
+}
 
 /** One-shot focus request addressed to a Conversation View. */
 export interface ConversationViewRequest {

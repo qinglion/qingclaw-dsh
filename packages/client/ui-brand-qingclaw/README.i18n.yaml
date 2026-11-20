@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-brand-qingclaw/README.md
+/:
+  en: 503dedf0cb8f8417
+  zh: ea84e7d2c7c4e8a7
+/deepseek-ai-dsh-client-ui-brand-qingclaw:
+  en: bf923d87d212a4bc
+  zh: 4094b10352ec6fc7
+/deepseek-ai-dsh-client-ui-brand-qingclaw/summary:
+  en: 1757a30847a48578
+  zh: 3a54477cd45a8578
+/deepseek-ai-dsh-client-ui-brand-qingclaw/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-client-ui-brand-qingclaw/use-this-package:
+  en: ee88148f58c77644
+  zh: b3a4805e0e66456d
+/deepseek-ai-dsh-client-ui-brand-qingclaw/understand-the-implementation:
+  en: 106a2e2240046416
+  zh: 3467a2f599c82cb7
+/deepseek-ai-dsh-client-ui-brand-qingclaw/further-exploration:
+  en: 3c9926f1077ec908
+  zh: 0e1efcd21a16cea0
+/deepseek-ai-dsh-client-ui-brand-qingclaw/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-client-ui-brand-qingclaw/model-experience/browser-branding:
+  en: ad5bf80e154b8e27
+  zh: f82ae6119af59f19
+/deepseek-ai-dsh-client-ui-brand-qingclaw/model-experience/browser-branding/what-the-model-sees:
+  en: 0f6e2643054019fb
+  zh: 20d6b6d40385f51b
+/deepseek-ai-dsh-client-ui-brand-qingclaw/model-experience/browser-branding/token-effect:
+  en: bc988a1c4cbfa5f1
+  zh: fb987874d0c57e1d
+/deepseek-ai-dsh-client-ui-brand-qingclaw/model-experience/browser-branding/kv-cache-effect:
+  en: b615068a408cfdc0
+  zh: c43b80ee74afa33a
+/deepseek-ai-dsh-client-ui-brand-qingclaw/known-limitations-and-deferred-work:
+  en: 880313eb489a8471
+  zh: 05c189b66b08fb78
+/deepseek-ai-dsh-client-ui-brand-qingclaw/known-limitations-and-deferred-work/dev-note:
+  en: 472116d006f8b402
+  zh: 6ead321087f05f2c

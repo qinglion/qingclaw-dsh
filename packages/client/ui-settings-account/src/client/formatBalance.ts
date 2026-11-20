@@ -19,3 +19,8 @@ function addCommas(value: string): string {
   const [integer, fraction] = value.split('.')
   return `${Number(integer).toLocaleString()}.${fraction}`
 }
+
+/** Preserve gateway credit precision in the account, composer and sidebar. */
+export function formatCredits(value: number): string {
+  return value.toLocaleString(undefined, { maximumSignificantDigits: 21 })
+}

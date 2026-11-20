@@ -220,6 +220,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       tabs.push({
         id: entry.options.id,
         label: resolveSlotLabel(entry.options.label) ?? entry.options.id,
+        ...(entry.options.supportsBlankSession ? { supportsBlankSession: true } : {}),
       })
     }
     return tabs

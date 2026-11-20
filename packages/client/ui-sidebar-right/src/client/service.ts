@@ -158,13 +158,15 @@ export interface SidebarRightPlacement {
   readonly paneId?: PaneId
   /** Prefer a new pane for new content; use the target pane when splitting is unavailable. */
   readonly preferNewPane?: boolean
+  /** Open in the other docked pane or split to make one. Move matching docked content from the target pane when needed. */
+  readonly beside?: boolean
   /**
    * Land new content in this tab's place and close it in the same step: a
    * docked tab lends its pane and strip slot; a floating tab is replaced in its
    * panel, and the new tab keeps the panel's pane id, rectangle, and stacking
    * order, takes focus, and leaves the column as it is. Content already open is
    * revealed, and this tab stays open. Where new content lands, it takes
-   * precedence over `paneId` and `preferNewPane`. A tab that has closed since
+   * precedence over `paneId`, `preferNewPane`, and `beside`. A tab that has closed since
    * is ignored, so the open places as without it.
    */
   readonly replaceTab?: TabId
@@ -183,7 +185,7 @@ export interface SidebarRightOpenResourceOptions extends SidebarRightPlacement {
   readonly params?: SidebarRightResourceParams
   /**
    * Settle the resource in this host, matched by Session, claimed kind, and
-   * content id; `paneId`, `preferNewPane`, `replaceTab`, and `revealIfOpened`
+   * content id; `paneId`, `preferNewPane`, `beside`, `replaceTab`, and `revealIfOpened`
    * are then ignored and no tab closes. A copy already in the host is revealed;
    * otherwise one copy from the other host moves there, keeping its tab id and
    * occurrence; otherwise a new tab opens there. `'sidebar'` uses the default
@@ -248,6 +250,13 @@ export interface ISidebarRight {
    * @param options - placement and that kind's navigation parameters.
    */
   openTab<K extends string>(kind: K, options?: SidebarRightOpenTabOptions<K>): void
+  /**
+   * Show a docked workspace with one page on the left and companion pages on the right.
+   * @param leading - the registered page kind selected in the left pane.
+   * @param trailing - registered page kinds to place in the right pane.
+   * @param selected - the right-hand page kind to select.
+   */
+  openTabWorkspace(leading: string, trailing: readonly string[], selected: string): void
   /**
    * Close one tab of the on-screen Session; the sole docked guide remains open.
    * @param tabId - the tab to close.
@@ -392,6 +401,37 @@ export class SidebarRightController implements ISidebarRight {
     this.placeTab(sessionId, actions, kind, options)
   }
 
+  openTabWorkspace(leading: string, trailing: readonly string[], selected: string): void {
+    const { sessionId, actions } = this.require()
+    if (!trailing.includes(selected)) throw new Error(`sidebarRight: selected workspace page "${selected}" is not in the right pane`)
+    for (const kind of [leading, ...trailing]) {
+      if (this.tabs.get(kind) === undefined) throw new Error(`sidebarRight: no tab type is registered as "${kind}"`)
+    }
+    this.host.openWithFocus(sessionId, () => {
+      actions.setMode(sessionId, 'push')
+      const initial = this.mountedSurface()?.layout
+      const leadingPane = initial === undefined ? undefined : dockPaneIds(initial)[0]
+      this.placeTab(sessionId, actions, leading, leadingPane === undefined ? {} : { paneId: leadingPane })
+      const layout = this.mountedSurface()?.layout
+      if (layout === undefined) return undefined
+      const [left, right] = dockPaneIds(layout)
+      if (left === undefined) return undefined
+      if (right === undefined) {
+        actions.splitPane(sessionId, left)
+      }
+      const splitLayout = this.mountedSurface()?.layout ?? layout
+      const companion = dockPaneIds(splitLayout)[1]
+      const seed = right === undefined && companion !== undefined ? getPane(splitLayout, companion).activeTabId : undefined
+      for (const kind of trailing) this.placeTab(sessionId, actions, kind, { paneId: left, beside: true })
+      const settled = this.mountedSurface()?.layout
+      if (companion === undefined || settled === undefined) return undefined
+      if (seed !== undefined) this.closeIn(sessionId, seed)
+      const tabId = findPaneContentTab(settled, companion, pageAddress(selected), selected)
+      if (tabId !== undefined) actions.focusTab(sessionId, tabId)
+      return companion
+    })
+  }
+
   /**
    * Open a resource in one session, for a tab's own action; nothing happens
    * for a session whose store was never adopted or whose adoption was released.
@@ -497,7 +537,8 @@ export class SidebarRightController implements ISidebarRight {
     const replaced = placement.replaceTab === undefined ? undefined : layout?.tabs[placement.replaceTab]
     const targetPane = layout === undefined ? undefined : placement.paneId ?? activeDockPaneId(layout)
     const target = targetPane === undefined ? undefined : layout?.nodes[targetPane]
-    const preferNewPane = placement.preferNewPane === true
+    const beside = placement.beside === true && replaced === undefined && target?.kind === 'pane' && target.host === 'dock'
+    const preferNewPane = (placement.preferNewPane === true || beside)
       && replaced === undefined
       && layout !== undefined
       && target?.kind === 'pane'
@@ -513,6 +554,7 @@ export class SidebarRightController implements ISidebarRight {
       title: claim.title,
       ...placement.paneId === undefined ? {} : { paneId: placement.paneId },
       ...preferNewPane ? { preferNewPane: true } : {},
+      ...beside ? { beside: true } : {},
       ...replaced === undefined ? {} : { replaceTab: replaced.id },
       ...placement.revealIfOpened === undefined ? {} : { revealIfOpened: placement.revealIfOpened },
     }, (tabId) => { this.tabDomain.navigate(sessionId, tabId, { address, params }) }) }
@@ -527,7 +569,7 @@ export class SidebarRightController implements ISidebarRight {
     if (replaced === undefined || revealed !== undefined) commit()
     else this.removeAfterCleanup(sessionId, replaced, commit)
     // A reveal focuses the tab where it is.
-    if (layout !== undefined && revealed !== undefined) this.flashShowing(sessionId, layout, revealed)
+    if (!beside && layout !== undefined && revealed !== undefined) this.flashShowing(sessionId, layout, revealed)
   }
 
   /**
@@ -657,8 +699,9 @@ export class SidebarRightController implements ISidebarRight {
    * Open from a captured pane using the guide's replacement and floating placement rules.
    * @param kind - registered page kind.
    * @param target - captured live pane and optional page.
+   * @param placement - whether to prefer a companion docked pane.
    */
-  openTabFromTarget(kind: string, target: SidebarRightTarget): void {
+  openTabFromTarget(kind: string, target: SidebarRightTarget, placement: Pick<SidebarRightPlacement, 'beside'> = {}): void {
     if (!this.isTargetCurrent(target)) return
     const { sessionId, actions } = this.require()
     this.host.openWithFocus(sessionId, () => {
@@ -670,6 +713,7 @@ export class SidebarRightController implements ISidebarRight {
       } else {
         const guide = tab?.kind === 'guide' ? tab : undefined
         this.openTab(kind, {
+          ...placement,
           ...target.host === 'dock' ? { paneId: target.paneId } : {},
           ...guide === undefined ? {} : { replaceTab: guide.id },
         })

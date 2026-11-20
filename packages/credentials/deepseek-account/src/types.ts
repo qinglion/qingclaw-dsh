@@ -57,6 +57,34 @@ export interface AccountProfile {
   readonly contact: string | null
   /** Profile image URL supplied by Platform, absent when no picture is configured. */
   readonly avatarUrl?: string | null
+  /** Product role returned by QingClaw's control plane. */
+  readonly role?: 'user' | 'creator' | 'admin' | null
+  /** Server-authoritative QingClaw product capabilities. */
+  readonly capabilities?: {
+    readonly publishPlugins: boolean
+    readonly managePluginMarket: boolean
+    readonly manageUsers: boolean
+  }
+  /** QingClaw model entitlement plan, when the deployment supplies one. */
+  readonly plan?: string | null
+  /** ISO timestamp when the current subscription ends. */
+  readonly subscriptionEndsAt?: string | null
+  /** Total usable QingClaw quota across trial, weekly, and top-up balances. */
+  readonly quotaRemaining?: number | null
+  /** Current weekly quota limit, or the gateway limit when no weekly quota exists. */
+  readonly quotaLimit?: number | null
+  /** Remaining current-week allowance. */
+  readonly weeklyRemaining?: number | null
+  /** Current-week allowance limit. */
+  readonly weeklyLimit?: number | null
+  /** Non-expiring purchased quota. */
+  readonly topupTokens?: number | null
+  /** Non-expiring trial quota. */
+  readonly trialTokens?: number | null
+  /** Whether the paid subscription is currently active. */
+  readonly subscriptionActive?: boolean | null
+  /** ISO timestamp when the current quota window resets. */
+  readonly quotaResetAt?: string | null
 }
 /** Platform recharge or bonus wallet balance; decimal strings retain server precision. */
 export interface AccountWallet {

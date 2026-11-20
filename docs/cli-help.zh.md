@@ -15,9 +15,9 @@
 - [`dsh plugin`](#dsh-plugin)
 - [`dsh acp`](#dsh-acp)
 - [`dsh headless`](#dsh-headless)
+- [`dsh qingclaw`](#dsh-qingclaw)
 - [`dsh sdk`](#dsh-sdk)
 - [`dsh sdk-minimal`](#dsh-sdk-minimal)
-- [`dsh web`](#dsh-web)
 
 <a id="dsh"></a>
 ## `dsh`
@@ -136,46 +136,10 @@ Examples:
 
 ```
 
-<a id="dsh-sdk"></a>
-## `dsh sdk`
+<a id="dsh-qingclaw"></a>
+## `dsh qingclaw`
 
-调用方式: `dsh sdk --help`, `dsh --profile sdk --help`
-
-```text
-Usage: dsh --profile sdk [options]
-
-Serve DeepSeek Harness SDK clients over stdio JSON-RPC.
-
-Options:
-  -h, --help  show this help
-
-Example:
-  dsh --profile sdk     serve one SDK runtime until its client disconnects
-
-```
-
-<a id="dsh-sdk-minimal"></a>
-## `dsh sdk-minimal`
-
-调用方式: `dsh sdk-minimal --help`, `dsh --profile sdk-minimal --help`
-
-```text
-Usage: dsh --profile sdk-minimal [options]
-
-Serve DeepSeek Harness SDK clients over stdio JSON-RPC.
-
-Options:
-  -h, --help  show this help
-
-Example:
-  dsh --profile sdk-minimal     serve one SDK runtime until its client disconnects
-
-```
-
-<a id="dsh-web"></a>
-## `dsh web`
-
-调用方式: `dsh web --help`, `dsh --profile web --help`
+调用方式: `dsh qingclaw --help`, `dsh --profile qingclaw --help`, `dsh web --help`, `dsh --profile web --help`
 
 ```text
 Usage: dsh --profile web [options]
@@ -209,5 +173,41 @@ Examples:
                                              advertise a prefix-stripping HTTPS proxy entry and admit its authority
   dsh --profile web --tls-cert ./server-chain.pem --tls-key ./server-key.pem
                                              serve HTTPS with an existing certificate and key
+
+```
+
+<a id="dsh-sdk"></a>
+## `dsh sdk`
+
+调用方式: `dsh sdk --help`, `dsh --profile sdk --help`
+
+```text
+Usage: dsh --profile sdk [options]
+
+Serve DeepSeek Harness SDK clients over stdio JSON-RPC.
+
+Options:
+  -h, --help  show this help
+
+Example:
+  dsh --profile sdk     serve one SDK runtime until its client disconnects
+
+```
+
+<a id="dsh-sdk-minimal"></a>
+## `dsh sdk-minimal`
+
+调用方式: `dsh sdk-minimal --help`, `dsh --profile sdk-minimal --help`
+
+```text
+Usage: dsh --profile sdk-minimal [options]
+
+Serve DeepSeek Harness SDK clients over stdio JSON-RPC.
+
+Options:
+  -h, --help  show this help
+
+Example:
+  dsh --profile sdk-minimal     serve one SDK runtime until its client disconnects
 
 ```

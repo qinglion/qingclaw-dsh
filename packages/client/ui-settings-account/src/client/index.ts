@@ -19,12 +19,15 @@ import { authorizeUrlWithTheme } from './authorize-url.ts'
 import { BrowserLogin } from './browser-login.ts'
 import { AccountOnboarding } from './AccountOnboarding.tsx'
 import { AccountPlatformHost, type AccountPlatformHostInjected } from './AccountPlatformHost.tsx'
+import { AccountQuotaTool } from './AccountQuotaTool.tsx'
 import { AccountMenu } from './AccountMenu.tsx'
+import { AccountColdStart } from './AccountColdStart.tsx'
 import { createPlatformPages, type PlatformPages } from './platform-pages.ts'
 import { AccountSection, type AccountSnapshot, type AccountSectionInjected } from './AccountSection.tsx'
 import { accountClientMetadata } from './client-metadata.ts'
 import { en, ja, es, fr, de, ru, pt, zh, type AccountKey } from './locales.ts'
 import { AccountQuotaNotice, type AccountQuotaNoticeInjected } from './AccountQuotaNotice.tsx'
+import { AccountQuotaBanner, type AccountQuotaBannerInjected } from './AccountQuotaBanner.tsx'
 import { DESKTOP_ONBOARDING_NAMESPACE, type OnboardingSettings } from '../onboarding-settings.ts'
 import { DesktopOnboardingController } from './onboarding-state.ts'
 import { DesktopOnboardingEntry, type DesktopOnboardingInjected } from './DesktopOnboardingEntry.tsx'
@@ -50,8 +53,11 @@ export function apply(ctx: Context): void {
   const t = ctx.locale.bind('settings.account')
   const page = globalThis as Partial<Record<typeof CONTACT_CONFIG_GLOBAL, unknown>>
   const config = ContactConfig(page[CONTACT_CONFIG_GLOBAL] ?? {})
+  const desktopOnboarding = desktop && config.desktopOnboarding
+  const accountOnlyColdStart = desktop && !config.allowApiKey
   let snapshot: AccountSnapshot = {
-    view: undefined, details: undefined, avatar: undefined, failed: false, loginVisible: false, desktopOnboardingVisible: desktop,
+    view: undefined, details: undefined, avatar: undefined, failed: false, loginVisible: false,
+    desktopOnboardingVisible: desktopOnboarding,
   }
   // Desktop main opens the authorization page natively; a plain browser opens it in a tab it owns.
   const browser = new BrowserLogin(url => authorizeUrlWithTheme(url, ctx.theme.getTheme().active.colorScheme))
@@ -178,6 +184,7 @@ export function apply(ctx: Context): void {
       if (reason === 'returned' && page === 'top-up') void refreshAfterReturn(refreshing, reRead)
     })
   const operations: AccountSectionInjected = {
+    allowApiKey: config.allowApiKey,
     avatarFailed: (value) => { avatar.failed(value) },
     subscribeSessionExpired: listener => ctx.remote.$on('deepseek-account/session-expired', listener),
     subscribeModelSignInRequired: listener => ctx.remote.$on('deepseek-account/model-sign-in-required', listener),
@@ -256,7 +263,7 @@ export function apply(ctx: Context): void {
       throw result.error
     },
   }
-  if (desktop) {
+  if (desktopOnboarding) {
     const controller = new DesktopOnboardingController(
       ctx.configForms.get<OnboardingSettings>(DESKTOP_ONBOARDING_NAMESPACE),
       ctx.configForms.get<{ transcriptView?: TranscriptViewMode | null; performanceUsage: 'compact' | 'detailed' }>('ui-chat'),
@@ -294,6 +301,10 @@ export function apply(ctx: Context): void {
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.models.sign-in', () => ctx.slots.register({
     name: 'settings.models.sign-in', locale: 'settings.account', inject: () => operations,
   }, AccountOnboarding)))
+  if (accountOnlyColdStart) ctx.remoteAccess.whenAccess('account/watch', () =>
+    ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
+      name: 'settings.onboarding', id: 'account-sign-in', order: -10, locale: 'settings.account', inject: () => operations,
+    }, AccountColdStart)))
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('shell.quota-notice', () => ctx.slots.register({
     name: 'shell.quota-notice', locale: 'settings.account',
     select: owner => owner.code === 'ACCOUNT_QUOTA' ? owner : null,
@@ -313,8 +324,25 @@ export function apply(ctx: Context): void {
   }
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher', () => ctx.slots.register({
     name: 'settings.launcher', locale: 'settings.account', inject: () => operations,
-    children: { 'settings.launcher.notifications': { kind: 'single', scope: 'root' } },
+    children: {
+      'settings.launcher.notifications': { kind: 'single', scope: 'root' },
+      'settings.launcher.actions': { kind: 'list', scope: 'root' },
+      'settings.launcher.tools': { kind: 'list', scope: 'root' },
+    },
   }, AccountMenu)))
+  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher.tools', () => ctx.slots.register({
+    name: 'settings.launcher.tools', id: 'account-quota', order: 10, locale: 'settings.account',
+    inject: () => ({ hooks: { account: operations.hooks.account }, refreshAccount,
+      ...(nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) }) }),
+  }, AccountQuotaTool)))
+  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock', id: 'account-quota-banner', order: 100, locale: 'settings.account',
+    inject: (): AccountQuotaBannerInjected => ({
+      hooks: { account: operations.hooks.account, platformPage: platformPages },
+      ...nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) },
+    }),
+  }, AccountQuotaBanner)))
+
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.section', () => {
     let unregister: (() => void) | undefined
     const update = () => {

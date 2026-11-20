@@ -1,8 +1,14 @@
 {
-  "bucket": "replace-with-bucket-1250000000",
-  "edgeOneZoneId": "zone-replacewithproductionzone",
-  "origin": "https://download.deepseek.com",
-  "credentialsFile": "C:/absolute/path/to/packaging/secrets/cos-production.json",
+  "bucket": "qinglion",
+  "origin": "https://d.qinglion.com",
+  "credentialsFile": "C:/absolute/path/to/packaging/secrets/oss-production.json",
+  "storage": {
+    "provider": "aliyun-oss",
+    "region": "oss-cn-hangzhou"
+  },
+  "cache": {
+    "provider": "none"
+  },
   "windows": {
     "certificateThumbprint": "0000000000000000000000000000000000000000"
   },

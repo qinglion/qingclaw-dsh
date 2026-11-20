@@ -5,7 +5,7 @@
  * preference through a narrow field writer in the same settings namespace.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { RemoteErrorCode } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
@@ -13,7 +13,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
   AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController,
-  writeDefaultPreset,
+  readRoster, writeDefaultPreset,
 } from '../src/client/settings-store.ts'
 
 /** The roster store over a scripted context. */
@@ -55,6 +55,18 @@ function fakeRoster(
   }
   return partial as ClientContext
 }
+
+it('keeps dedicated presets out of general pickers only for a profile that reserves them', async () => {
+  const roster = [{ id: 'cordis', isDefault: false }, { id: 'chat', isDefault: true }]
+  const context = fakeRoster(roster)
+  expect(await readRoster(context)).toEqual({ ok: true, value: { presets: roster } })
+  vi.stubGlobal('__DSH_HIDDEN_PRESET_CHOICES__', ['cordis'])
+  try {
+    expect(await readRoster(context)).toEqual({ ok: true, value: { presets: [roster[1]] } })
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
 
 /** A context whose roster and settings write outcome the test controls. */
 function fakeApi(
