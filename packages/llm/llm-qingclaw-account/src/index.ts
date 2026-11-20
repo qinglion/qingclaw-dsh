@@ -13,6 +13,7 @@ import type {
 import { Config, plainOptions, resolveOptions } from './config.ts'
 import { ModelKeyCache } from './model-key.ts'
 import { ModelTokenCache } from './model-token.ts'
+import { installTurnUsageRefresh } from './turn-usage.ts'
 
 export { Config, plainOptions, resolveOptions } from './config.ts'
 export const name = 'llm-qingclaw-account'
@@ -53,11 +54,11 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
   let skipped = 0
   for (const item of data) {
     if (typeof item !== 'object' || item === null) { skipped += 1; continue }
-    const id = Reflect.get(item, 'id')
+    const id: unknown = Reflect.get(item, 'id')
     if (typeof id !== 'string' || id.length === 0) { skipped += 1; continue }
-    const name = Reflect.get(item, 'name')
+    const name: unknown = Reflect.get(item, 'name')
     const isDefault = Reflect.get(item, 'default') === true
-    const rawModalities = Reflect.get(item, 'input_modalities')
+    const rawModalities: unknown = Reflect.get(item, 'input_modalities')
     const inputModalities = Array.isArray(rawModalities)
       ? rawModalities.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
       : []
@@ -81,6 +82,7 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
 export function apply(ctx: Context, config: Config): void {
   const settings = () => resolveOptions(plainOptions(config))
   settings()
+  installTurnUsageRefresh(ctx, PROVIDER)
   const tokens = new ModelTokenCache({ account: ctx.deepseekAccount, timeoutMs: () => settings().modelTokenTimeoutMs })
   const keys = new ModelKeyCache({ account: ctx.deepseekAccount, timeoutMs: () => settings().modelTokenTimeoutMs })
   ctx.effect(() => () => Promise.all([tokens.dispose(), keys.dispose()]), 'llm-qingclaw-account: credential caches')
@@ -117,20 +119,26 @@ export function apply(ctx: Context, config: Config): void {
     return [...baseSupported, ...extra]
   }
   const resolveAuth = async (_connection: ResolvedDeepSeekOptions): Promise<DeepSeekRequestAuth> => {
-    const apiKey = await keys.resolve()
-    if (apiKey === undefined) {
+    const binding = await keys.resolveBound()
+    if (binding === undefined) {
       throw new LlmError('Sign in to QingClaw to use the account provider.', 'ACCOUNT_SIGN_IN_REQUIRED')
     }
     return {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      onRequestError: (error) => {
-        if (!(error instanceof LlmError)) return Promise.resolve(error)
-        if (error.code === QUOTA_EXCEEDED_CODE) {
-          return Promise.resolve(new LlmError(error.message, ACCOUNT_QUOTA_EXCEEDED_CODE, { ...error.failure, cause: error }))
+      headers: { Authorization: `Bearer ${binding.key}` },
+      onRequestError: async (error) => {
+        if (!(error instanceof LlmError)) return error
+        // The QingClaw gateway returns this bare body for a depleted gateway quota.
+        // Messages transport keeps non-JSON bodies in the live error cause.
+        const plainQuota = error.code === 'RATE_LIMIT' && error.failure.status === 429 && error.failure.providerRetryAfterMs === undefined
+          && error.cause instanceof Error && error.cause.message === 'quota exceeded'
+        if (plainQuota || error.code === QUOTA_EXCEEDED_CODE) {
+          await keys.reconcileQuota(binding)
+          const message = plainQuota ? '网关返回额度不足，请刷新用量。' : error.message
+          return new LlmError(message, ACCOUNT_QUOTA_EXCEEDED_CODE, { ...error.failure, cause: error })
         }
-        if (error.failure.status !== 401) return Promise.resolve(error)
-        keys.reject(apiKey)
-        return Promise.resolve(new LlmError(error.message, 'ACCOUNT_TOKEN_INVALID', { ...error.failure, cause: error }))
+        if (error.failure.status !== 401) return error
+        keys.reject(binding)
+        return new LlmError(error.message, 'ACCOUNT_TOKEN_INVALID', { ...error.failure, cause: error })
       },
     }
   }

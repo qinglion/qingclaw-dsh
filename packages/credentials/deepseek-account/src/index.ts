@@ -126,7 +126,8 @@ export class DeepSeekAccount extends TypertRemoteService {
    * Latest ready profile read and the grant token it was read with. Binding the token keeps a
    * cached identity from answering for a credential that has since changed.
    */
-  private lastProfile: { readonly token: string; readonly profile: Extract<AccountDetails['profile'], { status: 'ready' }> } | undefined
+  private lastProfile: { readonly token: string; readonly revision: number; readonly profile: Extract<AccountDetails['profile'], { status: 'ready' }> } | undefined
+  private usageRevision = 0
   private detailsLifetime = new AbortController()
   private closed = false
   private removing: Promise<AccountView> | undefined
@@ -227,15 +228,29 @@ export class DeepSeekAccount extends TypertRemoteService {
   @Remote
   async getProfile(client: AccountClientMetadata): Promise<AccountDetails['profile'] | null> {
     const lifetime = this.detailsLifetime
+    const revision = this.usageRevision
     const stored = await this.readCurrentGrant(lifetime)
     if (stored === null || lifetime.signal.aborted) return null
     const result = await this.getDetail('profile', this.detailHeaders(client), { lifetime, stored })
-    if (this.detailsLifetime !== lifetime) return null
+    if (this.detailsLifetime !== lifetime || this.usageRevision !== revision) return null
     if (result !== null) this.cacheProfile(stored.token, result)
     if (result?.status !== 'failed') return result
     // Only this same grant's last ready read may stand in for a failed refresh.
-    const cached = this.lastProfile?.token === stored.token ? this.lastProfile.profile : undefined
+    const cached = this.lastProfile?.token === stored.token && this.lastProfile.revision === revision ? this.lastProfile.profile : undefined
     return cached ?? result
+  }
+
+  /**
+   * Refresh account observers after a backend usage reconciliation for this grant.
+   * @param expectedToken - device grant whose usage was reconciled.
+   */
+  async refreshUsage(expectedToken: string): Promise<void> {
+    const lifetime = this.detailsLifetime
+    const stored = await this.readCurrentGrant(lifetime)
+    if (!stored || stored.token !== expectedToken || lifetime !== this.detailsLifetime || this.removing) return
+    this.usageRevision++
+    if (this.attempt?.initialProfile?.token === expectedToken) delete this.attempt.initialProfile
+    this.changed('snapshot')
   }
 
   /**
@@ -339,7 +354,7 @@ export class DeepSeekAccount extends TypertRemoteService {
     if (profile.status !== 'ready') return
     // Identity publishers re-read the session snapshot; wake them only when the stable ID changes.
     const previous = this.lastProfile?.profile.value.id || null
-    this.lastProfile = { token, profile }
+    this.lastProfile = { token, revision: this.usageRevision, profile }
     if (previous !== (profile.value.id || null)) this.changed('identity')
   }
 

@@ -1548,6 +1548,30 @@ it.each([null, '', 'stable-user'])('exports the stable profile ID for native sto
   expect(await f.account.getPlatformSession()).toMatchObject({ userId: id || null, token: 'test-platform-grant' })
 })
 
+it('refreshes the same account from current after usage changes and preserves identity when a quota read fails', async () => {
+  const source = { email: 'test@example.invalid', quota_remaining: 56_173 }
+  const f = await fixture(source)
+  await storeAccount(f)
+  const read = () => f.account.getProfile(clientMetadata())
+  const watch = new AbortController()
+  const frames = f.account.watchState(watch.signal)[Symbol.asyncIterator]()
+  try {
+    await frames.next()
+    expect(await read()).toMatchObject({ value: { quotaRemaining: 56_173 } })
+    f.failProfile(true)
+    await f.account.refreshUsage('not-this-account')
+    expect(await read()).toMatchObject({ value: { quotaRemaining: 56_173 } })
+    const update = frames.next()
+    await f.account.refreshUsage('test-platform-grant')
+    expect(await update).toMatchObject({ value: { type: 'snapshot', state: { status: 'credential-stored' } } })
+    expect(await read()).toEqual({ status: 'failed' })
+    expect(await f.account.getPlatformSession()).toMatchObject({ userId: 'test-user' })
+    f.failProfile(false)
+    source.quota_remaining = 0
+    expect(await read()).toMatchObject({ value: { quotaRemaining: 0 } })
+  } finally { watch.abort() }
+})
+
 it('publishes a snapshot while the profile read is still pending', async () => {
   const f = await fixture()
   await storeAccount(f)

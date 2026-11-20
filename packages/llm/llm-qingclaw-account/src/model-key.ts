@@ -17,6 +17,10 @@ const responseEnvelope = z.object({
   }),
 })
 
+const deniedResponse = z.object({
+  data: z.object({ reason: z.string().optional(), message: z.string().optional(), remaining_tokens: z.number().optional() }),
+})
+
 interface CachedKey {
   readonly sessionKey: string
   readonly key: string
@@ -24,7 +28,7 @@ interface CachedKey {
 
 /** Dependencies of one API-key cache, injectable for tests. */
 export interface ModelKeyCacheDependencies {
-  readonly account: Pick<DeepSeekAccount, 'getPlatformSession'>
+  readonly account: Pick<DeepSeekAccount, 'getPlatformSession' | 'refreshUsage'>
   readonly timeoutMs: () => number
   readonly request?: typeof fetch
 }
@@ -39,7 +43,7 @@ function invalidResponse(message: string, cause?: unknown): LlmError {
 
 function endpointFailure(status: number, detail?: string): LlmError {
   if (status === 401) return new LlmError('QingClaw model-key credential was rejected.', 'ACCOUNT_TOKEN_INVALID', { status })
-  if (status === 403) return new LlmError(detail ?? 'QingClaw account has no active model entitlement.', 'ACCOUNT_QUOTA', { status })
+  if (status === 403) return new LlmError(detail ?? 'QingClaw account has no active model entitlement.', 'HTTP_403', { status })
   if (status === 429) return new LlmError('QingClaw model-key exchange was rate limited.', 'RATE_LIMIT', { status })
   if (status >= 500) return new LlmError('QingClaw model-key service is unavailable.', 'SERVER', { status })
   return new LlmError(`QingClaw model-key endpoint answered HTTP ${status}.`, `HTTP_${status}`, { status })
@@ -61,9 +65,10 @@ export class ModelKeyCache {
   private readonly timeoutMs: () => number
   private readonly request: typeof fetch
   private readonly lifetime = new AbortController()
-  private readonly pending = new Set<Promise<string>>()
+  private readonly pending = new Set<Promise<CachedKey>>()
   private cached: CachedKey | undefined
-  private inflight: { readonly sessionKey: string; readonly promise: Promise<string> } | undefined
+  private inflight: { readonly sessionKey: string; readonly promise: Promise<CachedKey> } | undefined
+  private readonly reconciliations = new WeakMap<CachedKey, Promise<void>>()
   private closed = false
 
   /** @param dependencies - account service, deadline, and HTTP transport. */
@@ -78,6 +83,11 @@ export class ModelKeyCache {
    * @returns the API key, or `undefined` while signed out.
    */
   async resolve(): Promise<string | undefined> {
+    return (await this.resolveBound())?.key
+  }
+
+  /** Capture one credential generation so late errors cannot invalidate a new session or exchange. */
+  async resolveBound(): Promise<CachedKey | undefined> {
     if (this.closed) throw new LlmError('QingClaw model-key cache is disposed.', 'ABORTED')
     const session = await this.account.getPlatformSession()
     if (session === null) {
@@ -85,12 +95,15 @@ export class ModelKeyCache {
       return undefined
     }
     const key = sessionKey(session)
-    if (this.cached?.sessionKey === key) return this.cached.key
+    if (this.cached?.sessionKey === key) return this.cached
     if (this.inflight?.sessionKey === key) return await this.inflight.promise
 
-    const operation = this.exchange(session).then((apiKey) => {
-      this.cached = { sessionKey: key, key: apiKey }
-      return apiKey
+    const operation = this.exchange(session).then(async (apiKey): Promise<CachedKey> => {
+      const current = await this.account.getPlatformSession()
+      if (this.closed || !current || sessionKey(current) !== key || this.inflight?.promise !== operation) {
+        throw new LlmError('QingClaw account changed during the model-key exchange.', 'ABORTED')
+      }
+      return (this.cached = { sessionKey: key, key: apiKey })
     }).finally(() => {
       this.pending.delete(operation)
       if (this.inflight?.promise === operation) this.inflight = undefined
@@ -101,9 +114,31 @@ export class ModelKeyCache {
   }
 
   /** Drop the exact key rejected by the gateway. */
-  reject(key: string): void {
-    if (this.cached?.key !== key) return
+  reject(key: CachedKey): void {
+    if (this.cached !== key) return
     this.cached = undefined
+  }
+
+  /** Retire a depleted gateway key and notify the signed-in account once per key generation. */
+  reconcileQuota(rejected: CachedKey): Promise<void> {
+    const existing = this.reconciliations.get(rejected)
+    if (existing) return existing
+    if (this.closed || this.cached !== rejected) return Promise.resolve()
+    this.reject(rejected)
+    const refresh = this.refreshUsage(rejected.sessionKey)
+    this.reconciliations.set(rejected, refresh)
+    return refresh
+  }
+
+  private refreshUsage(expectedSession: string): Promise<void> {
+    return this.account.getPlatformSession().then(async (session) => {
+      if (!this.closed && session && sessionKey(session) === expectedSession) {
+        // The profile refresh queries the gateway balance. The next model request obtains its own new key.
+        await this.account.refreshUsage(session.token)
+      }
+    }).catch(() => {
+      // Account refresh failures must not mask the original gateway failure.
+    })
   }
 
   /** Clear all cached keys without changing the device session. */
@@ -136,11 +171,17 @@ export class ModelKeyCache {
       throw new LlmError('QingClaw model-key exchange failed.', 'SERVER', { cause: error })
     }
     if (!response.ok) {
-      const body = await response.json().catch(() => undefined)
-      const detail = typeof body === 'object' && body !== null
-        ? (Reflect.get(body, 'data') as { message?: unknown } | undefined)?.message
-        : undefined
-      throw endpointFailure(response.status, typeof detail === 'string' ? detail : undefined)
+      if (response.status === 403) {
+        const denial = deniedResponse.safeParse(await readJson(response).catch(() => undefined)).data?.data
+        // The website only labels an expired subscription a quota refusal when its remaining balance is zero.
+        if (denial?.reason === 'no_quota' || denial?.reason === 'free_quota_exhausted'
+            || (denial?.reason === 'subscription_expired' && denial.remaining_tokens === 0)) {
+          await this.refreshUsage(sessionKey(session))
+          throw new LlmError(denial.message ?? '网关返回额度不足，请刷新用量。', 'ACCOUNT_QUOTA', { status: 403 })
+        }
+        throw endpointFailure(403, denial?.message)
+      }
+      throw endpointFailure(response.status)
     }
     const parsed = responseEnvelope.safeParse(await readJson(response))
     if (!parsed.success) throw invalidResponse('has an unexpected envelope', parsed.error)

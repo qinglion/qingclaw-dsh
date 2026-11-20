@@ -56,6 +56,7 @@ async function finishOf(ctx: Context) {
 }
 
 async function mount(request: typeof fetch) {
+  const refreshUsage = vi.fn(async (_token: string): Promise<void> => {})
   const rejectToken = vi.fn(async (_token: string): Promise<void> => {})
   const session: PlatformSession = {
     origin: 'https://beta.qingclaw.test',
@@ -67,13 +68,13 @@ async function mount(request: typeof fetch) {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(LlmRuntime)
-  const account: Pick<DeepSeekAccount, 'getPlatformSession' | 'rejectToken'> = {
+  const account: Pick<DeepSeekAccount, 'getPlatformSession' | 'rejectToken' | 'refreshUsage'> = {
     getPlatformSession: async (): Promise<PlatformSession> => session,
-    rejectToken,
+    rejectToken, refreshUsage,
   }
   ctx.provide('deepseekAccount', account as DeepSeekAccount)
   await ctx.plugin(QingClawAccount, { baseURL: 'https://gateway.qingclaw.test/anthropic' })
-  return { ctx, rejectToken }
+  return { ctx, rejectToken, refreshUsage }
 }
 
 describe('QingClaw account provider', () => {
@@ -130,7 +131,7 @@ describe('QingClaw account provider', () => {
     expect(modelKey?.headers.get('x-dsh-auth-token')).toBe('long-lived-device-session')
     expect(listing?.headers.get('authorization')).toBeNull()
     expect(listing?.headers.get('x-dsh-auth-token')).toBe('Bearer ' + issuedToken)
-    expect(messages?.headers.get('authorization')).toBe('Bearer ' + apiKeys[0])
+    expect(messages?.headers.get('authorization')).toBe('Bearer ' + apiKeys[0]!)
     expect(messages?.headers.get('x-dsh-auth-token')).toBeNull()
     expect(exchanges).toBe(1)
     expect(keyExchanges).toBe(1)
@@ -162,6 +163,64 @@ describe('QingClaw account provider', () => {
     const models = await ctx.llm.listModels('deepseek-account')
     expect(saveSelection).toHaveBeenCalledWith({ provider: 'deepseek-account', model: 'new-upstream-model' })
     expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash-1017', 'new-upstream-model'])
+  })
+
+  it.each([
+    { body: 'quota exceeded', delay: undefined, expected: 'ACCOUNT_QUOTA' },
+    { body: 'too many requests', delay: undefined, expected: 'RATE_LIMIT' },
+    { body: 'quota exceeded', delay: '3', expected: 'RATE_LIMIT' },
+  ])('classifies the gateway HTTP 429 body "$body" with retry delay $delay as $expected', async ({ body, delay, expected }) => {
+    let keyExchanges = 0
+    let messageRequests = 0
+    const { ctx, rejectToken, refreshUsage } = await mount(async (input, init) => {
+      const path = new URL(new Request(input, init).url).pathname
+      if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
+      if (path === '/auth-api/v0/dsh/model_key') {
+        return keyGrant(++keyExchanges)
+      }
+      if (path === '/auth-api/v0/dsh/models') return new Response(null, { status: 404 })
+      if (path === '/anthropic/v1/messages') {
+        messageRequests++
+        const headers = new Headers({ 'content-type': 'text/plain', 'x-request-id': 'gateway-test' })
+        if (delay) headers.set('retry-after', delay)
+        return new Response(body, { status: 429, headers })
+      }
+      throw new Error('unexpected path ' + path)
+    })
+    await expect(finishOf(ctx)).resolves.toMatchObject({
+      kind: 'error', failure: { code: expected, status: 429, requestId: 'gateway-test',
+        ...(expected === 'ACCOUNT_QUOTA' && { message: '网关返回额度不足，请刷新用量。' }),
+        ...(delay && { providerRetryAfterMs: 3000 }),
+      },
+    })
+    expect(messageRequests).toBe(1)
+    expect(keyExchanges).toBe(1)
+    expect(refreshUsage.mock.calls).toEqual(expected === 'ACCOUNT_QUOTA' ? [['long-lived-device-session']] : [])
+    expect(rejectToken).not.toHaveBeenCalled()
+  })
+
+  it('refreshes after a structured gateway balance refusal and obtains a fresh key on the next request', async () => {
+    let issued = 0
+    const sent: Array<string | null> = []
+    const { ctx, refreshUsage } = await mount(async (input, init) => {
+      const request = new Request(input, init)
+      const path = new URL(request.url).pathname
+      if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
+      if (path === '/auth-api/v0/dsh/models') return new Response(null, { status: 404 })
+      if (path === '/auth-api/v0/dsh/model_key') return keyGrant(++issued)
+      if (path === '/anthropic/v1/messages') {
+        sent.push(request.headers.get('authorization'))
+        return sent.length === 1
+          ? Response.json({ error: { code: 'insufficient_balance', message: 'Insufficient balance' } }, { status: 402 })
+          : successfulMessages()
+      }
+      throw new Error('unexpected path ' + path)
+    })
+    await expect(finishOf(ctx)).resolves.toMatchObject({ kind: 'error', failure: { code: 'ACCOUNT_QUOTA', status: 402 } })
+    expect(sent).toEqual(['Bearer gateway-key-1'])
+    expect(refreshUsage.mock.calls).toEqual([['long-lived-device-session']])
+    await expect(finishOf(ctx)).resolves.toMatchObject({ kind: 'stop' })
+    expect(sent).toEqual(['Bearer gateway-key-1', 'Bearer gateway-key-2'])
   })
 
   it('drops only a gateway-rejected API key and exchanges a new one without signing out the device', async () => {
