@@ -97,6 +97,8 @@ macOS“文件”菜单显示已接受的单键绑定（包括方向键），并
 
 macOS PNG 使用带留白的圆角底板，供传统 ICNS 打包使用，包含最高 1024 像素的表示。它是扁平图标，并非 Icon Composer 文档。Apple 的[应用图标指南](https://developer.apple.com/design/human-interface-guidelines/app-icons)要求向 Icon Composer 提供未遮罩的图层；这些输入需要在 macOS 上单独导出，不能复用已做圆角的 ICNS 图案。发布前须在支持的 macOS 版本中验收 Finder 和 Dock 的显示效果。
 
+挂载后的 DMG 卷使用 `resources/dmg-volume.icns` 中的银色硬盘图案，通过 `dmg.icon` 配置。其透明的 1024×1024 源图位于 [`assets/branding/qingclaw-macos-volume-icon.png`](../../assets/branding/qingclaw-macos-volume-icon.png)。ICNS 包含 16–1024 像素的表示，供 Finder 和桌面使用。
+
 <a id="bundled-workspace-dependencies"></a>
 
 ### 内置工作区依赖

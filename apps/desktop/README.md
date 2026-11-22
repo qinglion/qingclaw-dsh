@@ -97,6 +97,8 @@ The macOS File menu displays the accepted single-key binding, including arrow ke
 
 The macOS PNG uses an inset rounded background for legacy ICNS packaging, with representations up to 1024 pixels. It is a flattened icon, not an Icon Composer document. Apple's [app icon guidance](https://developer.apple.com/design/human-interface-guidelines/app-icons) describes unmasked layers for Icon Composer; those inputs require a separate macOS export and must not reuse the rounded ICNS artwork. Verify Finder and Dock appearance on supported macOS versions before release.
 
+Mounted DMG volumes use the silver drive artwork in `resources/dmg-volume.icns`, configured through `dmg.icon`. Its transparent 1024×1024 source is [`assets/branding/qingclaw-macos-volume-icon.png`](../../assets/branding/qingclaw-macos-volume-icon.png). The ICNS contains 16–1024 pixel representations for Finder and the desktop.
+
 <a id="bundled-workspace-dependencies"></a>
 
 ### Bundled workspace dependencies

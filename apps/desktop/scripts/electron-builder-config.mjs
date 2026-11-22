@@ -183,6 +183,7 @@ export function createElectronBuilderConfig(
       target: unsigned ? ['dmg'] : ['dmg', 'zip'],
     },
     dmg: {
+      icon: fileURLToPath(new URL('../resources/dmg-volume.icns', import.meta.url)),
       format: 'ULMO',
       sign: !unsigned,
       writeUpdateInfo: false,
