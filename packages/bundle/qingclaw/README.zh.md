@@ -34,9 +34,9 @@ kind: "package-bundle"
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
-patch 定位已有的账号、模型、网页、通知、官方品牌与 Agent preset 行 id，只替换这些行的完整配置或启用状态，再插入青狮自有插件行。默认 preset 是 `standard`，青狮不再声明自己的 preset：它的 `preset-standard` 覆盖会去掉该声明中的 persona 行，其余插件行与上游保持一致，因此部署人设继续生效，而不会被上游的 coding-agent 人设替换。账号服务继续复用 DSH 的浏览器授权、本机 PKCE 回调、凭据存储和账号模型选择，青狮 Rails 平台负责实现兼容的服务端协议。账号服务的 `inferenceOrigin` 令牌释放边界会刻意留在官网来源，因此通用账号令牌消费者无法把 30 天设备会话释放给 `api.qingclaw.com`。模型 provider 单独持有网关来源，先把设备会话换成短期模型 JWT，再只向青狮网关发送 `X-DSH-Auth-Token: Bearer <model JWT>`；上游模型密钥不会到达桌面端。当前旧版 Serverless 网关使用自带的消费者 JWT 与本地非对称 JWKS 鉴权，不走该版本不支持的插件市场 `jwt-auth`/`remote_jwks` 方案。
+patch 定位已有的账号、模型、网页、通知、官方品牌与 Agent preset 行 id，只替换这些行的完整配置或启用状态，再插入青狮自有插件行。默认 preset 是 `standard`，青狮不再声明自己的 preset：它的 `preset-standard` 覆盖会去掉该声明中的 persona 行，其余插件行与上游保持一致，因此部署人设继续生效，而不会被上游的 coding-agent 人设替换。账号服务继续复用 DSH 的浏览器授权、本机 PKCE 回调、凭据存储和账号模型选择，青狮 Rails 平台负责实现兼容的服务端协议。账号服务的 `inferenceOrigin` 令牌释放边界会刻意留在官网来源，因此通用账号令牌消费者无法把 30 天设备会话释放给 `api.qingclaw.com`。模型提供方在登录的官网换取当前用户的网关密钥，通过 Authorization 请求头向 `/v1/chat/completions` 发送推理请求。
 
-青狮龙虾第一版会停用上游两套 DeepSeek 网页后端。它们解析的是长期账号授权，无法复用青狮模型 provider 私有的短 JWT 缓存；网关目前也还没有 `/v1/tools/search` 或 `/v1/tools/fetch` 路由。发行插件会对每个 Agent 作用域应用 `tools.restrict()`，因此声明了 `web_search` 的 preset 不会向模型公开它。匿名 `web_fetch` 仍通过 `http` provider 可用，并且不会读取账号凭据。只有在共享短令牌 seam 和网关 tools 路由都具备后，才能重新启用网关搜索；同时必须用测试保证请求携带带 `Bearer ` 前缀的模型 JWT，绝不会携带设备会话。本 bundle 还会停用 DeepSeek 会话日志与活跃插件清单贡献器，因此青狮 Messages 请求不会携带 `dsh_session_log` 和 `dsh_plugin_packages` 顶层字段。本 bundle 不复制 Web roster。后续青狮业务能力可以作为额外插件行加入本 bundle，无需修改 DSH agent loop。
+青狮龙虾第一版会停用上游两套 DeepSeek 网页后端。它们解析的是长期账号授权，无法复用青狮模型 provider 私有的短 JWT 缓存；网关目前也还没有 `/v1/tools/search` 或 `/v1/tools/fetch` 路由。发行插件会对每个 Agent 作用域应用 `tools.restrict()`，因此声明了 `web_search` 的 preset 不会向模型公开它。匿名 `web_fetch` 仍通过 `http` provider 可用，并且不会读取账号凭据。只有在共享短令牌 seam 和网关 tools 路由都具备后，才能重新启用网关搜索；同时必须用测试保证请求携带带 `Bearer ` 前缀的模型 JWT，绝不会携带设备会话。本 bundle 还会停用 DeepSeek 会话日志与活跃插件清单贡献器，因此青狮聊天请求不会携带 `dsh_session_log` 和 `dsh_plugin_packages` 顶层字段。本 bundle 不复制 Web roster。后续青狮业务能力可以作为额外插件行加入本 bundle，无需修改 DSH agent loop。
 
 -----
 
@@ -56,7 +56,7 @@ patch 定位已有的账号、模型、网页、通知、官方品牌与 Agent p
 
 #### 模型看到什么
 
-模型不会看到额外的提示词，也不会看到 `web_search` 声明。standard、PTC 与 Cordis preset 会保留匿名 `web_fetch`，minimal preset 则不含这两个网页工具。选中的账号 provider 会通过青狮推理源发送请求，把鉴权保留在 `X-DSH-Auth-Token` 请求头中，并读取网关公开的模型目录。
+模型不会看到额外的提示词，也不会看到 `web_search` 声明。standard、PTC 与 Cordis preset 会保留匿名 `web_fetch`，minimal preset 则不含这两个网页工具。选中的账号 provider 会通过青狮推理源发送请求，把鉴权保留在 `Authorization` 请求头中，并读取官网配置的模型目录。
 
 #### Token 影响
 
@@ -72,7 +72,7 @@ patch 定位已有的账号、模型、网页、通知、官方品牌与 Agent p
 
 - 本 bundle 必须位于 Web 应用层之后，因为它定位后者声明的配置行。
 - `preset-standard` 覆盖会替换完整的上游声明。上游修改该 preset 的插件列表时，需要同步到 [presets/standard.patch.yml](presets/standard.patch.yml)；composition 测试会在 id、顺序或配置偏离时失败。
-- 青狮账号与网关服务必须保持 DSH 账号协议、`x-dsh-auth-token` 契约、模型目录结构和 Messages 流式行为兼容。网关消费者 JWT 契约使用 `Bearer ` 前缀与 `aud=qingclaw-model-gateway`。
+- 推理网关需要在 OpenAI 兼容的 Chat Completions 路由上授权桌面消费者组，并按账号统计用量。
 - 8,192 Token 路由设置只是客户端默认值与目录上限，不是安全边界。网关必须独立拒绝修改版客户端的超限请求，或把它们计入额度。
 - 第一版停用账号通知，因为青狮尚未提供可选的通知端点。
 - 第一版会隐藏 `web_search`，并停用 DeepSeek 网页搜索与 DeepSeek 网页抓取；匿名 HTTP 页面抓取仍然启用，网关搜索要等共享的短模型 JWT 凭据 seam 与 `/v1/tools` 路由完成后再开放。

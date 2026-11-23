@@ -9,8 +9,7 @@
     # This is the release boundary for the long-lived device grant, not the
     # QingClaw model endpoint. Keep it on Platform so generic account-token
     # consumers can never release that grant to api.qingclaw.com. The model
-    # provider below owns the gateway origin and exchanges the grant for a
-    # short-lived model JWT first.
+    # provider obtains the account's gateway key from the signed-in platform.
     inferenceOrigin: !!js process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com'
     desktopPlatform: !!js "ctx.get('profileContext')?.name === 'desktop' && ['darwin', 'win32'].includes(process.platform) ? process.platform : null"
 
@@ -45,7 +44,7 @@
     - id: llm-qingclaw-account
       name: '@qinglion/dsh-llm-qingclaw-account'
       config:
-        baseURL: !!js "(process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com').replace(/\\/+$/, '') + '/anthropic-key'"
+        baseURL: !!js "(process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com').replace(/\\/+$/, '') + '/v1'"
         catalogURL: !!js "(process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com').replace(/\\/+$/, '') + '/auth-api/v0/dsh/models'"
         imageModel: qwen-image-3.0
         videoModel: wan3.0-video-prime

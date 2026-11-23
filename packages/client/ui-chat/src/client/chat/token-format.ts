@@ -29,6 +29,19 @@ export function formatExactTokens(value: number, t: ChatViewSlotProps['t']): str
   return groups.join(t('number.groupSeparator'))
 }
 
+/**
+ * Format a known cache-read count, a lower bound for partial reports, or missing telemetry.
+ * @param tokens - sum of observed cache reads.
+ * @param complete - whether all contributing requests reported the counter.
+ * @param t - owning view's locale.
+ * @returns a usage dialog value.
+ */
+export function formatCacheReadCount(tokens: number | undefined, complete: boolean, t: ChatViewSlotProps['t']): string {
+  if (tokens === undefined || (!complete && tokens === 0)) return t('message.turnUsage.notReported')
+  const count = t('message.turnUsage.count', { count: formatExactTokens(tokens, t) })
+  return complete ? count : t('message.turnUsage.atLeast', { count })
+}
+
 /** Round a cache-read ratio to exact percentage units, with positive ties rounded up. */
 function roundedPercentUnits(cacheReadTokens: number, denominator: number, decimalPlaces: 0 | 1): number {
   const unitsPerPercent = decimalPlaces === 0 ? 1 : 10
@@ -57,7 +70,7 @@ function displayPercentUnits(units: number, decimalPlaces: 0 | 1): string {
 }
 
 /**
- * Display-ready cache-hit share without rounding a partial hit to 100%.
+ * Display-ready cache-hit share that distinguishes partial hits from zero and full hits.
  * @param cacheReadTokens - exact prompt tokens served from cache.
  * @param promptTokens - exact aggregate prompt tokens.
  * @param decimalPlaces - ordinary-ratio precision; partial hits that would
@@ -74,6 +87,7 @@ export function formatCacheHitPercent(
   if (missedInputTokens === 0) return '100'
 
   const roundedUnits = roundedPercentUnits(cacheReadTokens, promptTokens, decimalPlaces)
+  if (roundedUnits === 0 && cacheReadTokens > 0) return decimalPlaces === 0 ? '<1' : '<0.1'
   const fullHitUnits = decimalPlaces === 0 ? 100 : 1_000
   if (roundedUnits < fullHitUnits) return displayPercentUnits(roundedUnits, decimalPlaces)
 

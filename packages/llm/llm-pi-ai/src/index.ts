@@ -64,11 +64,11 @@ import { assertUsableApiKey, LlmError, resolveImageAttachmentAccess } from '@dee
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-fs'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
-import { PiAiAdapter } from './adapter.ts'
+import { PiAiAdapter, type PiAiAdapterOptions } from './adapter.ts'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { catalogProvider, catalogProviderIds } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
-import type { ResolvedPiAiProviderProfile } from './config.ts'
+import type { PiAiProviderProfile, ResolvedPiAiProviderProfile } from './config.ts'
 import { discoverModels } from './discovery.ts'
 import type { StoredModelDiscoveryProfile } from './discovery.ts'
 import { registerPiAiFlows } from './login.ts'
@@ -91,6 +91,29 @@ export type {
   ResolvedPiAiProviderProfile,
 } from './config.ts'
 export { supportedProtocols } from './provider.ts'
+
+/**
+ * Construct one immutable profile for a host-owned route with its own catalog and credentials.
+ * @param ctx - Host supplying credentials and durable attachment services.
+ * @param route - registered provider id used in sessions and on every model descriptor.
+ * @param profile - wire protocol, model capabilities, and request defaults for this generation.
+ * @param options - route-owned credential resolution and per-request headers.
+ * @returns an adapter bound to this exact profile for the lifetime of a prepared call.
+ */
+export function createPiAiAdapterForProfile(
+  ctx: Context, route: string, profile: PiAiProviderProfile,
+  options: Pick<PiAiAdapterOptions, 'resolveApiKey' | 'prepareHeaders'>,
+): PiAiAdapter {
+  const profiles = resolveProfiles({ [route]: profile })
+  return new PiAiAdapter({
+    ...options, profiles: () => profiles,
+    auth: { credentials: credentialStoreFrom(ctx), authContext: authContextFrom(ctx) },
+    resolveAttachments: () => ctx.get('attachments'),
+    resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(
+      attachments, hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath), ref,
+    ),
+  })
+}
 
 export const name = 'llm-pi-ai'
 export const inject = ['llm']

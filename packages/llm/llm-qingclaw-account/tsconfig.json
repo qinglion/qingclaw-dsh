@@ -18,6 +18,12 @@
       "path": "../llm-deepseek"
     },
     {
+      "path": "../llm-pi-ai"
+    },
+    {
+      "path": "../../identity/anonymous-user-id"
+    },
+    {
       "path": "../../credentials/deepseek-account"
     },
     {
@@ -34,6 +40,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../settings/settings"
     }
   ]
 }

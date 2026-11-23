@@ -522,6 +522,35 @@ describe('composer stats pills', () => {
     expect(view.getByRole('dialog').textContent).toContain('Output7 tok')
   })
 
+  it('retains session totals without claiming a cache rate when earlier calls omitted cache usage', () => {
+    const { source } = makeSource()
+    const p = props(source, { tokenUsage: { ...USAGE, unreportedCacheReadAttempts: 1 } })
+    const view = render(<StatsPills {...p} />)
+    expect(view.getByRole('button').textContent).toBe('105 tok')
+    fireEvent.click(view.getByRole('button'))
+    const dialog = view.getByRole('dialog')
+    expect(dialog.textContent).toContain('Total input100 tok')
+    expect(dialog.textContent).toContain('Output5 tok')
+    expect(dialog.textContent).not.toMatch(/Cache hit|Uncached input/)
+    expect(dialog.textContent).toContain('Cached input≥ 90 tok')
+    view.rerender(<StatsPills {...p} usePerformanceUsage={selector => selector('compact')} />)
+    expect(view.container.textContent).toBe('')
+  })
+
+  it('labels missing cache telemetry in the details when no hit has been reported', () => {
+    const { source } = makeSource()
+    const p = props(source, { tokenUsage: { ...USAGE, cacheReadTokens: 0, unreportedCacheReadAttempts: 1 } })
+    const view = render(<StatsPills {...p} />)
+    fireEvent.click(view.getByRole('button'))
+    expect(view.getByRole('dialog').textContent).toContain('Cached inputNot reported')
+  })
+
+  it('displays an explicitly reported zero cache read', () => {
+    const { source } = makeSource()
+    const view = render(<StatsPills {...props(source, { tokenUsage: tokenUsage(0, 100) })} />)
+    expect(view.getByRole('button').textContent).toBe('101 tok·Cache hit 0%')
+  })
+
   it('includes cache writes in the total and the cache-hit denominator', () => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsPills {...props(source, {

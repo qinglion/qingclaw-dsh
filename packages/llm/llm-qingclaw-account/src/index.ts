@@ -1,15 +1,16 @@
 /** QingClaw short-token authentication, model discovery, and model gating. */
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type { Context } from '@deepseek-ai/cordis'
-import { ACCOUNT_QUOTA_EXCEEDED_CODE, APP_IDENTITY, attributionHeaders, LlmError, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
+import { APP_IDENTITY, attributionHeaders, LlmError } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-deepseek-account'
 import {
-  catalogModelInfo, createModelListingCache, refuseListedModel, registerDeepSeekProvider,
+  catalogModelInfo, createModelListingCache, refuseListedModel,
   resolveAdapterOptions, resolveListedCatalog,
 } from '@deepseek-ai/dsh-llm-deepseek'
 import type {
-  DeepSeekRequestAuth, ListedCatalog, ListingEntry, ListingView, ModelListing, ResolvedDeepSeekOptions,
+  ListedCatalog, ListingEntry, ListingView, ModelListing, ResolvedDeepSeekOptions,
 } from '@deepseek-ai/dsh-llm-deepseek'
+import { registerAccountAdapter } from './gateway-adapter.ts'
 import { Config, plainOptions, resolveOptions } from './config.ts'
 import { ModelKeyCache } from './model-key.ts'
 import { ModelTokenCache } from './model-token.ts'
@@ -96,7 +97,7 @@ export function apply(ctx: Context, config: Config): void {
   const baseSupported = resolveAdapterOptions({
     models: [
       { id: 'deepseek-flash', name: 'DeepSeek Flash', inputModalities: ['text', 'image'] },
-      { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text'] },
+      { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text', 'image'] },
       { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash (1017 snapshot)', inputModalities: ['text'] },
       { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] },
       { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] },
@@ -118,31 +119,6 @@ export function apply(ctx: Context, config: Config): void {
     }).models
     return [...baseSupported, ...extra]
   }
-  const resolveAuth = async (_connection: ResolvedDeepSeekOptions): Promise<DeepSeekRequestAuth> => {
-    const binding = await keys.resolveBound()
-    if (binding === undefined) {
-      throw new LlmError('Sign in to QingClaw to use the account provider.', 'ACCOUNT_SIGN_IN_REQUIRED')
-    }
-    return {
-      headers: { Authorization: `Bearer ${binding.key}` },
-      onRequestError: async (error) => {
-        if (!(error instanceof LlmError)) return error
-        // The QingClaw gateway returns this bare body for a depleted gateway quota.
-        // Messages transport keeps non-JSON bodies in the live error cause.
-        const plainQuota = error.code === 'RATE_LIMIT' && error.failure.status === 429 && error.failure.providerRetryAfterMs === undefined
-          && error.cause instanceof Error && error.cause.message === 'quota exceeded'
-        if (plainQuota || error.code === QUOTA_EXCEEDED_CODE) {
-          await keys.reconcileQuota(binding)
-          const message = plainQuota ? '网关返回额度不足，请刷新用量。' : error.message
-          return new LlmError(message, ACCOUNT_QUOTA_EXCEEDED_CODE, { ...error.failure, cause: error })
-        }
-        if (error.failure.status !== 401) return error
-        keys.reject(binding)
-        return new LlmError(error.message, 'ACCOUNT_TOKEN_INVALID', { ...error.failure, cause: error })
-      },
-    }
-  }
-
   const catalog = createModelListingCache(ctx, name, PROVIDER, {
     settings: () => settings().catalog,
     credential: async () => await tokens.resolve(),
@@ -310,11 +286,10 @@ export function apply(ctx: Context, config: Config): void {
     return connection
   }
 
-  registerDeepSeekProvider<AccountConnection>(ctx, PROVIDER, {
+  registerAccountAdapter<AccountConnection>(ctx, PROVIDER, keys, {
     providerName: 'QingClaw Account',
     options: () => connectionOf(catalog.current()),
     connect: async signal => connectionOf(await catalog.view(settings().catalog, signal)),
-    resolveAuth,
     admit: (connection, model) => { refuseListedModel(model, connection.catalog.refusals.get(model)) },
     discoverModels: async (provider) => {
       const view = await catalog.view(settings().catalog)

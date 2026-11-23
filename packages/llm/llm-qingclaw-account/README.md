@@ -9,9 +9,9 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Register the `deepseek-account` model route for QingClaw. The plugin keeps the existing `deepseekAccount` device session for QingClaw Platform, exchanges it for a 15-minute model JWT, and sends only that short-lived JWT to the QingClaw model gateway.
+Register QingClaw account models under the existing `deepseek-account` provider ID. Saved conversations and model selections use this ID.
 
-The Messages transport and catalog rules come from [`@deepseek-ai/dsh-llm-deepseek`](../llm-deepseek/README.md). The default Messages endpoint is `https://api.qingclaw.com/anthropic`; model discovery uses `https://api.qingclaw.com/models`.
+The desktop client sends text, images, tool calls and tool results to the OpenAI-compatible `POST /v1/chat/completions` endpoint. The QingClaw website supplies the signed-in model catalog.
 
 ## Table of Contents
 
@@ -35,16 +35,16 @@ Mount this plugin instead of `@deepseek-ai/dsh-llm-deepseek-account` while keepi
     - id: llm-qingclaw-account
       name: '@qinglion/dsh-llm-qingclaw-account'
       config:
-        baseURL: https://api.qingclaw.com/anthropic
+        baseURL: https://api.qingclaw.com/v1
 ```
 
-The plugin posts to `/auth-api/v0/dsh/model_token` on the signed-in Platform origin. Concurrent exchanges for one device session share one request. A JWT stays in memory until 60 seconds before its `exp` claim and is never persisted.
+The signed-in platform issues a catalog JWT at `/auth-api/v0/dsh/model_token` and a per-user gateway key at `/auth-api/v0/dsh/model_key`. Each exchange is shared across concurrent requests for the same session.
 
-The first authenticated catalog access requests `/models` at the gateway origin. A missing or failed route does not block Messages: before any successful listing, the QingClaw plug-in publishes the gateway-verified text catalog (Qwen Plus, Qwen 3.8 Flash, Qwen 3.8 Max, DeepSeek V4.1 Flash, and Kimi K3.1 Pro); after a successful listing, refresh failures retain the last-known catalog.
+The desktop bundle sets `catalogURL` to the website’s `/auth-api/v0/dsh/models`. A failed refresh retains the cached catalog. When no listing has succeeded, the provider uses its bundled catalog.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `baseURL` | `https://api.qingclaw.com/anthropic` | Messages endpoint; its origin also supplies `/models` |
+| `baseURL` | `https://api.qingclaw.com/v1` | OpenAI-compatible API root |
 | `modelTokenTimeoutMs` | `30,000` | Deadline for one Platform model-token exchange |
 | `modelsTimeoutMs` | `5,000` | Deadline for one model-listing request |
 | `modelsMaxAgeMs` | `600,000` | Model-listing refresh interval; `0` refreshes on access only |
@@ -53,16 +53,16 @@ The first authenticated catalog access requests `/models` at the gateway origin.
 <a id="security-and-failure-boundaries"></a>
 ## Security and failure boundaries
 
-The long-lived device token is sent only to the signed-in Platform origin as `X-DSH-Auth-Token: <device token>`. Messages and `/models` receive only `X-DSH-Auth-Token: Bearer <short JWT>`, matching the managed gateway's required value prefix. Deployment headers returned by `deepseekAccount.getPlatformSession()` are preserved for the Platform exchange and are not copied to the gateway.
+The client sends its device credential only to the signed-in website. Model discovery sends `X-DSH-Auth-Token: Bearer <catalog JWT>` to the catalog endpoint. Chat completions send `Authorization: Bearer <user gateway key>` to the inference gateway.
 
-The deployed Alibaba Cloud AI Gateway uses the built-in Consumer JWT authentication available on the legacy Serverless edition. Its `qingclaw-desktop` consumer holds a local asymmetric JWKS copied from the Platform issuer, reads the token from `X-DSH-Auth-Token` with the `Bearer ` prefix, and identifies the consumer with `aud=qingclaw-model-gateway`. It strips the JWT before forwarding and maps only `quota_key`, `tier`, and `sub` into QingClaw-owned upstream headers. The legacy Serverless edition does not support the plug-in marketplace, so do not document or configure the separate `jwt-auth` plug-in or `remote_jwks` for this deployment. Key rotation must overlap old and new public keys in the Consumer JWKS before the Platform starts issuing with the new key.
+Configure consumer authentication and the desktop consumer group on the gateway’s Chat Completions route so usage is attributed to the signed-in account.
 
-A gateway HTTP 401 clears only the exact rejected short JWT, so the next request exchanges a new one without signing the user out. Only an HTTP 401 from `/auth-api/v0/dsh/model_token` rejects the matching long-lived device session. HTTP 403 from that endpoint reports an account entitlement failure without clearing login state.
+A gateway HTTP 401 invalidates the rejected consumer key. The client obtains another key from the platform on the next request.
 
 <a id="dev-note"></a>
 ## Dev Note
 
-Focused tests cover single-flight exchange, expiry, response validation, Platform and gateway 401 boundaries, Loader namespace composition, the QingClaw plug-in's verified multi-model fallback on `/models` 404, and successful Messages streaming with the short JWT.
+Provider tests exercise platform credential exchange, model discovery and streaming chat requests through the registered account provider.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -71,7 +71,7 @@ Focused tests cover single-flight exchange, expiry, response validation, Platfor
 
 #### What the model sees
 
-Requests on `deepseek-account` add no model-visible text. The shared Messages transport serializes the request.
+Chat Completions serializes the conversation, attachments and tool definitions. The provider adds no model-visible authentication text.
 
 #### Token effect
 
@@ -86,5 +86,5 @@ Neither the device session nor the model JWT enters model input, so exchanging o
 <a id="known-limitations-and-deferred-work"></a>
 
 - Token and listing caches are process-local and reset on restart.
-- The gateway must validate the model JWT audience and claims; the desktop client only validates lifetime metadata before use.
-- Without `/models`, the QingClaw plug-in supplies the verified model catalog; add models only after gateway validation, or enable a dynamic listing route.
+- The gateway enforces consumer access and quota.
+- The bundled catalog is used until the website catalog is available.

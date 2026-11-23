@@ -1,13 +1,22 @@
 /** QingClaw provider composition, catalog fallback, and short-token failure boundaries. */
 import { Buffer } from 'node:buffer'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import type { DeepSeekAccount, PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
-import { BlockAssembler, LlmRuntime } from '@deepseek-ai/dsh-llm'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { BlockAssembler, createAssistantMessage, createToolResultMessage, createUserMessage, type GenerateOptions, LlmRuntime } from '@deepseek-ai/dsh-llm'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import LocalAttachments from '../../../attachment/attachment-local/src/index.ts'
 import * as QingClawAccount from '../src/index.ts'
 
 const contexts: Context[] = []
+
+interface ChatCompletionRequest {
+  messages: { role: string; content: string | { type: string; image_url?: { url: string } }[] }[]
+  tools?: unknown[]
+}
 
 afterEach(async () => {
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
@@ -32,27 +41,32 @@ function keyGrant(sequence: number): Response {
   return Response.json({ code: 0, data: { biz_code: 0, biz_data: { api_key: `gateway-key-${sequence}` } } })
 }
 
-function successfulMessages(): Response {
-  const events = [
-    { type: 'message_start', message: { id: 'msg_qingclaw', model: 'qwen-plus', usage: { input_tokens: 1, output_tokens: 0 } } },
-    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
-    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'QingClaw ready' } },
-    { type: 'content_block_stop', index: 0 },
-    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
-    { type: 'message_stop' },
+function completionStream(
+  deltas: Record<string, unknown>[] = [{ role: 'assistant', content: 'QingClaw ' }, { content: 'ready' }],
+  reason = 'stop',
+  model = 'qwen-plus',
+): Response {
+  const metadata = { id: 'chatcmpl-qingclaw-test', object: 'chat.completion.chunk', created: 1, model }
+  const chunks = [
+    ...deltas.map(delta => ({ choices: [{ index: 0, delta, finish_reason: null }] })),
+    { choices: [{ index: 0, delta: {}, finish_reason: reason }] },
+    { choices: [], usage: { prompt_tokens: 3, prompt_tokens_details: { cached_tokens: 1 }, completion_tokens: 2, total_tokens: 5 } },
   ]
-  return new Response(events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''), {
-    status: 200,
+  return new Response(chunks.map(chunk => `data: ${JSON.stringify({ ...metadata, ...chunk })}\n\n`).join('') + 'data: [DONE]\n\n', {
     headers: { 'content-type': 'text/event-stream' },
   })
 }
 
-async function finishOf(ctx: Context) {
+async function run(ctx: Context, options: Partial<GenerateOptions> = {}) {
   const assembler = new BlockAssembler()
   for await (const chunk of ctx.llm.stream({
-    provider: 'deepseek-account', model: 'qwen-plus', messages: [],
+    provider: 'deepseek-account', model: 'qwen-plus', messages: [], ...options,
   })) assembler.push(chunk)
-  return assembler.finish
+  return assembler
+}
+
+async function finishOf(ctx: Context, options: Partial<GenerateOptions> = {}) {
+  return (await run(ctx, options)).finish
 }
 
 async function mount(request: typeof fetch) {
@@ -73,12 +87,27 @@ async function mount(request: typeof fetch) {
     rejectToken, refreshUsage,
   }
   ctx.provide('deepseekAccount', account as DeepSeekAccount)
-  await ctx.plugin(QingClawAccount, { baseURL: 'https://gateway.qingclaw.test/anthropic' })
+  await ctx.plugin(QingClawAccount, { baseURL: 'https://gateway.qingclaw.test/test/v1' })
   return { ctx, rejectToken, refreshUsage }
 }
 
+async function savedImage(ctx: Context, provider: string, model: string) {
+  const home = await mkdtemp(join(tmpdir(), 'qingclaw-vision-'))
+  vi.stubEnv('DSH_HOME', home)
+  onTestFinished(async () => {
+    vi.unstubAllEnvs()
+    await rm(home, { recursive: true, force: true })
+  })
+  await ctx.plugin(LocalAttachments, { dshHome: home })
+  const attachment = await ctx.attachments.saveImage({
+    data: await readFile(new URL('../../llm-deepseek/tests/fixtures/red.png', import.meta.url)), mediaType: 'image/png',
+  })
+  const image = await ctx.attachments.readImageRequest(attachment, ctx.llm.imageRequestTarget(provider, model, attachment))
+  return { attachment, dataURL: `data:${image.mediaType};base64,${Buffer.from(image.data).toString('base64')}` }
+}
+
 describe('QingClaw account provider', () => {
-  it('survives a missing website model catalog route with the bundled catalog and still sends Messages with the short JWT', async () => {
+  it('uses the bundled catalog during an outage and authenticates Chat Completions with the exchanged gateway key', async () => {
     const observed: Request[] = []
     const issued: string[] = []
     const apiKeys: string[] = []
@@ -99,7 +128,7 @@ describe('QingClaw account provider', () => {
         return keyGrant(keyExchanges)
       }
       if (url.pathname === '/auth-api/v0/dsh/models') return new Response(null, { status: 404 })
-      if (url.pathname === '/anthropic/v1/messages') return successfulMessages()
+      if (url.pathname === '/test/v1/chat/completions') return completionStream()
       throw new Error(`unexpected request ${request.method} ${request.url}`)
     }
     const { ctx, rejectToken } = await mount(request)
@@ -107,7 +136,7 @@ describe('QingClaw account provider', () => {
     await expect(ctx.llm.listModels('deepseek-account'))
       .resolves.toEqual([
         expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-flash', name: 'DeepSeek Flash', inputModalities: ['text', 'image'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text'] }),
+        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text', 'image'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash (1017 snapshot)', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] }),
@@ -117,12 +146,15 @@ describe('QingClaw account provider', () => {
         expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] }),
         expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] }),
       ])
-    await expect(finishOf(ctx)).resolves.toMatchObject({ kind: 'stop' })
+    const result = await run(ctx)
+    expect(result.finish.kind).toBe('stop')
+    expect(result.blocks()).toContainEqual({ type: 'text', text: 'QingClaw ready' })
+    expect(result.usage).toMatchObject({ inputTokens: 2, cacheReadTokens: 1, outputTokens: 2, totalTokens: 5 })
 
     const platform = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/model_token')
     const modelKey = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/model_key')
     const listing = observed.find(item => new URL(item.url).pathname === '/auth-api/v0/dsh/models')
-    const messages = observed.find(item => new URL(item.url).pathname === '/anthropic/v1/messages')
+    const messages = observed.find(item => new URL(item.url).pathname === '/test/v1/chat/completions')
     expect(platform?.headers.get('x-dsh-auth-token')).toBe('long-lived-device-session')
     expect(platform?.headers.get('authorization')).toBeNull()
     expect(platform?.headers.get('cookie')).toBe('deployment=beta')
@@ -138,6 +170,43 @@ describe('QingClaw account provider', () => {
     expect(rejectToken).not.toHaveBeenCalled()
   })
 
+  it.each(['deepseek-v4.1-flash', 'qwen4-max'])('sends retained image bytes on a %s follow-up from a saved Messages conversation', async (model) => {
+    const messagesRequests: Request[] = []
+    const { ctx } = await mount(async (input, init) => {
+      const request = new Request(input, init)
+      const path = new URL(request.url).pathname
+      switch (path) {
+        case '/auth-api/v0/dsh/model_token': return grant(jwt(1))
+        case '/auth-api/v0/dsh/model_key': return keyGrant(1)
+        case '/auth-api/v0/dsh/models':
+          return model === 'deepseek-v4.1-flash' ? new Response(null, { status: 404 })
+            : Response.json({ data: [{ id: model, input_modalities: ['text', 'image'] }] })
+        case '/test/v1/chat/completions':
+          messagesRequests.push(request)
+          return completionStream(undefined, 'stop', model)
+        default: throw new Error('unexpected request ' + request.url)
+      }
+    })
+    const provider = 'deepseek-account'
+    const { attachment, dataURL } = await savedImage(ctx, provider, model)
+    const followUp = { type: 'text', text: 'What color was the image?' } as const
+    const messages = [
+      createUserMessage({ source: { kind: 'user' }, content: [{ type: 'image', attachment }] }),
+      createAssistantMessage({ source: { provider, model, replayState: {
+        response: { kind: 'deepseek-messages', version: 1, model }, blocks: [{ type: 'text' }],
+      } }, content: [{ type: 'text', text: 'I see it.' }] }),
+      createUserMessage({ source: { kind: 'user' }, content: [followUp] }),
+    ]
+    await expect(finishOf(ctx, { model, messages })).resolves.toMatchObject({ kind: 'stop' })
+    expect(messagesRequests).toHaveLength(1)
+    const { messages: sent } = await messagesRequests[0]!.json() as ChatCompletionRequest
+    expect(sent).toMatchObject([{ role: 'user' }, { role: 'assistant', content: 'I see it.' }, { role: 'user' }])
+    const original = sent[0]!.content
+    const imagePart = Array.isArray(original) && original.find(part => part.type === 'image_url')
+    expect(imagePart).toMatchObject({ image_url: { url: dataURL } })
+    expect(JSON.stringify(sent[2]!.content)).toContain(followUp.text)
+  })
+
   it('offers the gateway model list instead of only the bundled fallback', async () => {
     const request: typeof fetch = async (input, init) => {
       const request = new Request(input, init)
@@ -146,7 +215,7 @@ describe('QingClaw account provider', () => {
       if (path === '/auth-api/v0/dsh/models') {
         return Response.json({
           data: [
-            { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash' },
+            { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', input_modalities: ['text'] },
             { id: 'new-upstream-model', name: 'New Upstream Model', default: true },
           ],
         })
@@ -162,7 +231,54 @@ describe('QingClaw account provider', () => {
 
     const models = await ctx.llm.listModels('deepseek-account')
     expect(saveSelection).toHaveBeenCalledWith({ provider: 'deepseek-account', model: 'new-upstream-model' })
-    expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash-1017', 'new-upstream-model'])
+    expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash', 'new-upstream-model'])
+    expect(models[0]?.inputModalities).toEqual(['text'])
+  })
+
+  it('assembles streamed function arguments and delivers the image returned by the tool in the next request', async () => {
+    const requests: Request[] = []
+    const { ctx } = await mount(async (input, init) => {
+      const request = new Request(input, init)
+      switch (new URL(request.url).pathname) {
+        case '/auth-api/v0/dsh/model_token': return grant(jwt(1))
+        case '/auth-api/v0/dsh/model_key': return keyGrant(1)
+        case '/auth-api/v0/dsh/models': return new Response(null, { status: 404 })
+        case '/test/v1/chat/completions':
+          requests.push(request)
+          return requests.length > 1 ? completionStream(undefined, 'stop', model) : completionStream([
+            { role: 'assistant', tool_calls: [{ index: 0, id: 'call_color', type: 'function', function: { name: 'color', arguments: '{"x":' } }] },
+            { tool_calls: [{ index: 0, function: { arguments: '7}' } }] },
+          ], 'tool_calls', model)
+        default: throw new Error('unexpected request ' + request.url)
+      }
+    })
+    const model = 'deepseek-v4.1-flash'
+    const provider = 'deepseek-account'
+    const { attachment, dataURL } = await savedImage(ctx, provider, model)
+    const user = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'Check the color.' }] })
+    const tools = [{ name: 'color', description: 'Look up a color', parameters: { type: 'object', properties: { x: { type: 'integer' } } } }]
+    const first = await run(ctx, { model, messages: [user], tools })
+    expect(first.finish.kind).toBe('tool-calls')
+    const assistant = first.message({ provider, model })
+    const call = assistant.content.find(block => block.type === 'tool-call')
+    expect(call).toMatchObject({ name: 'color', id: 'call_color', arguments: '{"x":7}' })
+    const toolResult = createToolResultMessage({
+      callId: call!.id, content: [{ type: 'text', text: 'sampled pixel' }, { type: 'image', attachment }], isError: false,
+    })
+    const second = await run(ctx, { model, messages: [user, assistant, toolResult], tools })
+    expect(second.finish.kind).toBe('stop')
+    expect(requests).toHaveLength(2)
+    const body = await requests[1]!.json() as ChatCompletionRequest
+    expect(body.tools).toMatchObject([{ type: 'function', function: { name: 'color' } }])
+    expect(body.messages).toMatchObject([
+      { role: 'user' },
+      { role: 'assistant', tool_calls: [{ type: 'function', id: 'call_color', function: { name: 'color', arguments: '{"x":7}' } }] },
+      { role: 'tool', tool_call_id: 'call_color' },
+      { role: 'user' },
+    ])
+    expect(body.messages[2]!.content).toContain('sampled pixel')
+    const imageContents = body.messages[3]!.content
+    expect(Array.isArray(imageContents) && imageContents.find(part => part.type === 'image_url')?.image_url?.url).toBe(dataURL)
   })
 
   it.each([
@@ -179,7 +295,7 @@ describe('QingClaw account provider', () => {
         return keyGrant(++keyExchanges)
       }
       if (path === '/auth-api/v0/dsh/models') return new Response(null, { status: 404 })
-      if (path === '/anthropic/v1/messages') {
+      if (path === '/test/v1/chat/completions') {
         messageRequests++
         const headers = new Headers({ 'content-type': 'text/plain', 'x-request-id': 'gateway-test' })
         if (delay) headers.set('retry-after', delay)
@@ -208,11 +324,11 @@ describe('QingClaw account provider', () => {
       if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
       if (path === '/auth-api/v0/dsh/models') return new Response(null, { status: 404 })
       if (path === '/auth-api/v0/dsh/model_key') return keyGrant(++issued)
-      if (path === '/anthropic/v1/messages') {
+      if (path === '/test/v1/chat/completions') {
         sent.push(request.headers.get('authorization'))
         return sent.length === 1
           ? Response.json({ error: { code: 'insufficient_balance', message: 'Insufficient balance' } }, { status: 402 })
-          : successfulMessages()
+          : completionStream()
       }
       throw new Error('unexpected path ' + path)
     })
@@ -236,11 +352,11 @@ describe('QingClaw account provider', () => {
         return keyGrant(sequence)
       }
       if (path === '/auth-api/v0/dsh/models') return new Response(null, { status: 404 })
-      if (path === '/anthropic/v1/messages') {
+      if (path === '/test/v1/chat/completions') {
         messageKeys.push(request.headers.get('authorization') ?? '')
         return messageKeys.length === 1
           ? new Response('Unauthorized', { status: 401 })
-          : successfulMessages()
+          : completionStream()
       }
       throw new Error(`unexpected request ${request.method} ${request.url}`)
     }

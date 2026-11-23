@@ -12,8 +12,8 @@ import type {
 } from '@deepseek-ai/dsh-llm-deepseek'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 
-/** Default QingClaw Messages endpoint. */
-export const DEFAULT_BASE_URL = 'https://api.qingclaw.com/anthropic'
+/** Default OpenAI-compatible API root for QingClaw account inference. */
+export const DEFAULT_BASE_URL = 'https://api.qingclaw.com/v1'
 /** Default deadline for exchanging the device session for one model JWT. */
 export const DEFAULT_MODEL_TOKEN_TIMEOUT_MS = 30_000
 
@@ -23,7 +23,7 @@ export interface Config extends Omit<ProtocolConfig, 'models'>, ModelListingConf
   modelOverrides: Volatile<Record<string, ModelOverride>>
   /** Maximum duration of one device-session-to-model-token exchange. */
   modelTokenTimeoutMs: Volatile<number>
-  /** Website-managed model catalog URL; empty derives it from the Messages origin. */
+  /** Website-managed model catalog URL; empty derives it from the inference origin. */
   catalogURL: Volatile<string>
   /** Default image-generation model. */
   imageModel: Volatile<string>
@@ -63,7 +63,7 @@ export type Options = Omit<ProtocolOptions, 'models'> & ModelListingOptions & {
 
 /** One validated configuration generation of the QingClaw account route. */
 export interface ResolvedOptions {
-  /** Messages settings; request resolution replaces `models` with the resolved catalog. */
+  /** Inference settings; request resolution replaces `models` with the resolved catalog. */
   readonly protocol: ResolvedDeepSeekOptions
   /** Listing endpoint and cache timing. */
   readonly catalog: ListingSettings
@@ -125,6 +125,11 @@ export function resolveOptions(options: Options): ResolvedOptions {
   }
   const timing = resolveListingTiming(options, 'llm-qingclaw-account')
   const protocol = resolveAdapterOptions({ ...protocolOptions, baseURL: protocolOptions.baseURL ?? DEFAULT_BASE_URL })
+  // Older desktop profiles can persist one of the original QingClaw gateway URLs.
+  const root = new URL(protocol.baseURL)
+  if (root.origin === new URL(DEFAULT_BASE_URL).origin && /^\/anthropic(?:-key)?(?:\/v1)?\/*$/u.test(root.pathname)) {
+    protocol.baseURL = DEFAULT_BASE_URL
+  }
   return {
     protocol,
     catalog: {
