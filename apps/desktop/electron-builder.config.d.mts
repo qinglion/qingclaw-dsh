@@ -38,6 +38,7 @@ export interface DesktopElectronBuilderConfig {
     readonly signIgnore: readonly string[]
   }
   readonly dmg: {
+    readonly icon: string
     readonly format: 'ULMO'
     readonly sign: boolean
     readonly writeUpdateInfo: boolean

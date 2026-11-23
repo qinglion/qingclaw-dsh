@@ -2,6 +2,7 @@ import { SHIPPED_LOCALE_IDS } from '../../../scripts/shipped-locales.ts'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import type { NotarizeOptions } from '@electron/notarize'
 import {
   resolveDesktopAppId,
@@ -113,6 +114,8 @@ describe('desktop macOS release signature', () => {
           DSH_DESKTOP_UNSIGNED: unsigned,
         }, 'darwin', arch)
         expect(config.dmg.format).toBe('ULMO')
+        expect(config.dmg.icon).toBe(fileURLToPath(new URL('../resources/dmg-volume.icns', import.meta.url)))
+        expect(readFileSync(config.dmg.icon).subarray(0, 4).toString('ascii')).toBe('icns')
         await expect(validateConfiguration(config, { isEnabled: false })).resolves.toBeUndefined()
       }
     }
