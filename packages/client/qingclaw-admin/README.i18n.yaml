@@ -2,12 +2,18 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/qingclaw-admin/README.md
+/:
+  en: 182d3f5fbc4cf0c4
+  zh: a6da5b5177fb2284
 /qingclaw-management:
   en: 74ef9fe7ec0800bf
   zh: 3950ce1803d006cc
 /qingclaw-management/summary:
   en: da3c5cc2a19b5a87
-  zh: f8169f45996e6c68
+  zh: 68a4eb9256be893e
+/qingclaw-management/table-of-contents:
+  en: b4683d2a53256fda
+  zh: 705ecbe0b6cabec6
 /qingclaw-management/model-experience:
   en: d0b0639acf354a8e
   zh: 07b4f18c2ac4d296
@@ -15,5 +21,8 @@
   en: e5f0df71efc63834
   zh: e54dbabbf8c218ea
 /qingclaw-management/known-limitations-and-deferred-work:
-  en: cfd398fc682e5e52
-  zh: 306b59e03918f1a2
+  en: 0c134385b8132c9e
+  zh: 7b9fbcc696fbce27
+/qingclaw-management/known-limitations-and-deferred-work/dev-note:
+  en: 5ff25f6a2ecd2f87
+  zh: 77900317d2a2d739
