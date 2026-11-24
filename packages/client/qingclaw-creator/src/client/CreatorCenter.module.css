@@ -15,5 +15,3 @@
 .package { background: none; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; padding: 4px 0; overflow-wrap: anywhere; }
 .package:hover { text-decoration: underline; }
 .body code { white-space: pre-wrap; overflow-wrap: anywhere; }
-.projectForm { display: grid; gap: 12px; padding: 16px; margin-block: 12px; border-radius: var(--dsw-radius-lg); border: 1px solid var(--dsw-alias-border-l2); }
-.projectForm input { font: inherit; background: var(--dsw-alias-bg-base); color: inherit; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm); padding: 6px 8px; }

@@ -45,23 +45,6 @@ export function apply(ctx: Context): void {
           const active = () => !closed && currentId === userId
           const inputs: CenterInputs = {
             userId, hooks: { workspaces: scope.workspaces.list },
-            async openProject(kind, folder = '') {
-              if (!active()) return
-              if (kind !== 'open' && (!folder || !/^[^\\/:*?"<>|\u0000-\u001F]{1,100}$/.test(folder) || /[. ]$/.test(folder))) {
-                throw new Error(t('invalidFolder'))
-              }
-              const parent = await scope.uiWorkspace.pickDirectory()
-              if (!parent || !active()) return
-              const path = kind === 'open' ? parent : await scope.uiWorkspace.createDirectory(parent, folder)
-              if (!active()) return
-              const workspace = await scope.workspaces.create({ path })
-              if (!active()) return
-              scope.uiWorkspace.startSession(workspace.workspaceId, {
-                agentPreset: 'cordis', ...(kind === 'open' ? {} : {
-                  prompt: t(kind === 'plugin' ? 'projectPrompt' : 'workbenchPrompt'), whenDraftExists: 'append' as const,
-                }),
-              })
-            },
             resume(workspaceId, directory) {
               if (!active()) return
               scope.uiWorkspace.startSession(workspaceId, {

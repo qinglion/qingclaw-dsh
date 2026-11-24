@@ -6,7 +6,7 @@ English | [中文](README.zh.md)
 
 The built-in sidebar workbench is available to QingClaw creators and administrators. It lists the account’s npm packages and their versions. Choose a version to request a market listing. Publishing uses the signed-in QingClaw account.
 
-Create a plugin or a workbench in its own workspace, open an existing directory, or return to a local project. Recognized package directories expose a Release tab in the conversation. It shows project metadata and the package’s release history. The primary action sends a normal request to the current conversation.
+My plugins lists each package under its market listing title and keeps the package name beneath it. Recognized package directories expose a Release tab in the conversation. It shows project metadata and the package’s release history. The primary action sends a normal request to the current conversation.
 
 ## Model Experience
 

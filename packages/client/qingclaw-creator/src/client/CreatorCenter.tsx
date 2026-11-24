@@ -10,10 +10,8 @@ import type { CreatorKey, NS } from './locales.ts'
 import css from './CreatorCenter.module.css'
 
 type Translate = TranslateNS<typeof NS>
-export type ProjectAction = 'plugin' | 'workbench' | 'open'
 export interface CenterInputs {
   userId: string
-  openProject(kind: ProjectAction, folder?: string): Promise<void>
   resume(workspace: WorkspaceId, directory: string): void
   hooks: { workspaces: HostObservable<WorkspaceSnapshot> }
 }
@@ -60,13 +58,14 @@ function PackageList({ t }: { t: Translate }) {
   }
   return <section className={css.body}>
     <div className={css.sectionHead}>
-      <h2>{selected?.name ?? t('packages')}</h2>
+      <h2>{selected?.title ?? t('packages')}</h2>
       <div className={css.actions}>{selected && <Button variant="ghost" onClick={() => { select(undefined); setNotice('') }}>{t('back')}</Button>}
         <Button variant="ghost" icon={<IconRefreshOutlineRegular size={16} />} disabled={pending || status === 'loading'}
           onClick={() => { setNotice(''); reload(n => n + 1) }}>{t('reload')}</Button></div>
     </div>
     {notice && <p role={status === 'error' ? 'alert' : 'status'}>{notice}</p>}
     {status === 'loading' ? <p>{t('loading')}</p> : status === 'ready' && (selected ? <>
+      {selected.title !== selected.name && <p className={css.muted}><code>{selected.name}</code></p>}
       {selected.description && <p className={css.muted}>{selected.description}</p>}
       {selected.current_market_version
         ? <p className={css.muted}>{t('marketVersion')} {selected.current_market_version}</p>
@@ -81,41 +80,18 @@ function PackageList({ t }: { t: Translate }) {
         {item.review_note && <p className={css.muted}>{item.review_note}</p>}
       </li>)}</ul>
     </> : packages.length ? <ul className={css.list}>{packages.map(row => <li key={row.name} className={css.row}>
-      <div><button className={css.package} onClick={() => { select(row.name); setNotice('') }}>{row.name}</button>
+      <div><button className={css.package} onClick={() => { select(row.name); setNotice('') }}>{row.title}</button>
+        {row.title !== row.name && <p className={css.muted}><code>{row.name}</code></p>}
         {row.description && <p className={css.muted}>{row.description}</p>}</div><code>{row.latest_version}</code>
     </li>)}</ul> : <p className={css.muted}>{t('packageListEmpty')}</p>)}
   </section>
 }
 
-function Center({ t, openProject, useWorkspaces, resume }: Pick<Props, 't' | 'openProject' | 'useWorkspaces' | 'resume'>) {
+function Center({ t, useWorkspaces, resume }: Pick<Props, 't' | 'useWorkspaces' | 'resume'>) {
   const [tab, setTab] = useState<'packages' | 'local'>('packages')
-  const [kind, setKind] = useState<'plugin' | 'workbench'>()
-  const [folder, setFolder] = useState('')
   const workspaces = useWorkspaces(snapshot => snapshot.items)
-  const [error, setError] = useState('')
-  const [picking, setPicking] = useState(false)
-  const start = async (kind: ProjectAction) => {
-    if (picking) return
-    setPicking(true); setError('')
-    try { await openProject(kind, folder.trim()); setKind(undefined) } catch (reason) { setError(reason instanceof Error ? reason.message : t('setupFailed')) }
-    finally { setPicking(false) }
-  }
   return <main className={css.page}><div className={css.content}>
-    <header className={css.header}><h1>{t('center')}</h1>
-      <div className={css.actions}>
-        <Button disabled={picking} onClick={() => void start('open')}>{t('openProject')}</Button>
-        <Button disabled={picking} onClick={() => { setKind('workbench'); setFolder(''); setError('') }}>{t('newWorkbench')}</Button>
-        <Button variant="primary" disabled={picking} onClick={() => { setKind('plugin'); setFolder(''); setError('') }}>{t('newPlugin')}</Button>
-      </div></header>
-    {kind && <form className={css.projectForm} onSubmit={(event) => { event.preventDefault(); void start(kind) }}>
-      <h2>{t(kind === 'plugin' ? 'newProjectTitle' : 'newWorkbenchTitle')}</h2>
-      <label>{t('folder')} <input value={folder} autoFocus required maxLength={100}
-        onChange={event => setFolder(event.target.value)} /></label>
-      <div className={css.actions}>
-        <Button type="submit" variant="primary" disabled={!folder.trim() || picking}>{t('chooseParent')}</Button>
-        <Button type="button" variant="ghost" onClick={() => setKind(undefined)}>{t('cancel')}</Button></div>
-    </form>}
-    {error && <p role="alert">{error}</p>}
+    <header className={css.header}><h1>{t('center')}</h1></header>
     <nav className={css.tabs}>{(['packages', 'local'] as const).map(id =>
       <Button key={id} variant={tab === id ? 'outline' : 'ghost'} aria-pressed={tab === id} onClick={() => setTab(id)}>{t(id)}</Button>)}
     </nav>{tab === 'local'
@@ -124,6 +100,6 @@ function Center({ t, openProject, useWorkspaces, resume }: Pick<Props, 't' | 'op
 }
 
 /** Remount all account-scoped state on identity changes. */
-export function CreatorCenter({ userId, t, openProject, useWorkspaces, resume }: Props) {
-  return <Center key={userId} t={t} openProject={openProject} useWorkspaces={useWorkspaces} resume={resume} />
+export function CreatorCenter({ userId, t, useWorkspaces, resume }: Props) {
+  return <Center key={userId} t={t} useWorkspaces={useWorkspaces} resume={resume} />
 }

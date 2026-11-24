@@ -17,15 +17,31 @@ async function request<T>(action: string, signal: AbortSignal, post = false, fie
   return data as T
 }
 
-type InventoryRow = Omit<CreatorPackage, 'name'> & { package_name: string }
+type InventoryRow = Omit<CreatorPackage, 'name' | 'title'> & { package_name: string }
 interface Application {
   id: number
   package_name: string
   version: string
+  title?: string
   state: string
   current?: boolean
   listing_blocked_by_version?: boolean
   error?: string
+}
+
+/** Prefer the listed application's title, then the most recent one, then the package name. */
+function packageTitles(publications: Application[]): Map<string, string> {
+  const chosen = new Map<string, { title: string; current: boolean; id: number }>()
+  for (const item of publications) {
+    const title = item.title?.trim()
+    if (!title) continue
+    const current = item.current === true
+    const prior = chosen.get(item.package_name)
+    if (!prior || (current && !prior.current) || (current === prior.current && item.id > prior.id)) {
+      chosen.set(item.package_name, { title, current, id: item.id })
+    }
+  }
+  return new Map([...chosen].map(([name, item]) => [name, item.title]))
 }
 
 /** Join registry history with the most recent application for each immutable package version. */
@@ -34,13 +50,15 @@ export async function getMyPackages(signal: AbortSignal): Promise<CreatorPackage
     request<{ packages: InventoryRow[] }>('packages', signal),
     request<{ publications: Application[] }>('applications', signal),
   ])
+  const titles = packageTitles(applications.publications)
   const latest = new Map<string, Application>()
   for (const item of applications.publications) {
     const key = item.package_name + '@' + item.version
     if ((latest.get(key)?.id ?? -1) < item.id) latest.set(key, item)
   }
   return inventory.packages.map(row => ({
-    name: row.package_name, description: row.description, latest_version: row.latest_version,
+    name: row.package_name, title: titles.get(row.package_name) ?? row.package_name,
+    description: row.description, latest_version: row.latest_version,
     current_market_version: row.current_market_version ?? null, highest_market_version: row.highest_market_version ?? null,
     versions: row.versions.map((version) => {
       const listing = latest.get(row.package_name + '@' + version.version)

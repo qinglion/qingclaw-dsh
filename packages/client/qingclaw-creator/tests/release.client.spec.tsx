@@ -19,7 +19,7 @@ const t = ((key: keyof typeof en) => en[key]) as ComponentProps<typeof ReleaseVi
 
 it('requires selecting a package, shows its private npm history, and returns to the conversation after the publish action', async () => {
   vi.mocked(getProjectVersions).mockResolvedValue([{ version: '1.0.0', published_at: '2026-11-20T01:00:00Z' }, { version: '0.9.0' }])
-  vi.mocked(getMyPackages).mockResolvedValue([{ name: first.name, description: '', latest_version: '1.0.0', versions: [{ version: '1.0.0', market_state: 'published' }, { version: '0.9.0', market_state: 'superseded' }] }])
+  vi.mocked(getMyPackages).mockResolvedValue([{ name: first.name, title: first.title, description: '', latest_version: '1.0.0', versions: [{ version: '1.0.0', market_state: 'published' }, { version: '0.9.0', market_state: 'superseded' }] }])
   const publish = vi.fn(async () => {}), openView = vi.fn()
   render(<ReleaseView workspaceId="w" projects={[first, second]} t={t} publish={publish} openView={openView} />)
   const button = screen.getByRole('button', { name: en.publish }) as HTMLButtonElement

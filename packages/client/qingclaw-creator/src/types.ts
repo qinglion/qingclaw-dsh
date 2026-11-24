@@ -11,6 +11,8 @@ export interface CreatorVersion {
 
 export interface CreatorPackage {
   name: string
+  /** Market listing title for this package, resolved to the package name when no application carries one. */
+  title: string
   description: string
   current_market_version?: string | null
   highest_market_version?: string | null
