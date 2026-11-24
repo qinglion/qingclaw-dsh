@@ -28,6 +28,9 @@
     },
     {
       "path": "../ui-primitives"
+    },
+    {
+      "path": "../../host/webserver"
     }
   ]
 }

@@ -2,6 +2,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
+import type { IndexInjection, WebServer } from '@deepseek-ai/dsh-host-webserver'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -11,6 +12,9 @@ import { NS } from '../src/client/locales.ts'
 import { apply as hostApply } from '../src/index.ts'
 
 afterEach(() => { cleanup() })
+
+/** Page-scope stand-in for the served document peer. */
+const PAGE_PEER = { principal: { kind: 'owner' } } as Parameters<WebServer['renderIndex']>[1]
 
 const HOLES = [
   'sidebar.brand.mark',
@@ -32,8 +36,13 @@ async function bench(declare = true) {
 }
 
 describe('QingClaw browser-brand plugin', () => {
-  it('keeps the host Loader entry inert and declares its two browser services', () => {
-    expect(hostApply).not.toThrow()
+  it('publishes the brand splash rows from the host half and declares its two browser services', () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    hostApply(ctx)
+    const table: IndexInjection[] = []
+    ctx.emit('webserver/index-inject', table, PAGE_PEER)
+    expect(table.map(row => row.kind)).toEqual(['style', 'script'])
     expect(inject).toEqual(['slots', 'locale'])
   })
 
