@@ -2,10 +2,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
+import type { WorkspaceSnapshot, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { CreatorCenter } from '../src/client/CreatorCenter.tsx'
 import { getMyPackages, submitListing } from '../src/client/api.ts'
 import { getWorkspacePluginState } from '../src/client/project-api.ts'
 import { zh } from '../src/client/locales.ts'
+import type { PluginProject } from '../src/project-types.ts'
 
 vi.mock('../src/client/api.ts', () => ({
   getMyPackages: vi.fn(), submitListing: vi.fn(),
@@ -15,7 +17,21 @@ vi.mock('../src/client/project-api.ts', () => ({
 }))
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-function mount(useWorkspaces: ComponentProps<typeof CreatorCenter>['useWorkspaces'] = () => []) {
+/** A registered workspace row as the sidebar list reports it. */
+function view(workspaceId: string, title: string): WorkspaceView {
+  return { workspaceId: workspaceId as WorkspaceView['workspaceId'], title, path: '/tmp/' + workspaceId,
+    sessionIds: [], createdAt: '2026-11-24T00:00:00.000Z', updatedAt: '2026-11-24T00:00:00.000Z' }
+}
+
+/** The workspaces hook the center receives from the sidebar list. */
+function workspaces(items: readonly WorkspaceView[] = []): ComponentProps<typeof CreatorCenter>['useWorkspaces'] {
+  const snapshot: WorkspaceSnapshot = {
+    items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+  }
+  return selector => selector(snapshot)
+}
+
+function mount(useWorkspaces = workspaces()) {
   const props = {
     userId: '9', t: (key: keyof typeof zh) => zh[key], resume: vi.fn(), useWorkspaces,
   }
@@ -70,13 +86,12 @@ it('shows only the title, the tabs, and refresh above the package list', async (
 })
 
 it('discovers the root plugin of each workspace and opens its session', async () => {
-  const project = { name: '@qinglion/desk', title: 'Desk', version: '1.0.0', kind: 'workbench' }
+  const project: PluginProject = { name: '@qinglion/desk', title: 'Desk', version: '1.0.0', kind: 'workbench' }
   const resume = vi.fn()
   vi.mocked(getMyPackages).mockResolvedValue([])
   vi.mocked(getWorkspacePluginState).mockResolvedValue({ project })
   const props = {
-    userId: '9', t: (key: keyof typeof zh) => zh[key], resume,
-    useWorkspaces: () => [{ workspaceId: 'w1', title: 'Project' }],
+    userId: '9', t: (key: keyof typeof zh) => zh[key], resume, useWorkspaces: workspaces([view('w1', 'Project')]),
   }
   render(<CreatorCenter {...props as ComponentProps<typeof CreatorCenter>} />)
   fireEvent.click(screen.getByRole('button', { name: zh.local }))
@@ -89,7 +104,7 @@ it('discovers the root plugin of each workspace and opens its session', async ()
 it('keeps a collection workspace visible when its root manifest declares no plugin', async () => {
   vi.mocked(getMyPackages).mockResolvedValue([])
   vi.mocked(getWorkspacePluginState).mockResolvedValue({})
-  mount(() => [{ workspaceId: 'w1', title: 'Collection' }])
+  mount(workspaces([view('w1', 'Collection')]))
   fireEvent.click(screen.getByRole('button', { name: zh.local }))
   expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
 })
