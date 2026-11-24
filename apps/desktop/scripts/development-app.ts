@@ -4,9 +4,11 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import sharp from 'sharp'
 import { QINGCLAW_DISTRIBUTION } from '../../../distribution/qingclaw.mjs'
 
 const DEVELOPMENT_APP_ICON = `${QINGCLAW_DISTRIBUTION.shortName}.icns`
+const DEVELOPMENT_ICON_INSET = 100
 
 type IconCommand = (executable: string, args: readonly string[]) => void
 
@@ -19,18 +21,24 @@ function runIconCommand(executable: string, args: readonly string[]): void {
  * @param source - 1024 px product icon checked into Desktop resources.
  * @param bundle - Generated development application bundle.
  * @param run - Command runner overridden by unit tests.
- * @returns icon filename written beneath Contents/Resources.
+ * @returns icon filename written beneath Contents/Resources, with transparent Dock margins.
  */
-export function createDevelopmentAppIcon(source: string, bundle: string, run: IconCommand = runIconCommand): string {
+export async function createDevelopmentAppIcon(source: string, bundle: string, run: IconCommand = runIconCommand): Promise<string> {
   const scratch = mkdtempSync(join(tmpdir(), 'dsh-development-icon-'))
   try {
     const iconset = join(scratch, `${QINGCLAW_DISTRIBUTION.shortName}.iconset`)
     mkdirSync(iconset)
+    const insetSource = join(scratch, 'icon.png')
+    await sharp(source)
+      .resize(1024 - DEVELOPMENT_ICON_INSET * 2, 1024 - DEVELOPMENT_ICON_INSET * 2)
+      .extend({ top: DEVELOPMENT_ICON_INSET, bottom: DEVELOPMENT_ICON_INSET,
+        left: DEVELOPMENT_ICON_INSET, right: DEVELOPMENT_ICON_INSET, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png().toFile(insetSource)
     for (const points of [16, 32, 128, 256, 512]) {
       for (const scale of [1, 2]) {
         const pixels = points * scale
         const suffix = scale === 2 ? '@2x' : ''
-        run('/usr/bin/sips', ['-z', String(pixels), String(pixels), source, '--out',
+        run('/usr/bin/sips', ['-z', String(pixels), String(pixels), insetSource, '--out',
           join(iconset, `icon_${String(points)}x${String(points)}${suffix}.png`)])
       }
     }
@@ -65,7 +73,7 @@ function quote(value: string): string { return `'${value.replaceAll("'", "'\\''"
  * @param options - Current workspace, Electron binary, and private development locations.
  * @returns executable used by the supported desktop development launcher.
  */
-export function prepareDevelopmentApp(options: DevelopmentAppOptions): string {
+export async function prepareDevelopmentApp(options: DevelopmentAppOptions): Promise<string> {
   const source = dirname(dirname(dirname(options.electron)))
   const bundle = join(options.directory, `${QINGCLAW_DISTRIBUTION.shortName} Dev.app`)
   const executableName = `${QINGCLAW_DISTRIBUTION.shortName}Dev`
@@ -74,6 +82,7 @@ export function prepareDevelopmentApp(options: DevelopmentAppOptions): string {
   const iconSource = join(options.appRoot, 'resources', 'icon-macos.png')
   const launcher = developmentLauncher(options, bundle)
   const identity = JSON.stringify({ ...options, launcher,
+    iconInset: DEVELOPMENT_ICON_INSET,
     icon: createHash('sha256').update(readFileSync(iconSource)).digest('hex'),
     plist: readFileSync(join(source, 'Contents', 'Info.plist'), 'utf8') })
   if (!existsSync(stamp) || readFileSync(stamp, 'utf8') !== identity) {
@@ -85,7 +94,7 @@ export function prepareDevelopmentApp(options: DevelopmentAppOptions): string {
       CFBundleName: `${QINGCLAW_DISTRIBUTION.shortName} Dev`,
       CFBundleDisplayName: `${QINGCLAW_DISTRIBUTION.shortName} Dev`,
       CFBundleExecutable: executableName,
-      CFBundleIconFile: createDevelopmentAppIcon(iconSource, bundle),
+      CFBundleIconFile: await createDevelopmentAppIcon(iconSource, bundle),
       CFBundleURLTypes: [{
         CFBundleURLName: QINGCLAW_DISTRIBUTION.desktop.protocolName,
         CFBundleURLSchemes: [QINGCLAW_DISTRIBUTION.desktop.protocol],

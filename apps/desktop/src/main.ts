@@ -395,9 +395,6 @@ async function main(): Promise<void> {
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   const development = !app.isPackaged
-  if (process.platform === 'darwin' && development) {
-    app.dock?.setIcon(join(app.getAppPath(), 'resources', 'icon-macos.png'))
-  }
   const primaryRuntime = development
     ? developmentPrimaryRuntime()
     : join(process.resourcesPath, 'runtime', 'primary-runtime')

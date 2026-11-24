@@ -4,18 +4,21 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
+import sharp from 'sharp'
 import { createDevelopmentAppIcon, developmentLauncher } from '../scripts/development-app.ts'
 
-it('creates a branded multi-resolution icon for the macOS development bundle', () => {
+it('creates a branded multi-resolution icon with transparent Dock margins', async () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-development-app-icon-'))
   onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
   const source = join(root, 'icon-macos.png')
   const bundle = join(root, 'QingClaw Dev.app')
   mkdirSync(join(bundle, 'Contents', 'Resources'), { recursive: true })
-  writeFileSync(source, 'brand icon')
+  await sharp({ create: { width: 1024, height: 1024, channels: 4, background: '#4BB6B0' } }).png().toFile(source)
   const calls: Array<{ executable: string; args: readonly string[] }> = []
-  const icon = createDevelopmentAppIcon(source, bundle, (executable, args) => {
+  let insetSource: Buffer | undefined
+  const icon = await createDevelopmentAppIcon(source, bundle, (executable, args) => {
     calls.push({ executable, args })
+    if (executable === '/usr/bin/sips') insetSource = readFileSync(args[3]!)
     const output = executable === '/usr/bin/sips' ? args.at(-1) : args[3]
     if (output === undefined) throw new Error('icon command has no output')
     writeFileSync(output, executable === '/usr/bin/sips' ? 'png' : 'icns')
@@ -26,7 +29,11 @@ it('creates a branded multi-resolution icon for the macOS development bundle', (
   const resizeCalls = calls.filter(call => call.executable === '/usr/bin/sips')
   expect(resizeCalls).toHaveLength(10)
   expect(resizeCalls.map(call => call.args[1])).toEqual(['16', '32', '32', '64', '128', '256', '256', '512', '512', '1024'])
-  expect(resizeCalls.every(call => call.args[3] === source)).toBe(true)
+  const { data, info } = await sharp(insetSource).raw().toBuffer({ resolveWithObject: true })
+  expect([info.width, info.height, info.channels]).toEqual([1024, 1024, 4])
+  const alpha = (x: number, y: number): number => data[(y * info.width + x) * info.channels + 3]!
+  expect([alpha(99, 512), alpha(924, 512), alpha(512, 99), alpha(512, 924)]).toEqual([0, 0, 0, 0])
+  expect([alpha(100, 512), alpha(923, 512), alpha(512, 100), alpha(512, 923)]).toEqual([255, 255, 255, 255])
   const iconutil = calls.at(-1)
   expect(iconutil?.executable).toBe('/usr/bin/iconutil')
   expect(iconutil?.args.slice(0, 4)).toEqual(['--convert', 'icns', '--output', join(bundle, 'Contents', 'Resources', icon)])
