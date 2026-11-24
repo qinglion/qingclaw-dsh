@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-在产品包中启用 Host 插件并加载其 Client 组件。Host 从 `QINGCLAW_PLATFORM_ORIGIN` 指定的官网读取 `/workbenches/index.json`，默认官网是 `https://qingclaw.com`。每个条目指定 `https://npm.qingclaw.com/` 中一个 `@qinglion` 包的确切版本及其 `panelId`。该私有 npm 只对已登录的青狮账号开放，Host 用该账号的平台授权换取短期 npm 读取令牌，再据此读取工作台 README 并通过原生插件管理器安装，安装状态由插件管理器提供。令牌只留在 Host 进程内；未登录时，读取 README 与安装都会提示需要先登录。插件注册对应的 `main` 面板后即可直接打开。已安装且已加载的面板会自动出现在侧栏，可通过侧栏自带的按钮固定或隐藏。开启缓存后，客户端离线时可用同一官网上次通过校验的目录恢复已有面板。安装新工作台需要在线目录。
+在产品包中启用 Host 插件并加载其 Client 组件。Host 从 `QINGCLAW_PLATFORM_ORIGIN` 指定的官网读取 `/workbenches/index.json`，默认官网是 `https://qingclaw.com`。每个条目指定 `https://npm.qingclaw.com/` 中一个 `@qinglion` 包的确切版本及其 `panelId`。该私有 npm 只对已登录的青狮账号开放，Host 用该账号的平台授权换取短期 npm 读取令牌，再据此读取工作台 README 并通过原生插件管理器安装，安装状态由插件管理器提供。令牌只留在 Host 进程内；未登录时，读取 README 与安装都会提示需要先登录。安装还需要有效的专业版授权：免费账号可以浏览目录和查看详情，安装时会提示需要升级专业版。插件注册对应的 `main` 面板后即可直接打开。已安装且已加载的面板会自动出现在侧栏，可通过侧栏自带的按钮固定或隐藏。开启缓存后，客户端离线时可用同一官网上次通过校验的目录恢复已有面板。安装新工作台需要在线目录。
 
 插件可以用同一个 ID 注册 `main` 主面板和 `sidebar.panellist` 侧栏入口，方便上架前在本地打开。把这个 ID 填入 `package.json` 的 `qingclaw.workbench.panelId`。已上架的插件如果只注册了主面板，官方目录也会为它补上侧栏入口。
 
@@ -46,7 +46,7 @@ kind: "package-reference"
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- 读取工作台 README 与安装工作台都需要已登录的青狮账号，私有 npm 不提供匿名读取。
+- 读取工作台 README 需要已登录的青狮账号；安装工作台还需要有效的专业版授权，私有 npm 不提供匿名读取，产品也按套餐限制安装。
 - 收藏保存在当前客户端的浏览器本地存储中。
 - 工作台包已经安装、主面板尚未就绪时，页面会显示「重启后打开」。
 

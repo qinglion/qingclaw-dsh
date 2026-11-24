@@ -8,7 +8,7 @@ import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS, HostObservable
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
 import type { NS, WorkbenchLocaleKey } from './locales.ts'
-import { needsSignIn, type WorkbenchPluginItem, type WorkbenchPluginStore } from './workbench-plugin-store.ts'
+import { needsPro, needsSignIn, type WorkbenchPluginItem, type WorkbenchPluginStore } from './workbench-plugin-store.ts'
 import { WorkbenchReadme } from './WorkbenchReadme.tsx'
 import css from './WorkbenchPage.module.css'
 
@@ -176,7 +176,7 @@ export function WorkbenchPage({ pluginStore, t, useLocale }: WorkbenchPageProps)
       await action()
       await load()
     } catch (error) {
-      setError(needsSignIn(error) ? 'signInRequired' : failure)
+      setError(needsSignIn(error) ? 'signInRequired' : needsPro(error) ? 'proRequired' : failure)
     } finally {
       if (installId) setInstalling(undefined)
     }

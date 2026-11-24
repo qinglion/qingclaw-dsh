@@ -37,6 +37,9 @@ const FAVORITES = 'qingclaw.workbench.favorites.v1'
 /** The failure code the Host reports when the private registry needs a signed-in account. */
 const SIGN_IN_REQUIRED = 'qingclaw-workbench/sign-in-required'
 
+/** The failure code the Host reports when an installation needs the professional licence. */
+const PRO_REQUIRED = 'qingclaw-workbench/pro-required'
+
 /** Keep the Host's failure code on the error so the UI can ask for a sign-in instead of a retry. */
 function remoteFailure(error: { readonly code: string; readonly message: string }): Error {
   return Object.assign(new Error(error.message), { code: error.code })
@@ -45,6 +48,11 @@ function remoteFailure(error: { readonly code: string; readonly message: string 
 /** Whether a failed workbench operation needs a signed-in QingClaw account. */
 export function needsSignIn(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === SIGN_IN_REQUIRED
+}
+
+/** Whether a refused installation needs the professional licence. */
+export function needsPro(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === PRO_REQUIRED
 }
 
 function readIds(storage: Storage, key: string): Set<string> {

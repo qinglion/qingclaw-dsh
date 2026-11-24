@@ -122,6 +122,15 @@ it('asks for a signed-in account when the private registry refuses the install o
   expect(await detail.findByText(zh.signInRequired)).toBeTruthy()
 })
 
+it('asks for the professional plan when the installation needs the licence', async () => {
+  const { store, page } = setup()
+  store.install.mockRejectedValueOnce(Object.assign(new Error('Pro'), { code: 'qingclaw-workbench/pro-required' }))
+  page()
+  const card = within(await screen.findByRole('article', { name: media.title }))
+  fireEvent.click(card.getByRole('button', { name: zh.install }))
+  expect((await screen.findByRole('alert')).textContent).toBe(zh.proRequired)
+})
+
 it('shows the workbench details and installs the exact selection from that page', async () => {
   const { page, store } = setup()
   page()

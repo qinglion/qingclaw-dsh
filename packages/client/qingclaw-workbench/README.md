@@ -25,7 +25,7 @@ Select a card to read its summary and the README for the listed version, when av
 <a id="use-this-package"></a>
 ## Use this package
 
-Include the Host plugin and its Client contribution in the product bundle. The Host reads `/workbenches/index.json` from `QINGCLAW_PLATFORM_ORIGIN`, which defaults to `https://qingclaw.com`. Each catalog entry identifies an exact `@qinglion` package version at `https://npm.qingclaw.com/` and its `panelId`. That private registry answers only a signed-in QingClaw account, so the Host exchanges the account's platform grant for a short-lived registry token and uses it to read a workbench's README and to install it through the native plugin manager, which reports the installed state. The token stays in the Host process; without a signed-in account, a README and an installation report that sign-in is required. Once the plugin registers that `main` panel, users can open it directly. Installed panels appear in the sidebar automatically. The native sidebar provides the pin controls. With caching enabled, a previously verified directory from the same website can restore installed panels when the client is offline. Installing a new package requires the online directory.
+Include the Host plugin and its Client contribution in the product bundle. The Host reads `/workbenches/index.json` from `QINGCLAW_PLATFORM_ORIGIN`, which defaults to `https://qingclaw.com`. Each catalog entry identifies an exact `@qinglion` package version at `https://npm.qingclaw.com/` and its `panelId`. That private registry answers only a signed-in QingClaw account, so the Host exchanges the account's platform grant for a short-lived registry token and uses it to read a workbench's README and to install it through the native plugin manager, which reports the installed state. The token stays in the Host process; without a signed-in account, a README and an installation report that sign-in is required. Installation additionally requires an active professional licence: a free account can browse the catalog and read details, and an installation reports that the professional plan is required. Once the plugin registers that `main` panel, users can open it directly. Installed panels appear in the sidebar automatically. The native sidebar provides the pin controls. With caching enabled, a previously verified directory from the same website can restore installed panels when the client is offline. Installing a new package requires the online directory.
 
 The plugin registers a `main` panel and a `sidebar.panellist` entry with the same ID so you can open it before publication. Set `qingclaw.workbench.panelId` in `package.json` to that ID. The official catalog also supplies the sidebar entry for listed plugins that only register a main panel.
 
@@ -46,7 +46,7 @@ None. Catalog and feed reads add no tokens to model requests.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Reading a workbench README and installing one require a signed-in QingClaw account, because the private registry answers no anonymous reads.
+- Reading a workbench README requires a signed-in QingClaw account, and installing one additionally requires an active professional licence, because the private registry answers no anonymous reads and the product gates installation by plan.
 - Favorites are saved in this client’s local browser storage.
 - A workbench displays “Restart to open” while its package is installed and its main panel is unavailable.
 

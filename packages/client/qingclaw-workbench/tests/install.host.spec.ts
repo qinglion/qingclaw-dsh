@@ -19,10 +19,14 @@ async function fixture(options: {
   install?: (spec: string, settings: unknown) => Promise<unknown>
   manager?: boolean
   entries?: WorkbenchCatalogEntry[]
+  plan?: 'pro' | 'free'
 } = {}) {
   const ctx = new Context()
   const installBundle = vi.fn(options.install ?? (async () => ({ application: 'applied', changed: true })))
-  ctx.provide('deepseekAccount', { getPlatformSession: async () => ({ origin: 'https://qingclaw.com', token: 'platform-token' }) })
+  ctx.provide('deepseekAccount', {
+    getPlatformSession: async () => ({ origin: 'https://qingclaw.com', token: 'platform-token' }),
+    getProfile: async () => ({ status: 'ready', value: { plan: options.plan ?? 'pro', subscriptionEndsAt: null } }),
+  })
   if (options.manager !== false) ctx.provide('pluginManager', { installBundle })
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (url) => {
     if (String(url).endsWith('/workbenches/index.json')) {
@@ -45,6 +49,18 @@ it('installs one listed version through the native manager with the account regi
       enabled: true, saveExact: true, registry: entry.registry,
       expected: { name: entry.packageName, version: entry.version }, authToken: 'registry-bearer',
     })
+  } finally { vi.unstubAllGlobals(); await ctx.fiber.dispose() }
+})
+
+it('lets a free account browse but refuses to install without the professional licence', async () => {
+  const { ctx, installBundle } = await fixture({ plan: 'free' })
+  try {
+    expect(await ctx.qingclawWorkbench.getWorkbenchCatalog(false)).toMatchObject({
+      entries: [expect.objectContaining({ packageName: entry.packageName })],
+    })
+    await expect(ctx.qingclawWorkbench.installWorkbench(entry.packageName, entry.version))
+      .rejects.toMatchObject({ code: 'qingclaw-workbench/pro-required' })
+    expect(installBundle).not.toHaveBeenCalled()
   } finally { vi.unstubAllGlobals(); await ctx.fiber.dispose() }
 })
 

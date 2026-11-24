@@ -68,6 +68,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'qingclaw-workbench/feed-unavailable': { readonly reason: 'network' | 'shutdown' }
     /** The private registry needs a signed-in QingClaw account for this read or installation. */
     'qingclaw-workbench/sign-in-required': Record<string, never>
+    /** Installing a workbench requires an active professional licence; browsing stays open. */
+    'qingclaw-workbench/pro-required': Record<string, never>
   }
 }
 
@@ -120,7 +122,13 @@ export default class QingClawWorkbench extends TypertRemoteService {
     const entry = await this.listedEntry(name, version)
     const manager = this.ctx.get('pluginManager') as BundleInstaller | undefined
     if (manager === undefined) throw new Error('当前运行环境不支持安装工作台。')
+    // Sign-in is checked first so a signed-out visitor is asked to sign in
+    // rather than told to upgrade; the free plan can browse but cannot install.
     const { token } = await this.registry.authorization(entry.registry)
+    const entitlement = await this.getEntitlement()
+    if (!entitlement.active) {
+      throw new RemoteError('qingclaw-workbench/pro-required', 'Installing a workbench requires the professional licence.', {})
+    }
     const leaf = entry.packageName.split('/')[1]
     const archive = new URL(`${entry.packageName}/-/${leaf}-${entry.version}.tgz`, entry.registry).href
     // The registry is pinned so a Host fallback registry never becomes the package transport.
