@@ -33,19 +33,19 @@ it.each(['npm','pnpm'])('discovers declared %s members while respecting exclusio
   expect((await detectPluginProjects(dir)).map(x => x.directory)).toEqual(['packages/one','packages/two'])
 })
 
-it('reads exact package versions and timestamps through the registry anonymous read contract without any account token', async () => {
+it('reads exact package versions and timestamps with the account registry token', async () => {
   const name = '@qinglion/dsh-media-desk'
   const fetch = vi.spyOn(globalThis, 'fetch')
   try {
     fetch.mockResolvedValueOnce(Response.json({ name, versions: { '2.0.0': {}, '2.7.2': {} }, time: { '2.7.2': '2026-11-19T00:00:00Z' } }))
-    expect(await readRegistryHistory(name, new AbortController().signal)).toEqual([
+    expect(await readRegistryHistory(name, new AbortController().signal, 'read-token')).toEqual([
       { version: '2.7.2', published_at: '2026-11-19T00:00:00.000Z' }, { version: '2.0.0', published_at: null },
     ])
     expect(fetch.mock.calls[0]?.[0]?.toString()).toBe('https://npm.qingclaw.com/%40qinglion%2Fdsh-media-desk')
-    expect(fetch.mock.calls[0]?.[1]?.headers).toEqual({ accept: 'application/json' })
+    expect(fetch.mock.calls[0]?.[1]?.headers).toEqual({ accept: 'application/json', authorization: 'Bearer read-token' })
     fetch.mockResolvedValueOnce(new Response(null, { status: 403 }))
-    await expect(readRegistryHistory(name, new AbortController().signal)).rejects.toThrow('registry_unavailable')
+    await expect(readRegistryHistory(name, new AbortController().signal, 'read-token')).rejects.toThrow('registry_unavailable')
     fetch.mockResolvedValueOnce(new Response(null, { status: 404 }))
-    expect(await readRegistryHistory(name, new AbortController().signal)).toEqual([])
+    expect(await readRegistryHistory(name, new AbortController().signal, 'read-token')).toEqual([])
   } finally { fetch.mockRestore() }
 })

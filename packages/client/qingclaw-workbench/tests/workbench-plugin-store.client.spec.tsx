@@ -2,7 +2,11 @@
 import { Context } from '@deepseek-ai/cordis'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { expect, it, vi } from 'vitest'
-import { createWorkbenchPluginStore } from '../src/client/workbench-plugin-store.ts'
+import { createWorkbenchPluginStore, needsSignIn } from '../src/client/workbench-plugin-store.ts'
+import type { WorkbenchInstallResult } from '../src/types.ts'
+
+/** One Host answer as the Remote boundary delivers it. */
+type Answer<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
 
 it('installs the exact private package, opens a registered panel, and restores favorites and launchers on reload', async () => {
   const ctx = new Context()
@@ -11,13 +15,16 @@ it('installs the exact private package, opens a registered panel, and restores f
     description: '创作', category: '工具', author: 'QingClaw', registry: 'https://npm.qingclaw.com/' }
   let installed = false
   let installedVersion = entry.version
-  const installBundle = vi.fn(async () => { installed = true; return { ok: true, value: { application: 'applied' } } })
+  const installWorkbench = vi.fn(async (): Promise<Answer<WorkbenchInstallResult>> => {
+    installed = true
+    return { ok: true, value: { application: 'applied' } }
+  })
   let offline = false
   const getWorkbenchCatalog = vi.fn(async () => ({ ok: true, value: { entries: [entry], stale: offline } }))
-  const getWorkbenchReadme = vi.fn(async () => ({ ok: true, value: 'private registry document' }))
+  const getWorkbenchReadme = vi.fn(async (): Promise<Answer<string>> => ({ ok: true, value: 'private registry document' }))
   const readBundleDetail = vi.fn(async () => ({ ok: true, value: { status: 'found', path: 'README.md', markdown: 'installed document' } }))
-  ctx.provide('remote', { $on: () => () => {}, qingclawWorkbench: { getWorkbenchCatalog, getWorkbenchReadme }, pluginManager: {
-    installBundle, readBundleDetail, listBundles: async () => ({ ok: true, value: installed ? [{ name: entry.packageName, version: installedVersion, installed: true, availability: 'profile' }] : [] }),
+  ctx.provide('remote', { $on: () => () => {}, qingclawWorkbench: { getWorkbenchCatalog, getWorkbenchReadme, installWorkbench }, pluginManager: {
+    readBundleDetail, listBundles: async () => ({ ok: true, value: installed ? [{ name: entry.packageName, version: installedVersion, installed: true, availability: 'profile' }] : [] }),
   } } as never)
   const selectPanel = vi.fn()
   ctx.provide('layout', { selectPanel } as never)
@@ -28,18 +35,27 @@ it('installs the exact private package, opens a registered panel, and restores f
   try {
     expect((await store.load())[0]).toMatchObject({ installed: false, openable: false })
     await expect(store.install('dsh-native-workbench')).rejects.toThrow()
-    expect(installBundle).not.toHaveBeenCalled()
+    expect(installWorkbench).not.toHaveBeenCalled()
     expect(await store.readReadme(entry.packageName, entry.version, 'zh')).toEqual({ markdown: 'private registry document' })
     expect(getWorkbenchReadme).toHaveBeenCalledWith(entry.packageName, entry.version, 'zh')
     await expect(store.readReadme(entry.packageName, '0.0.1', 'zh')).rejects.toThrow()
     offline = true
     expect((await store.load())[0]?.installable).toBe(false)
     await expect(store.install(entry.packageName)).rejects.toThrow('请联网')
-    expect(installBundle).not.toHaveBeenCalled()
+    expect(installWorkbench).not.toHaveBeenCalled()
     offline = false
+    // The Host reports a missing sign-in, and the store keeps the code for the UI to act on.
+    installWorkbench.mockResolvedValueOnce({ ok: false, error: { code: 'qingclaw-workbench/sign-in-required', message: 'Sign in' } })
+    const refused = await store.install(entry.packageName).catch((error: unknown) => error)
+    expect(needsSignIn(refused)).toBe(true)
+    expect(needsSignIn(new Error('other'))).toBe(false)
+    getWorkbenchReadme.mockResolvedValueOnce({ ok: false, error: { code: 'qingclaw-workbench/sign-in-required', message: 'Sign in' } })
+    const unreadable = await store.readReadme(entry.packageName, entry.version, 'zh').catch((error: unknown) => error)
+    expect(needsSignIn(unreadable)).toBe(true)
+    installWorkbench.mockResolvedValueOnce({ ok: true, value: { application: 'failed', diagnostic: '私服拒绝安装' } })
+    await expect(store.install(entry.packageName)).rejects.toThrow('私服拒绝安装')
     await store.install(entry.packageName)
-    expect(installBundle).toHaveBeenCalledWith('https://npm.qingclaw.com/@qinglion/dsh-media-desk/-/dsh-media-desk-2.7.2.tgz',
-      expect.objectContaining({ expected: { name: entry.packageName, version: '2.7.2' }, enabled: true }))
+    expect(installWorkbench).toHaveBeenLastCalledWith(entry.packageName, entry.version)
     expect(await store.readReadme(entry.packageName, entry.version, 'zh')).toMatchObject({ markdown: 'installed document' })
     expect(readBundleDetail).toHaveBeenCalledWith(entry.packageName, 'zh', { npmFileSources: [] })
     installedVersion = '2.6.0'

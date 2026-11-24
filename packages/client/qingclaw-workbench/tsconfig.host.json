@@ -9,6 +9,7 @@
     "src/feed.ts",
     "src/catalog.ts",
     "src/readme.ts",
+    "src/registry-auth.ts",
     "src/index.ts",
     "src/types.ts"
   ],

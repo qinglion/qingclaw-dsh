@@ -108,6 +108,20 @@ it('opens installed workbenches offline and explains why new installs are disabl
   expect(store.open).toHaveBeenCalledWith(notes.id)
 })
 
+it('asks for a signed-in account when the private registry refuses the install or the documentation', async () => {
+  const { store, page } = setup()
+  store.install.mockRejectedValueOnce(Object.assign(new Error('Sign in'), { code: 'qingclaw-workbench/sign-in-required' }))
+  page()
+  const card = within(await screen.findByRole('article', { name: media.title }))
+  fireEvent.click(card.getByRole('button', { name: zh.install }))
+  expect((await screen.findByRole('alert')).textContent).toBe(zh.signInRequired)
+
+  store.readReadme.mockRejectedValueOnce(Object.assign(new Error('Sign in'), { code: 'qingclaw-workbench/sign-in-required' }))
+  fireEvent.click(card.getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  expect(await detail.findByText(zh.signInRequired)).toBeTruthy()
+})
+
 it('shows the workbench details and installs the exact selection from that page', async () => {
   const { page, store } = setup()
   page()

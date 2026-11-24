@@ -86,12 +86,31 @@ export async function detectPluginProjects(path: string): Promise<PluginProject[
   return projects
 }
 
+/** The Host service that exchanges the signed-in account for a private-registry read token. */
+interface RegistryAuthorizationReader {
+  registryAuthorization(registry: string): Promise<{ readonly token: string }>
+}
+
+/** The QingClaw private registry the product publishes to and reads from. */
+const REGISTRY = 'https://npm.qingclaw.com/'
+
+/**
+ * Ask the Host for the signed-in account's token that reads the private registry.
+ * @param ctx - Host context that provides the workbench service owning the exchange.
+ * @returns the bearer token.
+ */
+async function registryToken(ctx: Context): Promise<string> {
+  const access = ctx.get('qingclawWorkbench') as RegistryAuthorizationReader | undefined
+  if (!access) throw new Error('registry_unavailable')
+  return (await access.registryAuthorization(REGISTRY)).token
+}
+
 /** Read only version metadata exposed for this exact package by the QingClaw registry. */
-export async function readRegistryHistory(name: string, signal: AbortSignal): Promise<CreatorVersion[]> {
+export async function readRegistryHistory(name: string, signal: AbortSignal, token: string): Promise<CreatorVersion[]> {
   if (!/^@qinglion\/[a-z0-9][a-z0-9._~-]*$/.test(name)) return []
-  const registry = 'https://npm.qingclaw.com/'
-  const response = await fetch(new URL(encodeURIComponent(name), registry), {
-    headers: { accept: 'application/json' }, redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+  const response = await fetch(new URL(encodeURIComponent(name), REGISTRY), {
+    headers: { accept: 'application/json', authorization: 'Bearer ' + token }, redirect: 'error',
+    signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
   })
   if (response.status === 404) return []
   if (!response.ok) throw new Error('registry_unavailable')
@@ -142,7 +161,7 @@ export function registerProjectRoutes(ctx: Context, canReadProjects = createProj
       if (name === null) return Response.json({ projects }, { headers })
       if (!projects.some(project => project.name === name)) return Response.json({ error: 'project_not_found' }, { status: 404 })
       try {
-        return Response.json({ versions: await readRegistryHistory(name, request.signal) }, { headers })
+        return Response.json({ versions: await readRegistryHistory(name, request.signal, await registryToken(ctx)) }, { headers })
       } catch {
         return Response.json({ error: 'registry_unavailable' }, { status: 502 })
       }

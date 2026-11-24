@@ -9,13 +9,30 @@ import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typer
 import {
   fetchOfficialFeed, parseCacheRecord, serializeCacheRecord, type WorkbenchCacheRecord,
 } from './feed.ts'
-import type { ProEntitlement, WorkbenchCatalogResult, WorkbenchFeedResult } from './types.ts'
+import type {
+  ProEntitlement, WorkbenchCatalogEntry, WorkbenchCatalogResult, WorkbenchFeedResult, WorkbenchInstallResult,
+} from './types.ts'
 import { readRegistryReadme } from './readme.ts'
-import { WorkbenchDirectory } from './catalog.ts'
+import { OFFICIAL_REGISTRY, WorkbenchDirectory } from './catalog.ts'
+import { WorkbenchRegistryAccess, type RegistryAuthorization } from './registry-auth.ts'
 
 export type * from './types.ts'
 
 const DEFAULT_FEED_URL = 'https://qingclaw.com/api/workbench-feed'
+
+/** Minimal native installer the workbench host installs a listed package through. */
+interface BundleInstaller {
+  installBundle(spec: string, options: {
+    enabled: boolean
+    saveExact: boolean
+    registry: string
+    expected: { readonly name: string; readonly version: string }
+    authToken: string
+  }): Promise<{
+    application: WorkbenchInstallResult['application']
+    error?: { code?: string; diagnostic?: string }
+  }>
+}
 
 /** Minimal account reader used for the professional entitlement gate. */
 interface AccountProfileReader {
@@ -29,6 +46,8 @@ interface AccountProfileReader {
 /** Host settings for the public feed boundary and optional durable cache. */
 export interface Config {
   readonly feedUrl: string
+  /** Private registry every catalog entry must name; deployment-specific, defaults to the official one. */
+  readonly registry: string
   /** Absolute owner-private cache file; omission keeps only the process-local last good value. */
   readonly cacheFile?: string
   readonly cacheTtlMs: number
@@ -47,6 +66,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** Public content is unavailable and no last-good cache can be shown. */
     'qingclaw-workbench/feed-unavailable': { readonly reason: 'network' | 'shutdown' }
+    /** The private registry needs a signed-in QingClaw account for this read or installation. */
+    'qingclaw-workbench/sign-in-required': Record<string, never>
   }
 }
 
@@ -54,6 +75,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 export default class QingClawWorkbench extends TypertRemoteService {
   static Config = z.object({
     feedUrl: z.string().default(DEFAULT_FEED_URL),
+    registry: z.string().default(OFFICIAL_REGISTRY),
     cacheFile: z.string(),
     cacheTtlMs: z.number().step(1).min(0).max(2_147_483_647).default(5 * 60 * 1000),
     fetchTimeoutMs: z.number().step(1).min(1).max(2_147_483_647).default(8_000),
@@ -67,6 +89,7 @@ export default class QingClawWorkbench extends TypertRemoteService {
   private lastGood: WorkbenchCacheRecord | undefined
   private pending: Promise<WorkbenchFeedResult> | undefined
   private readonly directory: WorkbenchDirectory
+  private readonly registry: WorkbenchRegistryAccess
 
   /** Fetch the public directory of desktop-compatible workbenches. */
   @Remote
@@ -79,10 +102,51 @@ export default class QingClawWorkbench extends TypertRemoteService {
   @Remote
   async getWorkbenchReadme(name: string, version: string, language: string): Promise<string | null> {
     this.assertOpen()
+    const entry = await this.listedEntry(name, version)
+    const { token } = await this.registry.authorization(entry.registry)
+    return readRegistryReadme(entry, language, this.lifetime.signal, token)
+  }
+
+  /**
+   * Install one listed version from the private registry for the signed-in account.
+   * The registry token is obtained here so that it never leaves the Host process.
+   * @param name - the catalog package name.
+   * @param version - the exact listed version.
+   * @returns the installation outcome the product UI reports.
+   */
+  @Remote
+  async installWorkbench(name: string, version: string): Promise<WorkbenchInstallResult> {
+    this.assertOpen()
+    const entry = await this.listedEntry(name, version)
+    const manager = this.ctx.get('pluginManager') as BundleInstaller | undefined
+    if (manager === undefined) throw new Error('当前运行环境不支持安装工作台。')
+    const { token } = await this.registry.authorization(entry.registry)
+    const leaf = entry.packageName.split('/')[1]
+    const archive = new URL(`${entry.packageName}/-/${leaf}-${entry.version}.tgz`, entry.registry).href
+    // The registry is pinned so a Host fallback registry never becomes the package transport.
+    const result = await manager.installBundle(archive, { enabled: true, saveExact: true,
+      registry: entry.registry, expected: { name, version }, authToken: token })
+    const diagnostic = result.error?.diagnostic ?? result.error?.code
+    return { application: result.application, ...diagnostic === undefined ? {} : { diagnostic } }
+  }
+
+  /**
+   * The registry token that authorizes private reads for the signed-in account.
+   * Host-only support for the product's other plugins; it has no Remote surface,
+   * so the token never reaches the browser.
+   * @param registry - the registry URL the caller reads.
+   * @returns the bearer token and its expiry.
+   */
+  registryAuthorization(registry: string): Promise<RegistryAuthorization> {
+    return this.registry.authorization(registry)
+  }
+
+  /** The catalog entry that names one exact listed version. */
+  private async listedEntry(name: string, version: string): Promise<WorkbenchCatalogEntry> {
     const { entries } = await this.directory.get(false)
     const entry = entries.find(item => item.packageName === name && item.version === version)
     if (!entry) throw new Error('Unknown workbench version')
-    return readRegistryReadme(entry, language, this.lifetime.signal)
+    return entry
   }
 
   /** @param ctx - Host context supplying logging and effect ownership. @param config - validated plugin settings. */
@@ -90,7 +154,9 @@ export default class QingClawWorkbench extends TypertRemoteService {
     super(ctx, 'qingclawWorkbench')
     this.feedUrl = publicHttpUrl(config.feedUrl)
     const origin = publicHttpUrl(process.env.QINGCLAW_PLATFORM_ORIGIN || 'https://qingclaw.com')
-    this.directory = new WorkbenchDirectory(new URL('/workbenches/index.json', origin), config, this.lifetime.signal)
+    this.directory = new WorkbenchDirectory(new URL('/workbenches/index.json', origin),
+      { ...config, registry: registryUrl(config.registry) }, this.lifetime.signal)
+    this.registry = new WorkbenchRegistryAccess(ctx, this.lifetime.signal)
     if (config.cacheFile !== undefined && !isAbsolute(config.cacheFile)) {
       throw new Error('qingclaw-workbench: cacheFile must be absolute')
     }
@@ -200,15 +266,24 @@ export default class QingClawWorkbench extends TypertRemoteService {
   }
 }
 
-function publicHttpUrl(value: string): URL {
+function publicHttpUrl(value: string, name = 'feedUrl'): URL {
   const url = new URL(value)
   if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.hostname === '') {
-    throw new Error('qingclaw-workbench: feedUrl must be an HTTP(S) URL')
+    throw new Error(`qingclaw-workbench: ${name} must be an HTTP(S) URL`)
   }
   if (url.username !== '' || url.password !== '') {
-    throw new Error('qingclaw-workbench: feedUrl must not contain credentials')
+    throw new Error(`qingclaw-workbench: ${name} must not contain credentials`)
   }
   return url
+}
+
+/** Read one deployment's private registry URL, which catalog entries and reads must share. */
+function registryUrl(value: string): string {
+  const address = publicHttpUrl(value, 'registry')
+  if (address.search !== '' || address.hash !== '') {
+    throw new Error('qingclaw-workbench: registry must not carry a query or a fragment')
+  }
+  return address.pathname.endsWith('/') ? address.href : address.href + '/'
 }
 
 function unavailable(reason: 'network' | 'shutdown', cause?: unknown): RemoteError {

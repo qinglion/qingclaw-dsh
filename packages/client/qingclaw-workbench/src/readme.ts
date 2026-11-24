@@ -71,13 +71,24 @@ function selectDocument(files: ReadonlyMap<string, Buffer | null>, language: str
   return markdown?.replace(/^\uFEFF/u, '').replace(/^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/u, '') ?? null
 }
 
-/** Read the exact reviewed version from the catalog's validated private registry. */
-export async function readRegistryReadme(entry: WorkbenchCatalogEntry, language: string, lifetime: AbortSignal): Promise<string | null> {
+/**
+ * Read the exact reviewed version from the catalog's validated private registry.
+ * @param entry - the catalog entry whose archive is read.
+ * @param language - the requested locale, or a more specific one it falls back from.
+ * @param lifetime - ends the download with its owner.
+ * @param token - the account's bearer token for that registry.
+ * @returns the localized document, or the package README when the archive declares neither.
+ */
+export async function readRegistryReadme(
+  entry: WorkbenchCatalogEntry, language: string, lifetime: AbortSignal, token: string,
+): Promise<string | null> {
   if (!/^[a-z]{2,8}(?:-[a-z0-9]{1,8})*$/iu.test(language) || language.length > 64) throw new Error('Invalid workbench locale')
   const signal = AbortSignal.any([lifetime, AbortSignal.timeout(ARCHIVE_DOWNLOAD_TIMEOUT_MS)])
   const leaf = entry.packageName.split('/')[1]
   const url = new URL(`${entry.packageName}/-/${leaf}-${entry.version}.tgz`, entry.registry)
-  const response = await fetch(url, { signal, redirect: 'error', credentials: 'omit' })
+  const response = await fetch(url, {
+    signal, redirect: 'error', credentials: 'omit', headers: { authorization: 'Bearer ' + token },
+  })
   if (!response.ok) throw new Error('Workbench archive HTTP ' + response.status)
   const source = await documentationFiles(await readBoundedBody(response, 25 * 1024 * 1024), entry)
   signal.throwIfAborted()

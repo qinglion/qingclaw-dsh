@@ -46,6 +46,8 @@ async function fixture() {
       expect(JSON.parse(String(init.body))).toMatchObject({ password, name: target.account })
       return Response.json({ token: 'test-bearer' })
     }
+    // The version check reads the private registry with the account's token.
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer test-bearer')
     return known ? Response.json({ name: manifest.name, versions: { '1.0.0': { dist: { integrity: known } } } })
       : new Response(null, { status: 404 })
   })

@@ -34,6 +34,19 @@ export interface WorkbenchPluginStore {
 
 const FAVORITES = 'qingclaw.workbench.favorites.v1'
 
+/** The failure code the Host reports when the private registry needs a signed-in account. */
+const SIGN_IN_REQUIRED = 'qingclaw-workbench/sign-in-required'
+
+/** Keep the Host's failure code on the error so the UI can ask for a sign-in instead of a retry. */
+function remoteFailure(error: { readonly code: string; readonly message: string }): Error {
+  return Object.assign(new Error(error.message), { code: error.code })
+}
+
+/** Whether a failed workbench operation needs a signed-in QingClaw account. */
+export function needsSignIn(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === SIGN_IN_REQUIRED
+}
+
 function readIds(storage: Storage, key: string): Set<string> {
   try {
     const value: unknown = JSON.parse(storage.getItem(key) ?? '[]')
@@ -122,16 +135,11 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       const entry = find(id)
       if (installed.has(id)) return
       if (offline) throw new Error('请联网刷新工作台目录后安装')
-      // Pin the package transport to Verdaccio even if the Host has a fallback
-      // registry for dependencies. Native installation verifies the manifest.
-      const leaf = entry.packageName.split('/')[1]
-      const archive = new URL(`${entry.packageName}/-/${leaf}-${entry.version}.tgz`, entry.registry).href
-      const result = await ctx.remote.pluginManager.installBundle(archive, {
-        registry: entry.registry, enabled: true, saveExact: true, expected: { name: id, version: entry.version },
-      })
-      if (!result.ok) throw new Error(result.error.message)
+      // The Host authorizes the private registry read, so the registry token never reaches the browser.
+      const result = await ctx.remote.qingclawWorkbench.installWorkbench(entry.packageName, entry.version)
+      if (!result.ok) throw remoteFailure(result.error)
       if (result.value.application === 'failed' || result.value.application === 'cancelled' || result.value.application === 'overridden') {
-        throw new Error(result.value.error?.diagnostic ?? result.value.error?.code ?? result.value.application)
+        throw new Error(result.value.diagnostic ?? result.value.application)
       }
       if (result.value.application === 'restart-required') restartRequired.add(id)
       await load()
@@ -164,7 +172,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       if (entry.version !== version) throw new Error('工作台版本已变更')
       if (installed.get(id) === version) {
         const answer = await ctx.remote.pluginManager.readBundleDetail(id, language, { npmFileSources: [] })
-        if (!answer.ok) throw new Error(answer.error.message)
+        if (!answer.ok) throw remoteFailure(answer.error)
         if (answer.value.status !== 'found') return null
         const { markdown, path } = answer.value
         return { markdown, resolveImage(destination) {
@@ -174,7 +182,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
         } }
       }
       const answer = await ctx.remote.qingclawWorkbench.getWorkbenchReadme(id, version, language)
-      if (!answer.ok) throw new Error(answer.error.message)
+      if (!answer.ok) throw remoteFailure(answer.error)
       return answer.value === null ? null : { markdown: answer.value }
     },
     open(id) {

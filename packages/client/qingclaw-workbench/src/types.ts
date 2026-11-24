@@ -62,6 +62,13 @@ export interface WorkbenchCatalogEntry {
   readonly repositoryUrl?: string
 }
 
+/** What the Host reported for a workbench installation the browser requested. */
+export interface WorkbenchInstallResult {
+  readonly application: 'applied' | 'restart-required' | 'overridden' | 'failed' | 'cancelled'
+  /** Why the installation ended without applying, when the Host reported a reason. */
+  readonly diagnostic?: string
+}
+
 /** Entries may be shown offline. New installation requires a successful refresh. */
 export interface WorkbenchCatalogResult {
   readonly entries: WorkbenchCatalogEntry[]

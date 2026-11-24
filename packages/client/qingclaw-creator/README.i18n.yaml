@@ -2,12 +2,18 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/qingclaw-creator/README.md
+/:
+  en: 6ea5110839f75a98
+  zh: 2df46401dfad1ede
 /qingclaw-creator-center:
   en: ae55d0e94a16ab06
   zh: 5e37bda11e3c4ea0
 /qingclaw-creator-center/summary:
   en: 72b26cab6e6f73c3
   zh: 1136610f20795f0c
+/qingclaw-creator-center/table-of-contents:
+  en: b4683d2a53256fda
+  zh: 705ecbe0b6cabec6
 /qingclaw-creator-center/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -18,8 +24,14 @@
   en: 778a5610827134bc
   zh: dd035a83db72d7ea
 /qingclaw-creator-center/model-experience/publishing-a-package/token-effect:
-  en: 3734a40b7484ba6b
-  zh: 71175aba76c41c86
+  en: 9d4645d6c75986ae
+  zh: cd6f0efd7fcc8717
 /qingclaw-creator-center/model-experience/publishing-a-package/kv-cache-effect:
   en: 3978e64f94d308b2
   zh: e9e304671cd1b202
+/qingclaw-creator-center/known-limitations-and-deferred-work:
+  en: c125f9652ef0d751
+  zh: f0e6fb1ec158c989
+/qingclaw-creator-center/known-limitations-and-deferred-work/dev-note:
+  en: fcf857fcee37f087
+  zh: 730834d2149a3d3a

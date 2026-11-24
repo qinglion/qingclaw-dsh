@@ -75,6 +75,20 @@ export function registryPlan(requested: Registry | undefined, configured: Plugin
   return [normalizedFirst, ...known.filter((_registry, index) => keys[index] !== firstKey)]
 }
 
+/**
+ * The environment entries that let one pnpm run read an authenticated registry.
+ *
+ * pnpm reads `npm_config_` environment entries as configuration, so a host-scoped `_authToken` authorizes both
+ * packument requests and tarball downloads. The token reaches no command line, install log, or profile file.
+ * @param registry - the registry the run asks.
+ * @param token - the caller's short-lived bearer token.
+ * @returns the entries to add to the run's environment; none without a token or a named registry.
+ */
+export function registryAuthEnvironment(registry: Registry, token: string | undefined): Record<string, string> {
+  if (registry === null || token === undefined) return {}
+  return { [`npm_config_//${new URL(registry).host}/:_authToken`]: token }
+}
+
 /** The failures after which another registry can answer differently: this one was unreachable, or its copy may be stale. */
 const NEXT_REGISTRY_KINDS: ReadonlySet<PluginInstallFailureKind> = new Set(['network', 'timeout', 'not-found', 'no-matching-version'])
 

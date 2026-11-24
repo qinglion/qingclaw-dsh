@@ -19,6 +19,16 @@ it('accepts scoped, pinned workbench packages and resolves only same-origin prev
   expect(() => parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [entry, entry] }, url)).toThrow()
 })
 
+it('accepts only the registry this deployment configures, with or without its trailing slash', () => {
+  const local = { ...entry, registry: 'http://127.0.0.1:4873/' }
+  expect(parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [local] }, url, 'http://127.0.0.1:4873/')[0]?.registry)
+    .toBe('http://127.0.0.1:4873/')
+  expect(parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [local] }, url, 'http://127.0.0.1:4873')[0]?.packageName)
+    .toBe('@qinglion/dsh-media-desk')
+  expect(() => parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [local] }, url)).toThrow()
+  expect(() => parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [entry] }, url, 'http://127.0.0.1:4873/')).toThrow()
+})
+
 it('reopens verified catalog entries after an offline restart, rejects another source or a corrupted cache', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'qingclaw-directory-'))
   const options = { cacheFile: join(dir, 'feed.json'), cacheTtlMs: 0, maxResponseBytes: 64_000, fetchTimeoutMs: 2000 }

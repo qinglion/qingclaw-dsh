@@ -53,6 +53,7 @@ async function service(cacheFile: string | undefined, overrides: Partial<Config>
   vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
   const config: Config = {
     feedUrl: 'https://qingclaw.com/api/workbench-feed',
+    registry: 'https://npm.qingclaw.com/',
     cacheTtlMs: 300_000,
     fetchTimeoutMs: 1_000,
     maxResponseBytes: 64 * 1024,

@@ -9,9 +9,13 @@ import { detectPluginProjects } from './project.ts'
 
 const accountChanged = '青狮账号已更改，请从当前会话重新发起发布。'
 
-async function publishedIntegrity(target: PublishTarget, signal: AbortSignal, registryUrl: string): Promise<string | undefined> {
+async function publishedIntegrity(
+  target: PublishTarget, signal: AbortSignal, registryUrl: string, token: string,
+): Promise<string | undefined> {
+  // The private registry answers reads only a signed-in account; the publish login
+  // already produced the token this check uses.
   const response = await fetch(new URL(encodeURIComponent(target.packageName), registryUrl), {
-    headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+    headers: { accept: 'application/json', 'cache-control': 'no-cache', authorization: 'Bearer ' + token },
     redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
   })
   if (response.status === 404) return
@@ -62,15 +66,7 @@ export async function publishPackage(
       || (grant.registry !== registryUrl && grant.registry !== registryUrl.slice(0, -1))
       || !(Date.parse(grant.expires_at ?? '') > Date.now())) throw new Error('青狮发布授权无效或已到期。')
 
-  const inspectVersion = async () => {
-    const known = await publishedIntegrity(target, signal, registryUrl)
-    if (known && known !== prepared.integrity) throw new Error('该版本已被其他内容占用，请更新版本号后重新打包。')
-    return known
-  }
-  const result = { packageName: target.packageName, version: target.version, integrity: prepared.integrity }
-  const alreadyPublished = await inspectVersion()
-  await verifyAccount()
-  if (alreadyPublished) return { ...result, status: 'already_published' }
+  // Log in first: the same token authorizes the version check that follows.
   const login = await fetch(new URL('-/user/org.couchdb.user:' + grant.username, registryUrl), {
     method: 'PUT', redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
     headers: { 'content-type': 'application/json', accept: 'application/json' },
@@ -78,10 +74,20 @@ export async function publishPackage(
   })
   if (!login.ok) throw new Error('青狮 npm 暂未接受本次发布授权，请稍后重试。')
   const auth = await login.json() as { token?: unknown }
-  if (typeof auth.token !== 'string' || !auth.token || auth.token.length > 16384 || /\s/.test(auth.token)) {
+  const token = auth.token
+  if (typeof token !== 'string' || !token || token.length > 16384 || /\s/.test(token)) {
     throw new Error('青狮 npm 返回的令牌无效。')
   }
   await verifyAccount()
+  const inspectVersion = async () => {
+    const known = await publishedIntegrity(target, signal, registryUrl, token)
+    if (known && known !== prepared.integrity) throw new Error('该版本已被其他内容占用，请更新版本号后重新打包。')
+    return known
+  }
+  const result = { packageName: target.packageName, version: target.version, integrity: prepared.integrity }
+  const alreadyPublished = await inspectVersion()
+  await verifyAccount()
+  if (alreadyPublished) return { ...result, status: 'already_published' }
   const endpoint = new URL(registryUrl)
   const transport = endpoint.protocol === 'https:' ? new HttpsAgent() : new HttpAgent()
   const abortUpload = () => transport.destroy()
@@ -91,7 +97,7 @@ export async function publishPackage(
     // Options are assembled here. The workspace's .npmrc, hooks and environment
     // never receive these credentials. Redirects may not forward them off-origin.
     await publish({ ...prepared.manifest, tag: prepared.tag }, prepared.bytes, {
-      registry: registryUrl, ['//' + new URL(registryUrl).host + '/:_authToken']: auth.token,
+      registry: registryUrl, ['//' + new URL(registryUrl).host + '/:_authToken']: token,
       access: (prepared.manifest.publishConfig as { access?: string } | undefined)?.access === 'restricted' ? 'restricted' : 'public',
       // npm-registry-fetch does not forward redirect/signal options; bind the transport itself.
       agent: (url: URL) => {
