@@ -20,7 +20,11 @@ function addCommas(value: string): string {
   return `${Number(integer).toLocaleString()}.${fraction}`
 }
 
-/** Show whole credits in the account, composer and sidebar; the gateway still reports fractions. */
+/**
+ * Show whole credits in the account, composer and sidebar; the gateway still reports fractions.
+ * @param value - gateway credit balance, possibly fractional.
+ * @returns grouped whole credits.
+ */
 export function formatCredits(value: number): string {
   return Math.round(value).toLocaleString()
 }

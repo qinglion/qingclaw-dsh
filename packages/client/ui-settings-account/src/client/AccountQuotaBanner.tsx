@@ -18,23 +18,23 @@ type AccountQuotaBannerProps = PropsRuntime<'conversation.input.dock'>
   & PropsLocale<'settings.account'>
   & InjectFace<AccountQuotaBannerInjected>
 
-/** Show a red-ish banner only when the wallet is empty, the subscription lapsed, or quota is low. */
+/**
+ * Show a credit warning beside the composer when the balance is empty or has
+ * reached 5% of the credits granted since the last recharge. A licence grants no
+ * credits, so every account, free or paid, is pointed at a top-up.
+ */
 export function AccountQuotaBanner({ useAccount, usePlatformPage, openPlatformPage, t }: AccountQuotaBannerProps) {
   const profile = useAccount(snapshot => snapshot.details?.profile)
   const topUpUrl = useAccount(snapshot => snapshot.view?.links.topUpUrl)
   const page = usePlatformPage(current => current)
   if (profile?.status !== 'ready' || page !== null) return null
-  const { quotaRemaining: remaining, quotaTotal: total, subscriptionActive, plan } = profile.value
+  const { quotaRemaining: remaining, quotaTotal: total } = profile.value
   if (remaining == null) return null
-  const expired = subscriptionActive === false && plan != null && plan !== 'free'
   const low = total != null && total > 0 && remaining <= total * 0.05
-  if (remaining > 0 && !expired && !low) return null
-
   const text = remaining <= 0
     ? t('quotaBannerEmpty')
-    : expired
-      ? `${t('quotaBannerExpired')} ${formatCredits(remaining)}`
-      : `${t('quotaBannerLow')} ${formatCredits(remaining)}`
+    : low ? `${t('quotaBannerLow')} ${formatCredits(remaining)}` : null
+  if (text === null) return null
   const openTopUp = () => {
     if (openPlatformPage !== undefined) {
       openPlatformPage('top-up', () => undefined)

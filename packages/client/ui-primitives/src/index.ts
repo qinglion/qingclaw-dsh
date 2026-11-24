@@ -54,7 +54,7 @@ export type { ConnectionIndicatorState } from './ConnectionIndicator.tsx'
 export { FishLogo, FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from './FishLogo.tsx'
 export { BrandWordmark } from './BrandWordmark.tsx'
 export type { BrandWordmarkProps } from './BrandWordmark.tsx'
-export { QingClawMark, QINGCLAW_MARK_VIEWBOX } from './QingClawMark.tsx'
+export { QingClawMark, QINGCLAW_MARK_INK, QINGCLAW_MARK_VIEWBOX } from './QingClawMark.tsx'
 export type { QingClawMarkProps } from './QingClawMark.tsx'
 export {
   PermissionIconAutoReviewMedium, PermissionIconAutoReviewRegular,

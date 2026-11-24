@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AccountProfile } from '@deepseek-ai/dsh-deepseek-account/types'
-import { Menu, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Menu, MenuItemButton, QINGCLAW_MARK_INK, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSnapshot } from './AccountSection.tsx'
 import type { PlatformPages } from './platform-pages.ts'
@@ -42,10 +42,8 @@ function QuotaMenu({ wallet, usageUrl, wide, t, refreshAccount, openPlatformPage
   const percent = quotaPercent(wallet.quotaRemaining, wallet.quotaTotal)
   const unknown = t('quotaUnknown')
   const label = `${t('quotaRemaining')} · ${percent === undefined ? unknown : `${percent}%`}`
+  // A licence grants no credits: the balance is the trial grant plus top-ups.
   const sources: string[] = []
-  if (wallet.plan) {
-    sources.push(t('quotaPlan', { plan: wallet.plan.charAt(0).toUpperCase() + wallet.plan.slice(1) }))
-  }
   if (wallet.trialTokens && wallet.trialTokens > 0) sources.push(t('quotaTrial'))
   if (wallet.topupTokens && wallet.topupTokens > 0) sources.push(t('quotaPurchased'))
   return <Menu open={open} side="top" align="end" portal autoFocus listClassName={css.popover}
@@ -56,22 +54,24 @@ function QuotaMenu({ wallet, usageUrl, wide, t, refreshAccount, openPlatformPage
           setOpen(!open)
           if (!open) void refreshAccount().catch(() => undefined)
         }}>
-        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle className={css.track} cx="12" cy="12" r="8.5" strokeWidth="2.6" />
-          {percent !== undefined && percent > 0 && <circle className={css.value} cx="12" cy="12" r="8.5" strokeWidth="2.6"
-            pathLength="100" strokeDasharray={`${percent} 100`} transform="rotate(-90 12 12)" />}
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.3">
+          <circle className={css.coinRim} cx="12" cy="12" r="8.6" />
+          {percent !== undefined && percent > 0 && <circle cx="12" cy="12" r="8.6" pathLength="100"
+            strokeDasharray={`${percent} 100`} strokeLinecap="round" transform="rotate(-90 12 12)" />}
+          <path fill={QINGCLAW_MARK_INK.teal} stroke="none" d="M12 8.8 15.2 12 12 15.2 8.8 12Z" />
         </svg>
       </button>
     </Tooltip>}
   >
-    <div className={css.content}>
-      <div className={css.source}>{t('quotaSource')} {sources.join(' + ') || unknown}</div>
-      <dl className={css.rows}>
+    <div className={css.summary}>
+      <p className={css.source}>{t('quotaSourceValue', { source: sources.join(' + ') || unknown })}</p>
+      <dl className={css.metrics}>
         <div><dt>{t('quotaTotal')}</dt><dd>{wallet.quotaTotal == null ? unknown : formatCredits(wallet.quotaTotal)}</dd></div>
         <div><dt>{t('quotaRemaining')}</dt><dd>{wallet.quotaRemaining == null ? unknown : formatCredits(wallet.quotaRemaining)}</dd></div>
       </dl>
     </div>
-    <MenuItemButton disabled={!openPlatformPage && !usageUrl} onSelect={() => {
+    <MenuItemButton separatorBefore disabled={!openPlatformPage && !usageUrl} onSelect={() => {
       setOpen(false)
       if (openPlatformPage) openPlatformPage('usage', () => undefined)
       else if (usageUrl) window.open(usageUrl, '_blank', 'noopener,noreferrer')

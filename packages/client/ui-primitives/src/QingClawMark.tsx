@@ -7,6 +7,9 @@ export const QINGCLAW_MARK_VIEWBOX = 100
 const SLATE = '#48707A'
 const TEAL = '#4BB6B0'
 
+/** QingClaw brand inks, for artwork that draws a QingClaw element outside the shared mark. */
+export const QINGCLAW_MARK_INK = Object.freeze({ slate: SLATE, teal: TEAL })
+
 /** Presentation accepted by {@link QingClawMark}. */
 export interface QingClawMarkProps {
   /** Square edge in px; omission fills the caller's box. */

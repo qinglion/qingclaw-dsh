@@ -27,7 +27,11 @@ function mount(wallet: Partial<AccountProfile> | null | undefined, wide = true, 
   const refreshAccount = vi.fn(async () => {})
   type Props = ComponentProps<typeof AccountQuotaTool>
   const useAccount: Props['useAccount'] = selector => selector(snapshot)
-  const t: Props['t'] = (key, params) => (zh as Record<string, string>)[key]?.replace('{plan}', typeof params?.plan === 'string' ? params.plan : '') ?? key
+  const t: Props['t'] = (key, params) => {
+    const text = (zh as Record<string, string>)[key] ?? key
+    return text.replace('{plan}', typeof params?.plan === 'string' ? params.plan : '')
+      .replace('{source}', typeof params?.source === 'string' ? params.source : '')
+  }
   const props = { wide, useAccount, t, refreshAccount, openPlatformPage } as Props
   const view = render(<AccountQuotaTool {...props} />)
   function update(wallet: Partial<AccountProfile>) {
@@ -39,21 +43,38 @@ function mount(wallet: Partial<AccountProfile> | null | undefined, wide = true, 
 
 it.each([true, false])('shows the remaining share of the recharge total and opens usage, wide=%s', async (wide) => {
   const { openPlatformPage, refreshAccount } = mount({
-    plan: 'pro', subscriptionActive: true, quotaTotal: 1000, quotaRemaining: 220,
+    plan: 'pro', subscriptionActive: true, trialTokens: 200, topupTokens: 800, quotaTotal: 1000, quotaRemaining: 220,
   }, wide)
-  const ring = screen.getByRole('button', { name: '可用额度 · 22%' })
-  fireEvent.focus(ring)
-  fireEvent.pointerEnter(ring, { pointerType: 'mouse' })
+  const trigger = screen.getByRole('button', { name: '可用额度 · 22%' })
+  fireEvent.focus(trigger)
+  fireEvent.pointerEnter(trigger, { pointerType: 'mouse' })
   expect((await screen.findByRole('tooltip')).textContent).toBe('可用额度 · 22%')
-  fireEvent.click(ring)
+  fireEvent.click(trigger)
   const menu = within(screen.getByRole('menu'))
-  expect(menu.getByText(/Pro 套餐/)).toBeTruthy()
+  expect(menu.getByText('额度来源：试用额度 + 充值额度')).toBeTruthy()
   expect(menu.getByText('总额度').nextElementSibling?.textContent).toBe('1,000')
   expect(menu.getByText('可用额度').nextElementSibling?.textContent).toBe('220')
   expect(refreshAccount).toHaveBeenCalledOnce()
   fireEvent.click(menu.getByRole('menuitem', { name: '管理用量' }))
   expect(openPlatformPage).toHaveBeenCalledWith('usage', expect.any(Function))
   expect(screen.queryByRole('menu')).toBeNull()
+})
+
+it('shows whole credits for a gateway balance that reports fractions', () => {
+  mount({ plan: 'pro', subscriptionActive: true, topupTokens: 20_000, quotaTotal: 100_000, quotaRemaining: 94_676.4798 })
+  fireEvent.click(screen.getByRole('button'))
+  const menu = within(screen.getByRole('menu'))
+  expect(menu.getByText('总额度').nextElementSibling?.textContent).toBe('100,000')
+  expect(menu.getByText('可用额度').nextElementSibling?.textContent).toBe('94,676')
+  expect(menu.getByText('额度来源：充值额度')).toBeTruthy()
+})
+
+it('never lists the licence as a credit source', () => {
+  mount({ plan: 'pro', subscriptionActive: true, trialTokens: 5_000, quotaTotal: 5_000, quotaRemaining: 5_000 })
+  fireEvent.click(screen.getByRole('button'))
+  const menu = within(screen.getByRole('menu'))
+  expect(menu.getByText('额度来源：试用额度')).toBeTruthy()
+  expect(menu.queryByText(/套餐/)).toBeNull()
 })
 
 it.each([
