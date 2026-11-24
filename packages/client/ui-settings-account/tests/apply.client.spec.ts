@@ -23,6 +23,7 @@ import { AccountQuotaTool } from '../src/client/AccountQuotaTool.tsx'
 import { AccountQuotaNotice } from '../src/client/AccountQuotaNotice.tsx'
 import type { AccountQuotaNoticeInjected } from '../src/client/AccountQuotaNotice.tsx'
 import { AccountColdStart } from '../src/client/AccountColdStart.tsx'
+import { FeedbackMenuItem } from '../src/client/FeedbackMenuItem.tsx'
 
 const it = createClientTest({ roster: webApp })
 const withoutAccountAccess = createClientTest({ roster: webApp }, { access: action => action !== 'account/watch' })
@@ -63,6 +64,12 @@ it('registers account sign-in in a plain browser without the Desktop-only surfac
     if (reload) await c.reload(SELF)
     await c.mock.streams.opened('account/watch', reload ? 2 : 1)
     expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1)
+    // The questionnaire row occupies the feedback cell at its default priority.
+    const feedback = c.ctx.slots.entries('settings.launcher.feedback')
+    expect(feedback).toHaveLength(1)
+    expect(feedback[0]!.component).toBe(FeedbackMenuItem)
+    expect(feedback[0]!.options.priority).toBe(0)
+    expect(typeof (feedback[0]!.inject!() as object as { contactUs: unknown }).contactUs).toBe('function')
     expect(c.ctx.slots.entries('settings.launcher.tools').map(entry => entry.component)).toContain(AccountQuotaTool)
     expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(1)
     expect(quotaNoticeEntry(c)).toBeDefined()
@@ -95,6 +102,7 @@ withoutAccountAccess('opens no account stream and registers no account surface w
   const c = await start()
   expect(c.mock.streams.end('account/watch')).toBe(0)
   expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(0)
+  expect(c.ctx.slots.entries('settings.launcher.feedback')).toHaveLength(0)
   expect(quotaNoticeEntry(c)).toBeUndefined()
   expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(0)
   expect(c.ctx.slots.entries('settings.section').some(entry => entry.options.id === 'account')).toBe(false)

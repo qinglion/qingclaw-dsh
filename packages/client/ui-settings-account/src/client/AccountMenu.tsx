@@ -1,7 +1,7 @@
 /** Sidebar account launcher and locally authoritative sign-out action. */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Toast, Menu, MenuItemButton, IconEllipsisOutlineMedium, IconPaperPlaneOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
+  Toast, Menu, MenuItemButton, IconEllipsisOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSectionInjected } from './AccountSection.tsx'
@@ -13,7 +13,7 @@ import type {} from './account-ui.ts'
 import css from './AccountMenu.module.css'
 
 /** Account launcher composed by the settings shell. */
-export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSlots<'settings.launcher.notifications' | 'settings.launcher.actions' | 'settings.launcher.tools'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
+export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSlots<'settings.launcher.notifications' | 'settings.launcher.actions' | 'settings.launcher.tools' | 'settings.launcher.feedback'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 
 /** The signed-in label stays empty while the profile loads.
  * @param props - sidebar geometry, settings navigation and account operations.
@@ -22,7 +22,7 @@ export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSl
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
   useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, renderSlot,
-  contactUs, showLogin, start, cancel, avatarFailed, t,
+  showLogin, start, cancel, avatarFailed, t,
   allowApiKey,
 }: AccountMenuProps) {
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
@@ -82,9 +82,10 @@ export function AccountMenu({
 
       }}>
       {open && signedIn && renderSlot('settings.launcher.actions', { onDismiss: () => { setOpen(false) } })}
-      <MenuItemButton icon={<IconPaperPlaneOutlineMedium size={16} />} onSelect={() => { setOpen(false); contactUs() }}>
-        {t('contactUs')}
-      </MenuItemButton>
+      {renderSlot('settings.launcher.feedback', {
+        onDismiss: () => { setOpen(false) },
+        restoreFocus: () => { trigger.current?.focus() },
+      })}
       {signedIn
         ? <MenuItemButton icon={<LogoutIcon />} disabled={busy} onSelect={() => { void requestSignOut() }}>
           {t('signOut')}

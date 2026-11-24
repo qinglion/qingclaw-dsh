@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, act, within } from '@testing-library/react'
 import { useMemo, useSyncExternalStore } from 'react'
+import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import type { GlobalStandardProps, SlotMap } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountDetails, AccountView, SignInAttemptId } from '@deepseek-ai/dsh-deepseek-account/types'
@@ -17,6 +18,16 @@ import css from '../src/client/AccountSection.module.css'
 import type { AccountAvatarSnapshot } from '../src/client/account-avatar.ts'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+
+/** Menu-side stub for the feedback cell whose shipped contribution is the questionnaire row. */
+function feedbackSlot(copy: typeof en | typeof zh, onSelect: () => void): AccountMenuProps['renderSlot'] {
+  return (slot, value) => {
+    if (slot !== 'settings.launcher.feedback') return null
+    const owner: object = value
+    const { onDismiss } = owner as SlotMap['settings.launcher.feedback']['owner']
+    return <MenuItemButton onSelect={() => { onDismiss(); onSelect() }}>{copy.contactUs}</MenuItemButton>
+  }
+}
 
 /** One resolved theme snapshot per scheme; the slot's theme hook serves these in the application. */
 const themeOf = (colorScheme: 'light' | 'dark'): ThemeSnapshot => ({
@@ -129,8 +140,11 @@ it.each([en, zh].flatMap(copy => ([false, true, 'unknown'] as const).map(running
   const openSettings = vi.fn()
   const operations = mount({ status: 'credential-stored', attempt: null }, copy)
   cleanup()
+  const selectFeedback = vi.fn()
+  // The menu renders the feedback cell; the shipped composition fills it with the questionnaire row.
+  const renderSlot = feedbackSlot(copy, selectFeedback)
   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
-  render(<AccountMenu renderSlot={() => null} {...({} as GlobalStandardProps)} {...operations} settingsOpen={false} signOut={signOut}
+  render(<AccountMenu renderSlot={renderSlot} {...({} as GlobalStandardProps)} {...operations} settingsOpen={false} signOut={signOut}
     hasRunningAccountTasks={async () => { if (running === 'unknown') throw new Error('offline'); return running }}
     useAccount={selector => selector(operations.hooks.account.getSnapshot())}
     useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={openSettings}
@@ -142,7 +156,7 @@ it.each([en, zh].flatMap(copy => ([false, true, 'unknown'] as const).map(running
   expect(openSettings).toHaveBeenCalledOnce()
   fireEvent.click(screen.getByRole('button', { name: copy.menu }))
   fireEvent.click(screen.getByRole('menuitem', { name: copy.contactUs }))
-  expect(operations.contactUs).toHaveBeenCalledOnce()
+  expect(selectFeedback).toHaveBeenCalledOnce()
   expect(screen.queryByRole('menu')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: copy.menu }))
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: copy.signOut })) })
@@ -188,6 +202,7 @@ it('places contributed actions next to Settings and keeps sign-out last', async 
   const operations = operationsOf({ status: 'credential-stored', attempt: null })
   const selected = vi.fn()
   const renderAction: AccountMenuProps['renderSlot'] = (slot, value) => {
+    if (slot === 'settings.launcher.feedback') return feedbackSlot(en, () => {})(slot, value)
     if (slot !== 'settings.launcher.actions') return null
     const owner: object = value
     const { onDismiss } = owner as SlotMap['settings.launcher.actions']['owner']
@@ -211,9 +226,11 @@ it('places contributed actions next to Settings and keeps sign-out last', async 
 
 it.each([en, zh])('offers settings, contact and sign-in from the signed-out account menu', async (copy) => {
   const openSettings = vi.fn()
+  const selectFeedback = vi.fn()
   const operations = operationsOf({ status: 'signed-out', attempt: null })
+  const renderSlot = feedbackSlot(copy, selectFeedback)
   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
-  render(<AccountMenu renderSlot={() => null} {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+  render(<AccountMenu renderSlot={renderSlot} {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
     useAccount={selector => selector(operations.hooks.account.getSnapshot())}
     useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={openSettings}
     t={key => key in copy ? copy[key as AccountKey] : key} />)
@@ -227,7 +244,8 @@ it.each([en, zh])('offers settings, contact and sign-in from the signed-out acco
   expect(openSettings).toHaveBeenCalledOnce()
   fireEvent.click(screen.getByRole('button', { name: copy.menu }))
   fireEvent.click(screen.getByRole('menuitem', { name: copy.contactUs }))
-  expect(operations.contactUs).toHaveBeenCalledOnce()
+  expect(selectFeedback).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('menu')).toBeNull()
 })
 
 it.each([true, false])('keeps the account inset local through sign-in changes with wide=%s', async (wide) => {

@@ -65,6 +65,8 @@
       name: '@deepseek-ai/dsh-client-ui-plugin-market'
     - id: ui-qingclaw-admin
       name: '@qinglion/dsh-client-ui-qingclaw-admin'
+    - id: ui-qingclaw-feedback
+      name: '@qinglion/dsh-client-ui-qingclaw-feedback'
     - id: qingclaw-creator
       name: '@qinglion/dsh-qingclaw-creator'
 

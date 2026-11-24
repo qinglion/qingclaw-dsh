@@ -21,6 +21,7 @@ import { AccountOnboarding } from './AccountOnboarding.tsx'
 import { AccountPlatformHost, type AccountPlatformHostInjected } from './AccountPlatformHost.tsx'
 import { AccountQuotaTool } from './AccountQuotaTool.tsx'
 import { AccountMenu } from './AccountMenu.tsx'
+import { FeedbackMenuItem } from './FeedbackMenuItem.tsx'
 import { AccountColdStart } from './AccountColdStart.tsx'
 import { createPlatformPages, type PlatformPages } from './platform-pages.ts'
 import { AccountSection, type AccountSnapshot, type AccountSectionInjected } from './AccountSection.tsx'
@@ -38,7 +39,7 @@ export type { AccountSectionInjected, AccountSectionProps } from './AccountSecti
 export type { AccountMenuProps } from './AccountMenu.tsx'
 export type { AccountSnapshot } from './AccountSection.tsx'
 export type { AccountKey } from './locales.ts'
-export type { AccountUi, AccountUiState, AccountNotificationsOwnerProps } from './account-ui.ts'
+export type { AccountFeedbackOwnerProps, AccountUi, AccountUiState, AccountNotificationsOwnerProps } from './account-ui.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'settings.account': AccountKey }
@@ -328,8 +329,15 @@ export function apply(ctx: Context): void {
       'settings.launcher.notifications': { kind: 'single', scope: 'root' },
       'settings.launcher.actions': { kind: 'list', scope: 'root' },
       'settings.launcher.tools': { kind: 'list', scope: 'root' },
+      'settings.launcher.feedback': { kind: 'single', scope: 'root' },
     },
   }, AccountMenu)))
+  // The built-in questionnaire row occupies the feedback cell at priority 0;
+  // a distribution shadows it with its own feedback surface at a lower priority.
+  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher.feedback', () => ctx.slots.register({
+    name: 'settings.launcher.feedback', locale: 'settings.account', priority: 0,
+    inject: (): Pick<AccountSectionInjected, 'contactUs'> => ({ contactUs: operations.contactUs }),
+  }, FeedbackMenuItem)))
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher.tools', () => ctx.slots.register({
     name: 'settings.launcher.tools', id: 'account-quota', order: 10, locale: 'settings.account',
     inject: () => ({ hooks: { account: operations.hooks.account }, refreshAccount,
