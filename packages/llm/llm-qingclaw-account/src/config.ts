@@ -19,7 +19,7 @@ export const DEFAULT_MODEL_TOKEN_TIMEOUT_MS = 30_000
 
 /** QingClaw account route configuration; authentication comes from the account service. */
 export interface Config extends Omit<ProtocolConfig, 'models'>, ModelListingConfig {
-  /** Field overrides by model id, layered over the gateway listing and bundled catalog. */
+  /** Field overrides by model id, layered over the website catalog entry. */
   modelOverrides: Volatile<Record<string, ModelOverride>>
   /** Maximum duration of one device-session-to-model-token exchange. */
   modelTokenTimeoutMs: Volatile<number>
@@ -112,7 +112,7 @@ function resolveOverride(id: string, override: Readonly<Record<string, unknown>>
  */
 export function resolveOptions(options: Options): ResolvedOptions {
   if (Object.hasOwn(options, 'models')) {
-    throw new Error('llm-qingclaw-account: models is not configurable; /models or the bundled catalog supplies it. '
+    throw new Error('llm-qingclaw-account: models is not configurable; the website catalog supplies it. '
       + 'Adjust single models with modelOverrides.<model id>')
   }
   const {

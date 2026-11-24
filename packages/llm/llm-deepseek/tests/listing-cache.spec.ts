@@ -77,7 +77,7 @@ it('bounds the first wait by the request deadline and serves no listing after a 
   const { catalog, loads, warn } = harness(5)
   await expect(catalog.view()).resolves.toEqual({ authenticated: true, listing: undefined })
   expect(timeoutOf(loads[0]!.signal, LISTING_TIMEOUT)?.timeoutMs).toBe(5)
-  expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('using the bundled catalog'))
+  expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('no listing is available yet'))
 })
 
 it('abandons only the caller\'s wait when its signal aborts', async () => {

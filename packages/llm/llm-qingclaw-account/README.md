@@ -40,7 +40,7 @@ Mount this plugin instead of `@deepseek-ai/dsh-llm-deepseek-account` while keepi
 
 The signed-in platform issues a catalog JWT at `/auth-api/v0/dsh/model_token` and a per-user gateway key at `/auth-api/v0/dsh/model_key`. Each exchange is shared across concurrent requests for the same session.
 
-The desktop bundle sets `catalogURL` to the website’s `/auth-api/v0/dsh/models`. A failed refresh retains the cached catalog. When no listing has succeeded, the provider uses its bundled catalog.
+The desktop bundle sets `catalogURL` to the website’s `/auth-api/v0/dsh/models`. A failed refresh retains the cached catalog, and no models are advertised before the first successful listing. Each model is named by its catalog id: the provider keeps no display names of its own.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -48,7 +48,7 @@ The desktop bundle sets `catalogURL` to the website’s `/auth-api/v0/dsh/models
 | `modelTokenTimeoutMs` | `30,000` | Deadline for one Platform model-token exchange |
 | `modelsTimeoutMs` | `5,000` | Deadline for one model-listing request |
 | `modelsMaxAgeMs` | `600,000` | Model-listing refresh interval; `0` refreshes on access only |
-| `modelOverrides` | `{}` | Per-model metadata overrides over the remote or bundled catalog |
+| `modelOverrides` | `{}` | Per-model metadata overrides layered over the website catalog entry |
 
 <a id="security-and-failure-boundaries"></a>
 ## Security and failure boundaries
@@ -71,7 +71,7 @@ Provider tests exercise platform credential exchange, model discovery and stream
 
 #### What the model sees
 
-Chat Completions serializes the conversation, attachments and tool definitions. The provider adds no model-visible authentication text.
+`POST /v1/chat/completions` carries the conversation, attachments and tool definitions. The provider adds no model-visible authentication text.
 
 #### Token effect
 
@@ -87,4 +87,4 @@ Neither the device session nor the model JWT enters model input, so exchanging o
 
 - Token and listing caches are process-local and reset on restart.
 - The gateway enforces consumer access and quota.
-- The bundled catalog is used until the website catalog is available.
+- No model is advertised until the website catalog answers, so a signed-in client that cannot reach the website cannot start a conversation.

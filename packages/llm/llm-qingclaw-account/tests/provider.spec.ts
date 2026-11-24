@@ -107,7 +107,7 @@ async function savedImage(ctx: Context, provider: string, model: string) {
 }
 
 describe('QingClaw account provider', () => {
-  it('uses the bundled catalog during an outage and authenticates Chat Completions with the exchanged gateway key', async () => {
+  it('offers no models until the website catalog answers and authenticates Chat Completions with the exchanged gateway key', async () => {
     const observed: Request[] = []
     const issued: string[] = []
     const apiKeys: string[] = []
@@ -133,19 +133,7 @@ describe('QingClaw account provider', () => {
     }
     const { ctx, rejectToken } = await mount(request)
 
-    await expect(ctx.llm.listModels('deepseek-account'))
-      .resolves.toEqual([
-        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-flash', name: 'DeepSeek Flash', inputModalities: ['text', 'image'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text', 'image'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash (1017 snapshot)', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'glm-5.3', name: 'GLM 5.3', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'glm-5.3-prime', name: 'GLM 5.3 Prime', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'qwen-plus', name: 'Qwen Plus', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] }),
-        expect.objectContaining({ provider: 'deepseek-account', id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] }),
-      ])
+    await expect(ctx.llm.listModels('deepseek-account')).resolves.toEqual([])
     const result = await run(ctx)
     expect(result.finish.kind).toBe('stop')
     expect(result.blocks()).toContainEqual({ type: 'text', text: 'QingClaw ready' })
@@ -179,8 +167,7 @@ describe('QingClaw account provider', () => {
         case '/auth-api/v0/dsh/model_token': return grant(jwt(1))
         case '/auth-api/v0/dsh/model_key': return keyGrant(1)
         case '/auth-api/v0/dsh/models':
-          return model === 'deepseek-v4.1-flash' ? new Response(null, { status: 404 })
-            : Response.json({ data: [{ id: model, input_modalities: ['text', 'image'] }] })
+          return Response.json({ data: [{ id: model, input_modalities: ['text', 'image'] }] })
         case '/test/v1/chat/completions':
           messagesRequests.push(request)
           return completionStream(undefined, 'stop', model)
@@ -207,7 +194,7 @@ describe('QingClaw account provider', () => {
     expect(JSON.stringify(sent[2]!.content)).toContain(followUp.text)
   })
 
-  it('offers the gateway model list instead of only the bundled fallback', async () => {
+  it('offers exactly the website catalog and names each model by its catalog id', async () => {
     const request: typeof fetch = async (input, init) => {
       const request = new Request(input, init)
       const path = new URL(request.url).pathname
@@ -232,6 +219,7 @@ describe('QingClaw account provider', () => {
     const models = await ctx.llm.listModels('deepseek-account')
     expect(saveSelection).toHaveBeenCalledWith({ provider: 'deepseek-account', model: 'new-upstream-model' })
     expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash', 'new-upstream-model'])
+    expect(models.map(model => model.name)).toEqual(['deepseek-v4.1-flash', 'new-upstream-model'])
     expect(models[0]?.inputModalities).toEqual(['text'])
   })
 
@@ -242,7 +230,8 @@ describe('QingClaw account provider', () => {
       switch (new URL(request.url).pathname) {
         case '/auth-api/v0/dsh/model_token': return grant(jwt(1))
         case '/auth-api/v0/dsh/model_key': return keyGrant(1)
-        case '/auth-api/v0/dsh/models': return new Response(null, { status: 404 })
+        case '/auth-api/v0/dsh/models':
+          return Response.json({ data: [{ id: 'deepseek-v4.1-flash', input_modalities: ['text', 'image'] }] })
         case '/test/v1/chat/completions':
           requests.push(request)
           return requests.length > 1 ? completionStream(undefined, 'stop', model) : completionStream([

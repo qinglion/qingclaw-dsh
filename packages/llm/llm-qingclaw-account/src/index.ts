@@ -57,7 +57,6 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
     if (typeof item !== 'object' || item === null) { skipped += 1; continue }
     const id: unknown = Reflect.get(item, 'id')
     if (typeof id !== 'string' || id.length === 0) { skipped += 1; continue }
-    const name: unknown = Reflect.get(item, 'name')
     const isDefault = Reflect.get(item, 'default') === true
     const rawModalities: unknown = Reflect.get(item, 'input_modalities')
     const inputModalities = Array.isArray(rawModalities)
@@ -65,7 +64,6 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
       : []
     entries.push({
       id,
-      ...(typeof name === 'string' && name.length > 0 ? { name } : {}),
       ...(isDefault ? { default: true } : {}),
       requirement: { kind: 'none' },
       capabilities: {
@@ -89,36 +87,13 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => () => Promise.all([tokens.dispose(), keys.dispose()]), 'llm-qingclaw-account: credential caches')
   ctx.on('deepseek-account/signed-out', () => { tokens.clear(); keys.clear() })
 
-  // Keep a small, verified catalog in the QingClaw integration plug-in so the
-  // upstream client stays untouched even while the gateway has no /models route.
-  // The gateway's /v1/models reflects the upstream catalog, including models
-  // that our Bailian account has not activated and non-chat modalities. Keep
-  // the offered catalog to chat models we have verified against the gateway.
-  const baseSupported = resolveAdapterOptions({
-    models: [
-      { id: 'deepseek-flash', name: 'DeepSeek Flash', inputModalities: ['text', 'image'] },
-      { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash (latest)', inputModalities: ['text', 'image'] },
-      { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash (1017 snapshot)', inputModalities: ['text'] },
-      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', inputModalities: ['text'] },
-      { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputModalities: ['text'] },
-      { id: 'glm-5.3', name: 'GLM 5.3', inputModalities: ['text'] },
-      { id: 'glm-5.3-prime', name: 'GLM 5.3 Prime', inputModalities: ['text'] },
-      { id: 'qwen-plus', name: 'Qwen Plus', inputModalities: ['text'] },
-      { id: 'qwen3.8-flash', name: 'Qwen 3.8 Flash', inputModalities: ['text'] },
-      { id: 'qwen3.8-max-0902', name: 'Qwen 3.8 Max', inputModalities: ['text'] },
-    ],
+  // The website catalog is the only model source: it decides which models exist,
+  // their order, and which one is the default, so adding or retiring a model
+  // needs no client release. A model is displayed under its catalog id; the
+  // provider keeps no display names of its own.
+  const supportedFor = (view: ListingView) => resolveAdapterOptions({
+    models: (view.listing?.entries ?? []).map(entry => ({ id: entry.id })),
   }).models
-  const baseSupportedIds = new Set(baseSupported.map(model => model.id))
-  const supportedFor = (view: ListingView) => {
-    const entries = view.listing?.entries
-    if (entries === undefined) return baseSupported
-    const extra = resolveAdapterOptions({
-      models: entries
-        .filter(entry => !baseSupportedIds.has(entry.id))
-        .map(entry => ({ id: entry.id, name: entry.name ?? entry.id, inputModalities: ['text'] })),
-    }).models
-    return [...baseSupported, ...extra]
-  }
   const catalog = createModelListingCache(ctx, name, PROVIDER, {
     settings: () => settings().catalog,
     credential: async () => await tokens.resolve(),

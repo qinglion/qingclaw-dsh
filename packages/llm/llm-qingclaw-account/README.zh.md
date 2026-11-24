@@ -40,7 +40,7 @@ kind: "package-reference"
 
 客户端从登录平台的 `/auth-api/v0/dsh/model_token` 取得模型目录 JWT，从 `/auth-api/v0/dsh/model_key` 取得当前用户的网关密钥。同一会话的并发请求共享各自的凭据换取操作。
 
-桌面发行配置将 `catalogURL` 指向官网的 `/auth-api/v0/dsh/models`。目录刷新失败时使用缓存，首次成功获取目录前使用内置清单。
+桌面发行配置将 `catalogURL` 指向官网的 `/auth-api/v0/dsh/models`。目录刷新失败时沿用缓存，首次成功获取目录前不公布任何模型。每个模型以目录中的 id 命名，提供方不保留自己的显示名。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -48,7 +48,7 @@ kind: "package-reference"
 | `modelTokenTimeoutMs` | `30,000` | 单次平台模型 token 换取的超时 |
 | `modelsTimeoutMs` | `5,000` | 单次模型列表请求的超时 |
 | `modelsMaxAgeMs` | `600,000` | 模型列表刷新间隔；`0` 表示只在访问时刷新 |
-| `modelOverrides` | `{}` | 覆盖远端或内置目录中单个模型的元数据 |
+| `modelOverrides` | `{}` | 在官网目录条目之上覆盖单个模型的元数据 |
 
 <a id="security-and-failure-boundaries"></a>
 ## 安全与失败边界
@@ -71,7 +71,7 @@ kind: "package-reference"
 
 #### What the model sees
 
-Chat Completions 传输会话、附件和工具定义。鉴权信息只随请求头发送。
+`POST /v1/chat/completions` 传输会话、附件和工具定义。鉴权信息只随请求头发送。
 
 #### Token effect
 
@@ -87,4 +87,4 @@ Chat Completions 传输会话、附件和工具定义。鉴权信息只随请求
 
 - token 与列表缓存只在当前进程中保存，重启后会重建。
 - 账号权限和额度由推理网关校验。
-- 官网目录首次加载成功前使用内置模型清单。
+- 官网目录首次应答前不公布任何模型，因此登录后无法访问官网的客户端无法开始对话。
