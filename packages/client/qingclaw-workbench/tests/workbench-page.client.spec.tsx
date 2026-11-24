@@ -17,7 +17,7 @@ const media: WorkbenchPluginItem = {
   id: 'media', title: '自媒体工作台', description: '制作图文内容', author: '内容团队',
   category: '创作', version: '1.0.0', packageName: '@example/media',
   panelId: 'media', registry: 'https://npm.qingclaw.com/',
-  installed: false, installable: true, openable: false, favorite: false,
+  installed: false, installable: true, openable: false, favorite: false, updateAvailable: false,
   previewUrl: 'https://example.com/media-preview.png',
 }
 const notes: WorkbenchPluginItem = {
@@ -35,6 +35,8 @@ function setup(initial = [media, notes]) {
     subscribe: vi.fn(() => () => {}),
     setFavorite: vi.fn((id: string, favorite: boolean) => update(id, { favorite })),
     install: vi.fn(async (id: string) => update(id, { installed: true, openable: true })),
+    update: vi.fn(async (id: string) => update(id, { installedVersion: '1.0.0', updateAvailable: false })),
+    uninstall: vi.fn(async (id: string) => update(id, { installed: false, openable: false })),
     open: vi.fn(),
     readReadme: vi.fn(async (_id: string, _version: string, _language: string) => ({ markdown: '## 使用指南\n\n在灵感页新建素材。' })),
     dispose: vi.fn(),
@@ -177,6 +179,27 @@ it('keeps the single preview and default artwork for catalogs that declare only 
   expect(detail.getAllByAltText('自媒体工作台的界面预览').map(image => image.getAttribute('src')))
     .toEqual([media.previewUrl])
   expect(container.querySelector('header img')).toBeNull()
+})
+
+it('offers an update when the catalog version is newer than the installed one', async () => {
+  const { store, page } = setup([{ ...media, installed: true, installable: false, openable: true,
+    installedVersion: '0.9.0', updateAvailable: true }])
+  page()
+  const card = within(await screen.findByRole('article', { name: media.title }))
+  fireEvent.click(card.getByRole('button', { name: '更新到 1.0.0' }))
+  await waitFor(() => expect(store.update).toHaveBeenCalledWith(media.id))
+})
+
+it('uninstalls an installed workbench from its detail page after a confirmation', async () => {
+  const { store, page } = setup([{ ...media, installed: true, installable: false, openable: true }])
+  page()
+  fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
+    .getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  fireEvent.click(detail.getByRole('button', { name: zh.uninstall }))
+  expect(store.uninstall).not.toHaveBeenCalled()
+  fireEvent.click(detail.getByRole('button', { name: zh.confirmUninstall }))
+  await waitFor(() => expect(store.uninstall).toHaveBeenCalledWith(media.id))
 })
 
 it('preserves the tab, search, and category when returning from a workbench detail', async () => {

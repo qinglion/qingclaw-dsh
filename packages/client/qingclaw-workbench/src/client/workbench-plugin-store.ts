@@ -11,6 +11,10 @@ export interface WorkbenchPluginItem extends WorkbenchCatalogEntry {
   readonly id: string
   readonly iconUrl?: string
   readonly installed: boolean
+  /** Version the profile currently has installed, when the Host reports one. */
+  readonly installedVersion?: string
+  /** A newer catalog version replaces the installed one. */
+  readonly updateAvailable: boolean
   readonly installable: boolean
   readonly openable: boolean
   readonly favorite: boolean
@@ -26,6 +30,8 @@ export interface WorkbenchPluginStore {
   readReadme(id: string, version: string, language: string): Promise<WorkbenchReadmeDocument | null>
   load(refresh?: boolean): Promise<readonly WorkbenchPluginItem[]>
   install(id: string): Promise<void>
+  update(id: string): Promise<void>
+  uninstall(id: string): Promise<void>
   open(id: string): void
   setFavorite(id: string, favorite: boolean): void
   subscribe(listener: () => void): () => void
@@ -33,6 +39,43 @@ export interface WorkbenchPluginStore {
 }
 
 const FAVORITES = 'qingclaw.workbench.favorites.v1'
+
+/**
+ * Compare two SemVer versions: build metadata is ignored and a prerelease sorts before its release.
+ * @param left - the installed version.
+ * @param right - the catalog version.
+ * @returns a negative number when left precedes right.
+ */
+export function compareVersions(left: string, right: string): number {
+  const parse = (value: string): { core: number[]; pre: string[] } => {
+    const [withoutBuild = ''] = value.split('+')
+    const [core = '', pre = ''] = withoutBuild.split('-')
+    return { core: core.split('.').map(part => (/^\d+$/.test(part) ? Number(part) : 0)), pre: pre === '' ? [] : pre.split('.') }
+  }
+  const a = parse(left)
+  const b = parse(right)
+  for (let index = 0; index < 3; index += 1) {
+    const order = (a.core[index] ?? 0) - (b.core[index] ?? 0)
+    if (order !== 0) return order
+  }
+  if (a.pre.length === 0 || b.pre.length === 0) return b.pre.length - a.pre.length
+  for (let index = 0; index < Math.max(a.pre.length, b.pre.length); index += 1) {
+    const one = a.pre[index]
+    const two = b.pre[index]
+    if (one === undefined) return -1
+    if (two === undefined) return 1
+    const oneNumeric = /^\d+$/.test(one)
+    const twoNumeric = /^\d+$/.test(two)
+    if (oneNumeric && twoNumeric) {
+      const order = Number(one) - Number(two)
+      if (order !== 0) return order
+      continue
+    }
+    if (oneNumeric !== twoNumeric) return oneNumeric ? -1 : 1
+    if (one !== two) return one < two ? -1 : 1
+  }
+  return 0
+}
 
 /** The failure code the Host reports when the private registry needs a signed-in account. */
 const SIGN_IN_REQUIRED = 'qingclaw-workbench/sign-in-required'
@@ -75,9 +118,13 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   const sidebars = new Map<string, () => void>()
   const installs = new Map<string, Promise<void>>()
   const restartRequired = new Set<string>()
+  /** Removals the Host applied to the profile that the installed inventory may still list until a restart. */
+  const removed = new Set<string>()
   let entries: readonly WorkbenchCatalogEntry[] = []
   let offline = false
   let installed = new Map<string, string | undefined>()
+  /** Bundles the profile owns, which a new catalog version can replace; shipped copies cannot be updated. */
+  let managed = new Set<string>()
   let reading: Promise<void> | undefined
   let disposed = false
   const notify = (): void => { if (!disposed) for (const listener of listeners) listener() }
@@ -85,7 +132,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   const hasSidebar = (id: string): boolean => ctx.slots.entriesOfSlot('sidebar.panellist').some(entry => entry.options.id === id)
 
   function syncSidebars(): void {
-    const shown = entries.filter(entry => installed.has(entry.packageName) && hasMain(entry.panelId))
+    const shown = entries.filter(entry => present(entry.packageName) && hasMain(entry.panelId))
     const keep = new Set(shown.map(entry => entry.panelId))
     for (const [id, remove] of sidebars) {
       if (!keep.has(id)) { sidebars.delete(id); remove() }
@@ -96,6 +143,11 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       sidebars.set(entry.panelId, ctx.slots.register({ name: 'sidebar.panellist', id: entry.panelId as MainPanelId,
         label: entry.title }, workbenchPanelIcon(entry.iconUrl)))
     }
+  }
+
+  /** Whether the profile has this workbench, ignoring a removal the inventory has not caught up with. */
+  function present(id: string): boolean {
+    return installed.has(id) && !removed.has(id)
   }
 
   function find(id: string): WorkbenchCatalogEntry {
@@ -115,6 +167,10 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     offline = catalog.value.stale
     installed = new Map(bundles.value.filter(bundle => bundle.availability !== 'missing'
       && (bundle.installed || bundle.availability === 'installation')).map(bundle => [bundle.name, bundle.version]))
+    managed = new Set(bundles.value.filter(bundle => bundle.installed).map(bundle => bundle.name))
+    for (const name of removed) {
+      if (!installed.has(name)) removed.delete(name)
+    }
     syncSidebars()
   }
 
@@ -128,11 +184,15 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     } else await reading
     const favorites = readIds(storage, FAVORITES)
     return entries.map((entry) => {
-      const present = installed.has(entry.packageName)
-      const openable = present && hasMain(entry.panelId)
-      return { ...entry, id: entry.packageName, installed: present, installable: !present && !offline, openable,
+      const has = present(entry.packageName)
+      const installedVersion = has ? installed.get(entry.packageName) : undefined
+      const openable = has && hasMain(entry.panelId)
+      return { ...entry, id: entry.packageName, installed: has, installable: !has && !offline, openable,
         favorite: favorites.has(entry.packageName),
-        restartRequired: present && !openable && restartRequired.has(entry.packageName) }
+        updateAvailable: has && managed.has(entry.packageName) && installedVersion !== undefined
+          && compareVersions(installedVersion, entry.version) < 0,
+        ...(installedVersion === undefined ? {} : { installedVersion }),
+        restartRequired: has && !openable && restartRequired.has(entry.packageName) }
     })
   }
 
@@ -157,6 +217,49 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     try { await pending } finally { installs.delete(id) }
   }
 
+  async function update(id: string): Promise<void> {
+    if (installs.has(id)) return installs.get(id)
+    const pending = (async () => {
+      await load(true)
+      const entry = find(id)
+      if (!present(id)) return install(id)
+      if (offline) throw new Error('请联网刷新工作台目录后更新')
+      const result = await ctx.remote.qingclawWorkbench.updateWorkbench(entry.packageName, entry.version)
+      if (!result.ok) throw remoteFailure(result.error)
+      if (result.value.application === 'failed' || result.value.application === 'cancelled'
+        || result.value.application === 'overridden') {
+        throw new Error(result.value.diagnostic ?? result.value.application)
+      }
+      if (result.value.application === 'restart-required') restartRequired.add(id)
+      await load(true)
+      notify()
+    })()
+    installs.set(id, pending)
+    try { await pending } finally { installs.delete(id) }
+  }
+
+  async function uninstall(id: string): Promise<void> {
+    if (installs.has(id)) return installs.get(id)
+    const pending = (async () => {
+      await load(true)
+      const entry = find(id)
+      if (!present(id)) return
+      const result = await ctx.remote.pluginManager.removeBundle(entry.packageName)
+      if (!result.ok) throw remoteFailure(result.error)
+      const { application, error } = result.value
+      if (application === 'failed' || application === 'cancelled') {
+        throw new Error(error?.diagnostic ?? error?.code ?? application)
+      }
+      // The profile no longer owns it; the installed inventory may still list it until a restart.
+      removed.add(id)
+      restartRequired.delete(id)
+      await load(true)
+      notify()
+    })()
+    installs.set(id, pending)
+    try { await pending } finally { installs.delete(id) }
+  }
+
   const changed = (): void => { void load().then(notify, notify) }
   function clearSidebars(): void {
     for (const remove of sidebars.values()) remove()
@@ -174,7 +277,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   // Restore already-installed launchers before the user opens the directory.
   void load().catch(() => undefined)
   return {
-    load, install,
+    load, install, update, uninstall,
     async readReadme(id, version, language) {
       const entry = find(id)
       if (entry.version !== version) throw new Error('工作台版本已变更')

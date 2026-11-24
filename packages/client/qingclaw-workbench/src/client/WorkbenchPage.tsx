@@ -30,11 +30,13 @@ interface ItemActions {
   installing: boolean
   busy: boolean
   onInstall(): void
+  onUpdate(): void
+  onUninstall(): void
   onOpen(): void
   onFavorite(): void
 }
 
-function WorkbenchActions({ item, t, installing, busy, onInstall, onOpen, onFavorite }: ItemActions): ReactNode {
+function WorkbenchActions({ item, t, installing, busy, onInstall, onUpdate, onOpen, onFavorite }: ItemActions): ReactNode {
   const favoriteLabel = t(item.favorite ? 'unfavorite' : 'favorite')
   return <div className={css.actions}>
     <button type="button" className={css.favorite} aria-label={favoriteLabel}
@@ -43,9 +45,15 @@ function WorkbenchActions({ item, t, installing, busy, onInstall, onOpen, onFavo
       {t(item.favorite ? 'saved' : 'favorite')}
     </button>
     {item.installed
-      ? item.openable
-        ? <Button variant="outline" size="sm" onClick={onOpen}>{t('open')}</Button>
-        : <span className={css.installed}><IconCheckOutlineRegular size={14} />{t(item.restartRequired ? 'restartRequired' : 'installed')}</span>
+      ? <>
+        {item.updateAvailable && <Button variant="primary" size="sm" disabled={busy} onClick={onUpdate}
+          icon={<IconDownloadOutlineRegular size={14} />}>
+          {t(installing ? 'updating' : 'update', { version: item.version })}
+        </Button>}
+        {item.openable
+          ? <Button variant="outline" size="sm" onClick={onOpen}>{t('open')}</Button>
+          : <span className={css.installed}><IconCheckOutlineRegular size={14} />{t(item.restartRequired ? 'restartRequired' : 'installed')}</span>}
+      </>
       : <Button variant="primary" size="sm" disabled={busy || !item.installable} onClick={onInstall}
         title={busy && !installing ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
         {t(installing ? 'installing' : item.installable ? 'install' : 'offlineInstall')}
@@ -106,6 +114,8 @@ function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
 }): ReactNode {
   const heading = useRef<HTMLHeadingElement>(null)
   const titleId = useId()
+  // Uninstalling removes the workbench from the profile, so it asks for a second click first.
+  const [confirming, setConfirming] = useState(false)
   useLayoutEffect(() => { heading.current?.focus({ preventScroll: true }) }, [item.id])
   return <section className={css.detail} aria-labelledby={titleId}>
     <button type="button" className={css.back} onClick={onBack}>
@@ -125,6 +135,12 @@ function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
     </header>
     {item.description && <p className={css.summary}>{item.description}</p>}
     {error && <p className={css.error} role="alert">{t(error)}</p>}
+    {item.installed && <div className={css.detailActions}>
+      <Button variant="ghost" size="sm" disabled={actions.busy}
+        onClick={() => { if (confirming) actions.onUninstall(); else setConfirming(true) }}>
+        {t(confirming ? 'confirmUninstall' : 'uninstall')}
+      </Button>
+    </div>}
     <WorkbenchPreviews item={item} t={t} />
     <WorkbenchReadme item={item} pluginStore={store} language={language} t={t} />
     <section className={css.detailSection}>
@@ -215,6 +231,8 @@ export function WorkbenchPage({ pluginStore, t, useLocale }: WorkbenchPageProps)
   function actions(item: WorkbenchPluginItem): ItemActions {
     return { item, t, installing: installing === item.id, busy: installing !== undefined,
       onInstall: () => { void act(() => pluginStore.install(item.id), 'installError', item.id) },
+      onUpdate: () => { void act(() => pluginStore.update(item.id), 'updateError', item.id) },
+      onUninstall: () => { void act(() => pluginStore.uninstall(item.id), 'uninstallError', item.id) },
       onOpen: () => { void act(() => pluginStore.open(item.id), 'openError') },
       onFavorite: () => { void act(() => pluginStore.setFavorite(item.id, !item.favorite), 'preferenceError') },
     }

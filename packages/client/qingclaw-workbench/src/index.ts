@@ -32,6 +32,8 @@ interface BundleInstaller {
     application: WorkbenchInstallResult['application']
     error?: { code?: string; diagnostic?: string }
   }>
+  /** Present on the Host manager the desktop ships; used only to clear a running copy before an update. */
+  removeBundle?(name: string): Promise<{ application: string; error?: { code?: string } }>
 }
 
 /** Minimal account reader used for the professional entitlement gate. */
@@ -119,21 +121,43 @@ export default class QingClawWorkbench extends TypertRemoteService {
   @Remote
   async installWorkbench(name: string, version: string): Promise<WorkbenchInstallResult> {
     this.assertOpen()
-    const entry = await this.listedEntry(name, version)
+    return this.installListed(await this.listedEntry(name, version), '安装')
+  }
+
+  /**
+   * Install a newer listed version over the installed copy, with the same registry grant as an installation.
+   * @param name - the catalog package name.
+   * @param version - the exact listed version to install over the current one.
+   * @returns the installation outcome the product UI reports.
+   */
+  @Remote
+  async updateWorkbench(name: string, version: string): Promise<WorkbenchInstallResult> {
+    this.assertOpen()
+    return this.installListed(await this.listedEntry(name, version), '升级')
+  }
+
+  /** Install one listed release for the signed-in account and report the outcome. */
+  private async installListed(entry: WorkbenchCatalogEntry, verb: string): Promise<WorkbenchInstallResult> {
     const manager = this.ctx.get('pluginManager') as BundleInstaller | undefined
-    if (manager === undefined) throw new Error('当前运行环境不支持安装工作台。')
+    if (manager === undefined) throw new Error(`当前运行环境不支持${verb}工作台。`)
     // Sign-in is checked first so a signed-out visitor is asked to sign in
     // rather than told to upgrade; the free plan can browse but cannot install.
     const { token } = await this.registry.authorization(entry.registry)
     const entitlement = await this.getEntitlement()
     if (!entitlement.active) {
-      throw new RemoteError('qingclaw-workbench/pro-required', 'Installing a workbench requires the professional licence.', {})
+      throw new RemoteError('qingclaw-workbench/pro-required', `${verb} a workbench requires the professional licence.`, {})
     }
     const leaf = entry.packageName.split('/')[1]
     const archive = new URL(`${entry.packageName}/-/${leaf}-${entry.version}.tgz`, entry.registry).href
     // The registry is pinned so a Host fallback registry never becomes the package transport.
-    const result = await manager.installBundle(archive, { enabled: true, saveExact: true,
-      registry: entry.registry, expected: { name, version }, authToken: token })
+    const options = { enabled: true, saveExact: true, registry: entry.registry,
+      expected: { name: entry.packageName, version: entry.version }, authToken: token }
+    let result = await manager.installBundle(archive, options)
+    // With HMR the manager refuses to install over a running copy; stop it and install again.
+    if (result.error?.code === 'already-installed' && manager.removeBundle !== undefined) {
+      await manager.removeBundle(entry.packageName)
+      result = await manager.installBundle(archive, options)
+    }
     const diagnostic = result.error?.diagnostic ?? result.error?.code
     return { application: result.application, ...diagnostic === undefined ? {} : { diagnostic } }
   }
