@@ -807,6 +807,64 @@ describe('UiWorkspaceService', () => {
     expect(b.selectPanel).toHaveBeenCalledWith(null)
   })
 
+  it('opens a matching mode from an explicit Workspace on a panel or another Workspace', async () => {
+    const source = workspace('source', [sid('source-review')])
+    const target = workspace('target')
+    const b = bench({ workspaces: workspaceState([source, target]) })
+    const matchesWorkspace = vi.fn(async (item: WorkspaceView) => item === target)
+    b.uiWorkspace.registerSessionMode({
+      matches: id => id === sid('source-review'),
+      createId: () => sid('target-review'),
+      matchesWorkspace,
+    })
+    b.uiWorkspace.openSession(sid('source-review'))
+    b.layout.selectPanel('review-panel' as MainPanelId)
+
+    b.uiWorkspace.startSession(wid('target'))
+
+    await vi.waitFor(() => {
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('target'), sessionId: sid('target-review') })
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('target-review'), { source: 'mainView' })
+    })
+    expect(matchesWorkspace).toHaveBeenCalledExactlyOnceWith(target, expect.any(AbortSignal))
+  })
+
+  it('keeps an explicit Workspace without a matching mode on the ordinary creation path', async () => {
+    const target = workspace('target')
+    const b = bench({ workspaces: workspaceState([target]) })
+    b.uiWorkspace.registerSessionMode({
+      matches: () => false,
+      createId: () => sid('review'),
+      matchesWorkspace: async () => false,
+    })
+
+    b.uiWorkspace.startSession(wid('target'))
+
+    await vi.waitFor(() => {
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('target') })
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('created-target'), { source: 'mainView' })
+    })
+  })
+
+  it('skips creation when navigation supersedes a pending Workspace mode check', async () => {
+    const match = Promise.withResolvers<boolean>()
+    const b = bench({ workspaces: workspaceState([workspace('a')]) })
+    const createId = vi.fn(() => sid('review'))
+    b.uiWorkspace.registerSessionMode({
+      matches: () => false,
+      createId,
+      matchesWorkspace: () => match.promise,
+    })
+    b.uiWorkspace.startSession(wid('a'))
+    b.layout.selectPanel('other-panel' as MainPanelId)
+    match.resolve(true)
+    await match.promise
+    await Promise.resolve()
+
+    expect(createId).not.toHaveBeenCalled()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+  })
+
   describe('startSession draft initialization', () => {
     it.each<{ name: string; options: DraftInitializationOptions }>([
       { name: 'plain text', options: { prompt: '草稿 🧭\nsecond line', clearPreviousDraft: true } },

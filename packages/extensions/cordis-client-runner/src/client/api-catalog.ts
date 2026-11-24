@@ -361,7 +361,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void',
-        description: 'Open the Workspace blank `connectWorkspace` resolves, or create a fresh Session in the visible conversation\'s registered mode for a plain request in the same Workspace. A refused creation is shown through the Workspace notice and preserves the selection.',
+        description: 'Open the Workspace blank `connectWorkspace` resolves, or create a fresh Session in the registered mode chosen for a plain request by the visible conversation or explicit target. A refused creation is shown through the Workspace notice and preserves the selection.',
         parameters: [{ name: 'workspaceId', description: 'explicit target; absent inherits the current or most recent Workspace.' }, { name: 'options', description: 'initial content, the blank\'s preset, and `whenDraftExists`, which decides whether existing text or attachments are kept, replaced, or followed by the prompt.' }],
       },
       {
@@ -1041,7 +1041,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'StoredEntry',
-    declaration: 'export interface StoredEntry {\n    component: unknown;\n    options: {\n        key?: string;\n        id?: string;\n        order?: number;\n        label?: SlotLabel;\n        priority?: number;\n    };\n    select?: ((owner: never) => unknown) | undefined;\n    inject?: ((...args: never[]) => Record<string, unknown>) | undefined;\n    children?: Readonly<Record<string, SlotSpec<SlotEntryDef>>> | undefined;\n    store?: StoreDecl | undefined;\n    locale?: string | undefined;\n    registrant?: string | undefined;\n}',
+    declaration: 'export interface StoredEntry {\n    component: unknown;\n    options: {\n        key?: string;\n        id?: string;\n        order?: number;\n        label?: SlotLabel;\n        supportsBlankSession?: boolean;\n        priority?: number;\n    };\n    select?: ((owner: never) => unknown) | undefined;\n    inject?: ((...args: never[]) => Record<string, unknown>) | undefined;\n    children?: Readonly<Record<string, SlotSpec<SlotEntryDef>>> | undefined;\n    store?: StoreDecl | undefined;\n    locale?: string | undefined;\n    registrant?: string | undefined;\n}',
   },
   {
     name: 'StoredFactory',
