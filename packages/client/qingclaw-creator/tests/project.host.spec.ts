@@ -53,6 +53,17 @@ it('reports the root project for a registered workspace without changing what it
   expect(await empty.json()).toEqual({})
 })
 
+it('lists every plugin package a workspace holds for the publish panel', async () => {
+  await manifest(root, { ...plugin, name: '@qinglion/root' })
+  await manifest(join(root, 'packages', 'one'), { ...plugin, name: '@qinglion/one' })
+  await manifest(join(root, 'packages', 'one', 'packed', 'package'), { ...plugin, name: '@qinglion/staged' })
+  await manifest(join(root, 'node_modules', 'shadow'), { ...plugin, name: '@qinglion/shadow' })
+  const response = await route()(new Request(url + '&scope=candidates'))
+  const body = await response.json() as { candidates: { directory: string; project: { name: string } }[] }
+  expect(body.candidates.map(candidate => candidate.directory)).toEqual(['.', 'packages/one', 'packages/one/packed/package'])
+  expect(body.candidates.map(candidate => candidate.project.name)).toEqual(['@qinglion/root', '@qinglion/one', '@qinglion/staged'])
+})
+
 it('refuses unknown callers and workspaces and reports an unreadable one', async () => {
   await manifest(root, plugin)
   expect((await route({ canReadProjects: async () => false })(new Request(url))).status).toBe(403)

@@ -8,11 +8,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings-account/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { createElement } from 'react'
-import { IconCodeOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCodeOutlineRegular, IconUploadOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CreatorCenter, type CenterInputs } from './CreatorCenter.tsx'
+import { PublishPanel, publishPrompt, type PublishInputs } from './PublishPanel.tsx'
 import { en, NS, zh } from './locales.ts'
 
 const PANEL = 'qingclaw-creator' as MainPanelId
+const PUBLISH_PANEL = 'qingclaw-publish' as MainPanelId
 export const inject = ['locale', 'slots', 'layout', 'remote.account', 'remote', 'accountUi', 'workspaces', 'uiWorkspace']
 
 /** Mount the creator center only for the currently authenticated creator or administrator. */
@@ -49,10 +51,24 @@ export function apply(ctx: Context): void {
               scope.uiWorkspace.startSession(workspaceId, { agentPreset: 'cordis' })
             },
           }
+          const publish: PublishInputs = {
+            hooks: { workspaces: scope.workspaces.list },
+            publish(workspace, candidate) {
+              if (!active()) return
+              scope.uiWorkspace.startSession(workspace.workspaceId, { agentPreset: 'cordis', prompt: publishPrompt(candidate) })
+            },
+            startWorkspace(workspace) {
+              if (!active()) return
+              scope.uiWorkspace.startSession(workspace.workspaceId, { agentPreset: 'cordis' })
+            },
+          }
           scope.slots.inject('main', () => scope.slots.inject('sidebar.panellist', function* () {
             yield scope.slots.register({ name: 'main', key: PANEL, locale: NS, inject: () => inputs }, CreatorCenter)
             yield scope.slots.register({ name: 'sidebar.panellist', id: PANEL, order: -19, label: () => t('center'), locale: NS },
               ({ size }) => createElement(IconCodeOutlineRegular, { size }))
+            yield scope.slots.register({ name: 'main', key: PUBLISH_PANEL, locale: NS, inject: () => publish }, PublishPanel)
+            yield scope.slots.register({ name: 'sidebar.panellist', id: PUBLISH_PANEL, order: -18, label: () => t('publish'), locale: NS },
+              ({ size }) => createElement(IconUploadOutlineRegular, { size }))
           }))
         },
       })

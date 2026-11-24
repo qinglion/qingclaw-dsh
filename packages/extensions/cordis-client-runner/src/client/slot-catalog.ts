@@ -3059,6 +3059,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       '@qinglion/dsh-client-ui-qingclaw-admin AdminSection',
       '@qinglion/dsh-qingclaw-creator CreatorCenter',
+      '@qinglion/dsh-qingclaw-creator PublishPanel',
       '@qinglion/dsh-qingclaw-workbench WorkbenchPage',
       'client-ui-conversation ConversationPanel key \'conversation\'',
       'client-ui-plugin-manager PluginManagerPage',
@@ -4871,6 +4872,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'factory \'sidebar.panel.icon\' (client-ui-sidebar), so it exists while that definition is registered',
     occupants: [
       '@qinglion/dsh-qingclaw-creator ({ size }) => createElement(IconCodeOutlineRegular, { siz…',
+      '@qinglion/dsh-qingclaw-creator ({ size }) => createElement(IconUploadOutlineRegular, { s…',
       '@qinglion/dsh-qingclaw-workbench WorkbenchPanelIcon',
       '@qinglion/dsh-qingclaw-workbench workbenchPanelIcon(entry.iconUrl)',
       'client-ui-plugin-manager PluginsPanelIcon',

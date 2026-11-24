@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-deepseek-account'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { PROJECT_PATH } from './types.ts'
-import type { PluginProject, WorkspacePluginState } from './project-types.ts'
+import type { PluginProject, PublishCandidate, WorkspacePluginState } from './project-types.ts'
 
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
@@ -75,33 +75,30 @@ export async function detectPluginProject(directory: string): Promise<PluginProj
  */
 const MAX_LOOKUP_DIRECTORIES = 10_000
 
+/** Depth of one workspace-relative directory; `.` is the root. */
+function depth(directory: string): number {
+  return directory === '.' ? 0 : directory.split('/').length
+}
+
 /**
- * Find the workspace directories whose manifest declares exactly this package
- * and version. Publishing uses it when the request names no directory, so a
- * collection workspace resolves its own subdirectory instead of the model
- * guessing one. The shallowest directory wins because a copy nested deeper is
- * a pack or build artifact, not the project; equal depths report ambiguity.
+ * List every plugin package a workspace holds, shallowest first. The publish
+ * panel offers these candidates; discovery keeps reading only the root.
  * Hidden, dependency, and linked directories are never entered.
  * @param root - the workspace real path.
- * @param name - exact package name.
- * @param version - exact package version.
- * @returns matching workspace-relative directories, `.` for the root; more than one means equal depth.
+ * @returns candidate directories, `.` for the root, in breadth-first order.
  */
-export async function findPluginPackages(root: string, name: string, version: string): Promise<string[]> {
+export async function listPluginPackages(root: string): Promise<PublishCandidate[]> {
+  const candidates: PublishCandidate[] = []
   let level: { relative: string; directory: string }[] = [{ relative: '.', directory: root }]
   let inspected = 0
   while (level.length) {
-    const found: string[] = []
     const next: { relative: string; directory: string }[] = []
     for (const { relative, directory } of level) {
       if (++inspected > MAX_LOOKUP_DIRECTORIES) {
         throw new Error('工作区目录过多，请指定要发布的包目录。')
       }
       const project = await detectPluginProject(directory)
-      if (project?.name === name && project.version === version) {
-        found.push(relative)
-        if (found.length > 1) return found
-      }
+      if (project) candidates.push({ directory: relative, project })
       let entries
       try {
         entries = await readdir(directory, { withFileTypes: true })
@@ -113,10 +110,28 @@ export async function findPluginPackages(root: string, name: string, version: st
         next.push({ relative: relative === '.' ? entry.name : relative + '/' + entry.name, directory: join(directory, entry.name) })
       }
     }
-    if (found.length) return found
     level = next
   }
-  return []
+  return candidates
+}
+
+/**
+ * Find the workspace directories whose manifest declares exactly this package
+ * and version. Publishing uses it when the request names no directory, so a
+ * collection workspace resolves its own subdirectory instead of the model
+ * guessing one. The shallowest directory wins because a copy nested deeper is
+ * a pack or build artifact, not the project; equal depths report ambiguity.
+ * @param root - the workspace real path.
+ * @param name - exact package name.
+ * @param version - exact package version.
+ * @returns matching workspace-relative directories, `.` for the root; more than one means equal depth.
+ */
+export async function findPluginPackages(root: string, name: string, version: string): Promise<string[]> {
+  const matches = (await listPluginPackages(root))
+    .filter(candidate => candidate.project.name === name && candidate.project.version === version)
+  if (matches.length === 0) return []
+  const shallowest = Math.min(...matches.map(candidate => depth(candidate.directory)))
+  return matches.filter(candidate => depth(candidate.directory) === shallowest).map(candidate => candidate.directory)
 }
 
 /**
@@ -169,6 +184,13 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
     }
     const workspace = inputs.workspace(new URL(request.url).searchParams.get('workspace'))
     if (!workspace) return Response.json({ error: 'workspace_not_found' }, { status: 404 })
+    if (new URL(request.url).searchParams.get('scope') === 'candidates') {
+      try {
+        return Response.json({ candidates: await listPluginPackages(workspace.path) }, { headers: { 'cache-control': 'no-store' } })
+      } catch {
+        return Response.json({ error: 'workspace_unavailable' }, { status: 404 })
+      }
+    }
     let project: PluginProject | undefined
     try {
       project = await detectPluginProject(workspace.path)
