@@ -24,10 +24,10 @@ export function AccountQuotaBanner({ useAccount, usePlatformPage, openPlatformPa
   const topUpUrl = useAccount(snapshot => snapshot.view?.links.topUpUrl)
   const page = usePlatformPage(current => current)
   if (profile?.status !== 'ready' || page !== null) return null
-  const { quotaRemaining: remaining, quotaLimit: limit, subscriptionActive, plan } = profile.value
+  const { quotaRemaining: remaining, quotaTotal: total, subscriptionActive, plan } = profile.value
   if (remaining == null) return null
   const expired = subscriptionActive === false && plan != null && plan !== 'free'
-  const low = limit != null && limit > 0 && remaining <= limit * 0.05
+  const low = total != null && total > 0 && remaining <= total * 0.05
   if (remaining > 0 && !expired && !low) return null
 
   const text = remaining <= 0

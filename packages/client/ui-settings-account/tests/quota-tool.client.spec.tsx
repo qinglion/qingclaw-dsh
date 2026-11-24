@@ -37,19 +37,19 @@ function mount(wallet: Partial<AccountProfile> | null | undefined, wide = true, 
   return { openPlatformPage, refreshAccount, update }
 }
 
-it.each([true, false])('shows weekly allowance separately from total and opens usage, wide=%s', async (wide) => {
+it.each([true, false])('shows the remaining share of the recharge total and opens usage, wide=%s', async (wide) => {
   const { openPlatformPage, refreshAccount } = mount({
-    plan: 'pro', subscriptionActive: true, weeklyLimit: 1000, weeklyRemaining: 220, quotaRemaining: 56173,
+    plan: 'pro', subscriptionActive: true, quotaTotal: 1000, quotaRemaining: 220,
   }, wide)
-  const ring = screen.getByRole('button', { name: /本周剩余 · 22%/ })
+  const ring = screen.getByRole('button', { name: '可用额度 · 22%' })
   fireEvent.focus(ring)
   fireEvent.pointerEnter(ring, { pointerType: 'mouse' })
-  expect((await screen.findByRole('tooltip')).textContent).toBe('本周剩余 · 22%')
+  expect((await screen.findByRole('tooltip')).textContent).toBe('可用额度 · 22%')
   fireEvent.click(ring)
   const menu = within(screen.getByRole('menu'))
   expect(menu.getByText(/Pro 套餐/)).toBeTruthy()
-  expect(menu.getByText('22%')).toBeTruthy()
-  expect(menu.getByText('56,173')).toBeTruthy()
+  expect(menu.getByText('总额度').nextElementSibling?.textContent).toBe('1,000')
+  expect(menu.getByText('可用额度').nextElementSibling?.textContent).toBe('220')
   expect(refreshAccount).toHaveBeenCalledOnce()
   fireEvent.click(menu.getByRole('menuitem', { name: '管理用量' }))
   expect(openPlatformPage).toHaveBeenCalledWith('usage', expect.any(Function))
@@ -57,39 +57,46 @@ it.each([true, false])('shows weekly allowance separately from total and opens u
 })
 
 it.each([
-  [{ weeklyLimit: 5000, quotaRemaining: 2900 }, '暂不可用'],
-  [{ weeklyLimit: 0, weeklyRemaining: 0 }, '无每周额度'],
-  [{ weeklyLimit: 5000, weeklyRemaining: 0, quotaRemaining: 2900 }, '0%'],
-] as const)('shows the paid plan even with missing or exhausted weekly allowance', (wallet, text) => {
+  [{ quotaTotal: 120, quotaRemaining: 20 }, '17%'],
+  [{ quotaTotal: 1000, quotaRemaining: 0 }, '0%'],
+  [{ quotaTotal: 0, quotaRemaining: 0 }, '0%'],
+  [{ quotaTotal: 1000, quotaRemaining: 2000 }, '100%'],
+  [{ quotaTotal: 1000 }, '暂不可用'],
+  [{ quotaRemaining: 2900 }, '暂不可用'],
+] as const)('shares the remaining credits against the recharge total', (wallet, text) => {
   mount({ subscriptionActive: true, ...wallet })
-  fireEvent.click(screen.getByRole('button', { name: `可用额度 · 本周剩余 · ${text}` }))
-  expect(within(screen.getByRole('menu')).getByText('每周额度').nextElementSibling?.textContent).toBe(text)
+  expect(screen.getByRole('button', { name: `可用额度 · ${text}` })).toBeTruthy()
 })
 
 it.each([
-  ['free', { subscriptionActive: false, plan: 'free', trialTokens: 200000 }],
-  ['expired', { subscriptionActive: false, plan: 'pro', weeklyLimit: 5000, weeklyRemaining: 100 }],
-  ['top-up only', { subscriptionActive: false, topupTokens: 5000 }],
-  ['unknown subscription', { plan: 'pro', quotaRemaining: 2900 }],
+  ['free', { subscriptionActive: false, plan: 'free', quotaTotal: 200, quotaRemaining: 150 }],
+  ['expired', { subscriptionActive: false, plan: 'pro', quotaTotal: 5000, quotaRemaining: 100 }],
+  ['top-up only', { subscriptionActive: false, topupTokens: 5000, quotaTotal: 5000, quotaRemaining: 5000 }],
+  ['unknown subscription', { plan: 'pro', quotaTotal: 2900, quotaRemaining: 2900 }],
+] as const)('shows the control for a %s account', (_state, wallet) => {
+  mount(wallet)
+  expect(screen.getByRole('button')).toBeTruthy()
+})
+
+it.each([
+  ['no reported credits', { plan: 'free', subscriptionActive: false }],
   ['loading profile', undefined],
   ['failed profile', null],
-] as const)('hides the quota control for %s', (_state, wallet) => {
+] as const)('hides the quota control with %s', (_state, wallet) => {
   mount(wallet)
   expect(screen.queryByRole('button')).toBeNull()
 })
 
-it('closes the open menu when a refreshed account no longer has a subscription', () => {
-  const { update } = mount({ subscriptionActive: true })
+it('closes the open menu when a refreshed account no longer reports credits', () => {
+  const { update } = mount({ subscriptionActive: true, quotaTotal: 1000, quotaRemaining: 500 })
   fireEvent.click(screen.getByRole('button'))
   expect(screen.getByRole('menu')).toBeTruthy()
-  update({ subscriptionActive: false })
+  update({ subscriptionActive: true })
   expect(screen.queryByRole('button')).toBeNull()
   expect(screen.queryByRole('menu')).toBeNull()
-  update({ subscriptionActive: true })
-  expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('false')
 })
 
 it('hides the personal quota control when signed out', () => {
-  mount({ subscriptionActive: true }, false, false)
+  mount({ subscriptionActive: true, quotaTotal: 1000, quotaRemaining: 500 }, false, false)
   expect(screen.queryByRole('button')).toBeNull()
 })

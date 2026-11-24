@@ -69,14 +69,13 @@ export interface AccountProfile {
   readonly plan?: string | null
   /** ISO timestamp when the current subscription ends. */
   readonly subscriptionEndsAt?: string | null
-  /** Total usable QingClaw quota across trial, weekly, and top-up balances. */
+  /** Remaining usable QingClaw credits across trial, plan grants, and top-ups. */
   readonly quotaRemaining?: number | null
-  /** Current weekly quota limit, or the gateway limit when no weekly quota exists. */
-  readonly quotaLimit?: number | null
-  /** Remaining current-week allowance. */
-  readonly weeklyRemaining?: number | null
-  /** Current-week allowance limit. */
-  readonly weeklyLimit?: number | null
+  /**
+   * Credits granted since the last recharge; the quota ring denominator.
+   * A recharge adds its credits to the remaining balance and resets this total.
+   */
+  readonly quotaTotal?: number | null
   /** Non-expiring purchased quota. */
   readonly topupTokens?: number | null
   /** Non-expiring trial quota. */

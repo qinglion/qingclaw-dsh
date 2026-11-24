@@ -13,7 +13,7 @@ function account(remaining: number, active: boolean, plan = 'pro', limit = 100_0
     details: {
       profile: {
         status: 'ready' as const,
-        value: { id: 'u1', name: '用户', contact: null, quotaRemaining: remaining, quotaLimit: limit, plan, subscriptionActive: active },
+        value: { id: 'u1', name: '用户', contact: null, quotaRemaining: remaining, quotaTotal: limit, plan, subscriptionActive: active },
       },
     },
   }

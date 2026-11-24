@@ -15,31 +15,33 @@ interface QuotaToolFace {
 
 type QuotaToolProps = PropsRuntime<'settings.launcher.tools'> & PropsLocale<'settings.account'> & InjectFace<QuotaToolFace>
 
-/** Show the wallet's weekly allowance separately from its total available balance. */
+/** Show the credits left as a share of the total granted since the last recharge. */
 export function AccountQuotaTool({ wide, t, useAccount, refreshAccount, openPlatformPage }: QuotaToolProps) {
   const account = useAccount(value => value)
   const profile = account.details?.profile
-  if (account.failed || account.view?.status !== 'credential-stored' || profile?.status !== 'ready'
-    || profile.value.subscriptionActive !== true) return null
-  return <PaidQuotaMenu key={profile.value.id} wallet={profile.value} usageUrl={account.view.links.usageUrl}
+  if (account.failed || account.view?.status !== 'credential-stored' || profile?.status !== 'ready') return null
+  if (profile.value.quotaRemaining == null && profile.value.quotaTotal == null) return null
+  return <QuotaMenu key={profile.value.id} wallet={profile.value} usageUrl={account.view.links.usageUrl}
     wide={wide} t={t} refreshAccount={refreshAccount} openPlatformPage={openPlatformPage} />
 }
 
-function PaidQuotaMenu({ wallet, usageUrl, wide, t, refreshAccount, openPlatformPage }:
+/** Credit share of the recharge total; a recharge resets the denominator and refills the numerator. */
+function quotaPercent(remaining: number | null | undefined, total: number | null | undefined): number | undefined {
+  if (remaining == null || remaining < 0 || total == null || total < 0) return undefined
+  if (total === 0) return remaining === 0 ? 0 : undefined
+  return Math.min(100, Math.round(remaining / total * 100))
+}
+
+function QuotaMenu({ wallet, usageUrl, wide, t, refreshAccount, openPlatformPage }:
   Pick<QuotaToolProps, 'wide' | 't' | 'refreshAccount'> & {
     wallet: AccountProfile
     usageUrl: string
     openPlatformPage: PlatformPages['open'] | undefined
   }) {
   const [open, setOpen] = useState(false)
-  const limit = wallet.weeklyLimit
-  const remaining = wallet.weeklyRemaining
-  const noWeek = limit === 0
-  const percent = !noWeek && limit != null && limit > 0 && remaining != null && remaining >= 0
-    ? Math.min(100, Math.round(remaining / limit * 100)) : undefined
+  const percent = quotaPercent(wallet.quotaRemaining, wallet.quotaTotal)
   const unknown = t('quotaUnknown')
-  const weekly = noWeek ? t('quotaNoWeekly') : percent === undefined ? unknown : `${percent}%`
-  const weeklyLabel = `${t('quotaWeekRemaining')} · ${weekly}`
+  const label = `${t('quotaRemaining')} · ${percent === undefined ? unknown : `${percent}%`}`
   const sources: string[] = []
   if (wallet.plan) {
     sources.push(t('quotaPlan', { plan: wallet.plan.charAt(0).toUpperCase() + wallet.plan.slice(1) }))
@@ -48,8 +50,8 @@ function PaidQuotaMenu({ wallet, usageUrl, wide, t, refreshAccount, openPlatform
   if (wallet.topupTokens && wallet.topupTokens > 0) sources.push(t('quotaPurchased'))
   return <Menu open={open} side="top" align="end" portal autoFocus listClassName={css.popover}
     onClose={() => { setOpen(false) }}
-    anchor={<Tooltip label={weeklyLabel} side={wide ? 'top' : 'right'} portal disabled={open}>
-      <button type="button" className={css.trigger} aria-label={`${t('quotaRemaining')} · ${weeklyLabel}`}
+    anchor={<Tooltip label={label} side={wide ? 'top' : 'right'} portal disabled={open}>
+      <button type="button" className={css.trigger} aria-label={label}
         aria-haspopup="menu" aria-expanded={open} onClick={() => {
           setOpen(!open)
           if (!open) void refreshAccount().catch(() => undefined)
@@ -65,7 +67,7 @@ function PaidQuotaMenu({ wallet, usageUrl, wide, t, refreshAccount, openPlatform
     <div className={css.content}>
       <div className={css.source}>{t('quotaSource')} {sources.join(' + ') || unknown}</div>
       <dl className={css.rows}>
-        <div><dt>{t('quotaWeekly')}</dt><dd>{weekly}</dd></div>
+        <div><dt>{t('quotaTotal')}</dt><dd>{wallet.quotaTotal == null ? unknown : formatCredits(wallet.quotaTotal)}</dd></div>
         <div><dt>{t('quotaRemaining')}</dt><dd>{wallet.quotaRemaining == null ? unknown : formatCredits(wallet.quotaRemaining)}</dd></div>
       </dl>
     </div>

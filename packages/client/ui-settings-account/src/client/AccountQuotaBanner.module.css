@@ -13,6 +13,9 @@
   border: 1px solid color-mix(in srgb, var(--dsh-warning, #d97706) 35%, transparent);
   border-radius: 12px;
   background: color-mix(in srgb, var(--dsh-warning, #d97706) 9%, transparent);
+  /* The composer seat's fade band lets transcript text scroll under this card;
+     the theme's frosted material keeps the tint and the warning copy readable. */
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
   box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
   color: var(--dsh-text, #1f2937);
   font-size: 12px;
