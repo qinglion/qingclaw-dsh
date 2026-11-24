@@ -2,6 +2,8 @@ Before New Session
 - tree "Sessions":
   - treeitem "New session regression" [expanded]
   - treeitem "Use the read tool twice now" [selected]
+Workspace row tooltip
+- tooltip "New session"
 After New Session
 - tree "Sessions":
   - treeitem "New session regression" [expanded]

@@ -42,12 +42,16 @@ interface WorkspaceSessionMode {
   readonly matches: (sessionId: SessionId) => boolean
   /** Allocate a fresh Session identity for this mode. */
   readonly createId: () => SessionId
+  /** Identify a target Workspace for an explicit plain New Session action. */
+  readonly matchesWorkspace?: (workspace: WorkspaceView, signal: AbortSignal) => boolean | Promise<boolean>
 }
 
 /** Workspace archive and directory operations consumed by Client UI domains. */
 export interface UiWorkspace {
   /**
-   * Carry a visible dedicated conversation's mode into New Session in the same Workspace.
+   * Carry a visible conversation's mode into plain New Session in the same Workspace.
+   * For an explicit target, the first Workspace matcher supplies a mode when there is
+   * no visible mode to inherit. A failed match check reports a creation failure.
    * Registered mode Sessions are excluded from ordinary blank reuse.
    * @param mode - identity matcher and allocator for the dedicated workflow.
    * @returns disposer for the caller's registration.
@@ -97,7 +101,7 @@ export interface UiWorkspace {
   connectWorkspace(workspaceId: WorkspaceId, options?: Pick<StartSessionOptions, 'agentPreset'>): Promise<SessionId>
   /**
    * Open the Workspace blank `connectWorkspace` resolves, or create a fresh Session in the
-   * visible conversation's registered mode for a plain request in the same Workspace.
+   * registered mode chosen for a plain request by the visible conversation or explicit target.
    * A refused creation is shown through the Workspace notice and preserves the selection.
    * @param workspaceId - explicit target; absent inherits the current or most recent Workspace.
    * @param options - initial content, the blank's preset, and `whenDraftExists`, which decides
@@ -328,11 +332,18 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     workspaceId: WorkspaceId,
     beforeOpen: ((sessionId: SessionId) => void) | undefined,
     reuse: Pick<StartSessionOptions, 'agentPreset'>,
-    mode?: WorkspaceSessionMode,
+    selection?: WorkspaceSessionMode | 'target-workspace',
   ): Promise<void> {
     const navigation = AbortSignal.any([this.ctx.layout.beginNavigation(), this.lifetime.signal])
+    let mode: WorkspaceSessionMode | undefined
     let sessionId: SessionId
     try {
+      if (selection === 'target-workspace') {
+        mode = await this.modeForWorkspace(workspaceId, navigation)
+        if (navigation.aborted) return
+      } else {
+        mode = selection
+      }
       sessionId = mode === undefined
         ? await this.connectBlank(workspaceId, reuse)
         : await this.createNamed({ workspaceId, sessionId: mode.createId() })
@@ -344,6 +355,17 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     }
     if (navigation.aborted || (mode !== undefined && !this.sessionModes.has(mode))) return
     this.replaceMain(sessionId, navigation, 'reveal', beforeOpen)
+  }
+
+  private async modeForWorkspace(workspaceId: WorkspaceId, navigation: AbortSignal): Promise<WorkspaceSessionMode | undefined> {
+    const workspace = this.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
+    if (workspace === undefined) return undefined
+    for (const mode of Array.from(this.sessionModes)) {
+      if (navigation.aborted) return undefined
+      if (!this.sessionModes.has(mode) || mode.matchesWorkspace === undefined) continue
+      if (await mode.matchesWorkspace(workspace, navigation) && this.sessionModes.has(mode)) return mode
+    }
+    return undefined
   }
 
   async forkSession(
@@ -386,14 +408,17 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       && this.ctx.layout.panelInfo.getSnapshot().activePanelId === null
       ? Array.from(this.sessionModes).find(candidate => candidate.matches(current))
       : undefined
+    const matchTarget = options === undefined && workspaceId !== undefined
+      && Array.from(this.sessionModes).some(candidate => candidate.matchesWorkspace !== undefined)
+    const selection = mode ?? (matchTarget ? 'target-workspace' : undefined)
     const beforeOpen = initializeDraft ? (id: SessionId) => {
       const binding = this.sessions.binding(id)
       if (binding === undefined) this.draftPreparationFailed()
       this.prepareDraft(binding, draftOptions)
     } : undefined
-    const opening = mode === undefined
+    const opening = selection === undefined
       ? this.openWorkspace(target, beforeOpen, agentPreset === undefined ? {} : { agentPreset })
-      : this.openWorkspaceSession(target, undefined, {}, mode)
+      : this.openWorkspaceSession(target, undefined, {}, selection)
     void opening.catch(
       (reason: unknown) => { console.warn('new session failed:', reason) },
     )

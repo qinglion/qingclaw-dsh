@@ -89,7 +89,7 @@ Session 行渲染运行时的实时 `pendingInteraction` 分类：审批显示**
 
 `ctx.uiWorkspace.openSession(target)` 会同步替换其拥有的 `mainView` reference，并让主区域返回 Conversation，而不等待 `reference.ready`，因此历史加载会显示在已经选中的 Session 视图内。目标可以是已知 Session id，也可以是持久的直接父子 subagent 地址；显式地址不要求预先加载 parent catalog。`openWorkspace(id, beforeOpen?, options?)` 仅在请求未被后续导航替代时打开工作区空白 Session；新会话与重新打开工作区打开同一个空白会话，因此会回到该空白会话中未发送的草稿。`forkSession(id, onCreated?, options?)` 创建子会话，不导航，也不替代尚未完成的导航；`allowMigration` 携带调用方的迁移许可。可选的同步准备回调在目标被 retain 后执行，并且仅对仍有效的 Workspace 请求执行，因此过期请求不会搬移 composer 草稿。后续导航或 owner 释放会阻止晚到的 UI 提交，但不取消底层 Session 创建。
 
-插件可以通过 `registerSessionMode({ matches, createId })` 注册专用会话模式。在当前可见会话符合该模式时，直接在同一工作区新建会话会沿用该模式，并创建独立会话。模式有效期间，普通新会话会跳过该模式的空白会话。
+插件可以通过 `registerSessionMode({ matches, createId, matchesWorkspace })` 创建专用会话。直接新建会话时，如果当前可见会话属于目标工作区并符合已注册的模式，就沿用该模式。显式指定目标且无可沿用的模式时，由可选的 `matchesWorkspace` 回调根据目标工作区选择模式。普通新会话复用空白会话时会跳过已注册模式的会话。全局「新会话」快捷键使用当前或最近使用的工作区，工作区行按钮使用该行的工作区。
 
 Session 行与 Workspace 行的可用操作来自浏览器根的访问 Hook：`useWorkspaceAccess` 门控 Workspace 的新建、重命名、删除与排序动作，`useSessionAccess` 门控 Session 行的重命名、分叉、拖拽、置顶、归档与取消归档动作，以及搜索结果的恢复控件。被拒绝的动作不渲染，但每个发往 Host 的请求仍以其授权为准。Ungrouped 标题行不提供新建会话，因为它没有可在其中新建会话的后备 Workspace。启动恢复会 retain 主 reference，不改变已选面板，也不取消后续导航。归档主 Session 会释放其 reference 并清除主选择。选择失败时保留当前全局面板。Session 行读取 `usePanelInfo`，在全局面板活跃时不显示 Session 选中样式；仅把焦点移到搜索框或目录选择器不会离开该面板。
 
