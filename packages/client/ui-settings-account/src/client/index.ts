@@ -133,14 +133,23 @@ export function apply(ctx: Context): void {
         const credentialsChanged = frame.value.type === 'credentials-changed'
         const view = frame.value.state
         const generationChanged = frame.generation !== accountGeneration
-        const reset = credentialsChanged || generationChanged || snapshot.view?.status !== view.status || snapshot.failed
+        // A routine frame only refreshes the sign-in state and starts a read; keeping what
+        // that read produced until its successor lands stops the composer banner and the
+        // account menu from blinking out on every frame. A new credential, a different
+        // sign-in state, or recovery from a failed stream invalidates it instead.
+        const dropDetails = credentialsChanged || snapshot.view?.status !== view.status || snapshot.failed
+        const reset = dropDetails || generationChanged
         accountGeneration = frame.generation
         revision++
         refreshing = undefined
-        avatar.reset()
+        if (dropDetails) avatar.reset()
         const initialize = view.status === 'credential-stored' && view.attempt?.phase === 'succeeded'
           && snapshot.view?.attempt?.phase !== 'succeeded'
-        publish({ ...snapshot, view, details: undefined, avatar: undefined, failed: false })
+        publish({
+          ...snapshot, view, failed: false,
+          details: dropDetails ? undefined : snapshot.details,
+          avatar: dropDetails ? undefined : snapshot.avatar,
+        })
         browser.update(view)
         frame.accept()
         ctx.emit('account-ui/change', snapshot, reset)

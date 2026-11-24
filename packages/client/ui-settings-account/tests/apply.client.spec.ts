@@ -313,6 +313,29 @@ it('keeps successful account refreshes silent and reports only failed reads', as
   expect(JSON.stringify(output.mock.calls)).not.toContain('private-rpc-detail')
 }, 60_000)
 
+it('keeps the account it already read through a routine frame so the composer banner does not blink', async ({ start }) => {
+  const c = await start()
+  const actions = operations(c)
+  c.mock.remote.account.getProfile.mockResolvedValue(ok(profile))
+  c.mock.remote.account.getBalance.mockResolvedValue(ok({ status: 'ready', value: [], bonusWallets: [] }))
+  c.mock.streams.push('account/watch', { type: 'snapshot', state: stored })
+  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().details?.profile).toEqual(profile) })
+  const seen: unknown[] = []
+  const stop = actions.hooks.account.subscribe(() => { seen.push(actions.hooks.account.getSnapshot().details?.profile) })
+  // A reconciliation frame refreshes the sign-in state and starts the one read; until
+  // that read lands, the banner and the account menu keep rendering what they had.
+  const pending = Promise.withResolvers<Awaited<ReturnType<typeof ok<AccountDetails['profile'] | null>>>>()
+  c.mock.remote.account.getProfile.mockReturnValueOnce(pending.promise)
+  c.mock.streams.push('account/watch', { type: 'snapshot', state: stored })
+  await vi.waitFor(() => { expect(c.mock.remote.account.getProfile).toHaveBeenCalledTimes(2) })
+  expect(actions.hooks.account.getSnapshot().details?.profile).toEqual(profile)
+  pending.resolve(ok(profile))
+  await c.flush()
+  stop()
+  expect(seen.length).toBeGreaterThan(0)
+  expect(seen.every(entry => entry !== undefined)).toBe(true)
+}, 60_000)
+
 it('coalesces refreshes, publishes independent failures, and rejects stale responses after sign-out or unload', async ({ start }) => {
   vi.stubGlobal('dshDesktop', {})
   const c = await start()
