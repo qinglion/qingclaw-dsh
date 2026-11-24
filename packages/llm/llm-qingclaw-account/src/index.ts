@@ -12,6 +12,11 @@ import type {
 } from '@deepseek-ai/dsh-llm-deepseek'
 import { registerAccountAdapter } from './gateway-adapter.ts'
 import { Config, plainOptions, resolveOptions } from './config.ts'
+import {
+  dataUrlOf, imageMediaTypeOf, isHostedReference, MAX_IMAGE_BYTES, mediaKindOf, MediaArgumentError,
+  readVideoArgs, VIDEO_SYNTHESIS_PATH, videoSynthesisRequest,
+} from './media.ts'
+import type { MediaItem, MediaType, VideoArgs } from './media.ts'
 import { ModelKeyCache } from './model-key.ts'
 import { ModelTokenCache } from './model-token.ts'
 import { installTurnUsageRefresh } from './turn-usage.ts'
@@ -27,6 +32,12 @@ const MODEL_TOKEN_HEADER = 'x-dsh-auth-token'
 /** Protocol settings plus the catalog resolved for the same operation. */
 interface AccountConnection extends ResolvedDeepSeekOptions {
   readonly catalog: ListedCatalog
+}
+
+/** Filesystem operations the media tools need, declared structurally to keep the dependency optional. */
+interface MediaFileSystem {
+  resolve(path: string, options: { signal?: AbortSignal }): Promise<object>
+  readBytes(target: object, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array>
 }
 
 async function requestQingclawListing(url: string, token: string, signal: AbortSignal): Promise<ModelListing> {
@@ -157,6 +168,45 @@ export function apply(ctx: Context, config: Config): void {
       if (!response.ok) throw new LlmError(`QingClaw media request failed: ${response.status} ${text.slice(0, 300)}`, 'UNKNOWN')
       return text
     }
+    const files = ctx.get('fs') as MediaFileSystem | undefined
+    /**
+     * Turn one media argument into a reference the gateway fetches or decodes.
+     * @param value - hosted URL, data URL, or local path.
+     * @param type - media slot the value fills.
+     * @param signal - cancels a local read.
+     * @returns the value to send in the request body.
+     */
+    const mediaReference = async (value: string, type: MediaType, signal?: AbortSignal): Promise<string> => {
+      if (isHostedReference(value)) return value
+      if (mediaKindOf(type) !== 'image') {
+        throw new MediaArgumentError(type + ' must be an https or oss:// URL; only images are read from local files')
+      }
+      const mediaType = imageMediaTypeOf(value)
+      if (mediaType === undefined) {
+        throw new MediaArgumentError('image must be an https URL, an oss:// URL, a data URL, or a local .jpg/.png/.webp/.bmp file')
+      }
+      if (files === undefined) throw new MediaArgumentError('local images need the session filesystem service')
+      const target = await files.resolve(value, signal === undefined ? {} : { signal })
+      return dataUrlOf(await files.readBytes(target, signal, MAX_IMAGE_BYTES), mediaType)
+    }
+    /**
+     * Resolve every media slot of one call into the array the gateway routes on.
+     * @param call - validated arguments.
+     * @param signal - cancels local reads.
+     * @returns media slots in prompt-reference order.
+     */
+    const collectMedia = async (call: VideoArgs, signal?: AbortSignal): Promise<MediaItem[]> => {
+      const slots: { type: MediaType; value: string }[] = [
+        ...(call.firstFrame === undefined ? [] : [{ type: 'first_frame' as const, value: call.firstFrame }]),
+        ...(call.lastFrame === undefined ? [] : [{ type: 'last_frame' as const, value: call.lastFrame }]),
+        ...call.referenceImages.map(value => ({ type: 'reference_image' as const, value })),
+        ...call.referenceVideos.map(value => ({ type: 'reference_video' as const, value })),
+        ...call.referenceAudios.map(value => ({ type: 'reference_audio' as const, value })),
+      ]
+      const media: MediaItem[] = []
+      for (const slot of slots) media.push({ type: slot.type, url: await mediaReference(slot.value, slot.type, signal) })
+      return media
+    }
     const textOutput = {
       schema: { type: 'string' as const },
       render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
@@ -182,26 +232,71 @@ export function apply(ctx: Context, config: Config): void {
         }),
         toolRegistry.register({
           name: 'video_generate',
-          description: 'Create a QingClaw video generation task with the default video model.',
+          description: 'Create a QingClaw video task with the default video model. '
+            + 'Pass firstFrame to animate a picture, or images/videos/audios to compose from references.',
           parameters: {
-            prompt: { type: 'string', required: true, description: 'Video description.' },
-            seconds: { type: 'string', description: 'Duration in seconds.' },
-            size: { type: 'string', description: 'Output size, for example 1280x720.' },
+            type: 'object',
+            properties: {
+              prompt: {
+                type: 'string',
+                description: 'What the clip shows: subject, action, camera movement, and style. '
+                  + 'Address reference media as "image 1", "video 1", or "audio 1" in send order.',
+              },
+              seconds: {
+                type: 'string',
+                description: 'Whole seconds from 2 to 30, or "auto" for the model-chosen length. Defaults to 5.',
+              },
+              size: {
+                type: 'string',
+                description: 'Output size such as 1280x720; 480, 720, and 1080 name the resolution tier. Defaults to 480P.',
+              },
+              ratio: {
+                type: 'string',
+                description: 'Frame ratio: adaptive, 21:9, 16:9, 4:3, 1:1, 3:4, or 9:16. Omit to follow the media.',
+              },
+              sound: {
+                type: 'boolean',
+                description: 'Whether the clip carries an audio track. Defaults to true.',
+              },
+              firstFrame: {
+                type: 'string',
+                description: 'Picture the clip starts from: an https, oss://, or data: URL, or a local image path.',
+              },
+              lastFrame: {
+                type: 'string',
+                description: 'Picture the clip ends on, in the same forms as firstFrame.',
+              },
+              images: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Up to 10 reference images: URLs or local image paths.',
+              },
+              videos: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Up to 5 reference videos: hosted mp4/mov URLs, 15 seconds in total.',
+              },
+              audios: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Up to 5 reference audio tracks: hosted mp3/wav URLs, 15 seconds in total.',
+              },
+            },
+            required: ['prompt'],
+            additionalProperties: false,
           },
           output: textOutput,
           timeoutMs: 60_000,
-          execute: async (args: { prompt: string; seconds?: string; size?: string }) => await mediaRequest(
-            '/video/api/v1/services/aigc/video-generation/video-synthesis',
-            {
-              model: settings().videoModel,
-              input: { prompt: args.prompt },
-              parameters: {
-                duration: Number(args.seconds ?? 5),
-                resolution: args.size?.includes('1080') === true ? '1080P' : args.size?.includes('720') === true ? '720P' : '480P',
-              },
-            },
-            { 'X-DashScope-Async': 'enable' },
-          ),
+          execute: async (args: unknown, exec?: { signal?: AbortSignal }) => {
+            const call = readVideoArgs(args)
+            const media = await collectMedia(call, exec?.signal)
+            return await mediaRequest(
+              VIDEO_SYNTHESIS_PATH,
+              videoSynthesisRequest(call, media, settings().videoModel),
+              { 'X-DashScope-Async': 'enable' },
+              exec?.signal,
+            )
+          },
         }),
         toolRegistry.register({
           name: 'audio_generate',

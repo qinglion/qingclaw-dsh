@@ -16,6 +16,7 @@ kind: "package-reference"
 ## 目录
 
 - [使用此包](#use-this-package)
+- [媒体工具](#media-tools)
 - [安全与失败边界](#security-and-failure-boundaries)
 - [开发备注](#dev-note)
 - [模型体验](#model-experience)
@@ -49,6 +50,29 @@ kind: "package-reference"
 | `modelsTimeoutMs` | `5,000` | 单次模型列表请求的超时 |
 | `modelsMaxAgeMs` | `600,000` | 模型列表刷新间隔；`0` 表示只在访问时刷新 |
 | `modelOverrides` | `{}` | 在官网目录条目之上覆盖单个模型的元数据 |
+
+<a id="media-tools"></a>
+## 媒体工具
+
+组合提供了工具注册表时，插件注册 `image_generate`、`video_generate` 和 `video_get`。它们使用与 Chat Completions 相同的网关密钥鉴权，并原样返回网关的 JSON 应答。
+
+`video_generate` 在 `/video/api/v1/services/aigc/video-generation/video-synthesis` 上创建一个异步任务。模型按素材槽位自动路由，因此同一条路由即可覆盖文生视频、首帧生视频、参考生视频、视频编辑和视频延长：
+
+| 字段 | 含义 |
+|---|---|
+| `prompt` | 必填，描述主体、动作、运镜和风格；按发送顺序用「图1」「视频1」「音频1」指代素材 |
+| `seconds` | 2 到 30 之间的整数秒，或用 `auto` 交给模型决定时长，默认 5 |
+| `size` | 输出像素，例如 `1280x720`；480、720、1080 决定分辨率档位，默认 480P |
+| `ratio` | `adaptive`、`21:9`、`16:9`、`4:3`、`1:1`、`3:4`、`9:16`；不填则跟随素材 |
+| `sound` | 成片是否带音轨；网关默认带声音 |
+| `firstFrame` / `lastFrame` | 成片的首帧和尾帧图片 |
+| `images` | 最多 10 张参考图 |
+| `videos` | 最多 5 段参考视频（mp4/mov，总时长不超过 15 秒） |
+| `audios` | 最多 5 段参考音频（mp3/wav，总时长不超过 15 秒） |
+
+首尾帧与参考素材互斥：一次调用只发送 `firstFrame`/`lastFrame`，或只发送 `images`/`videos`/`audios`，因为网关拒绝混用任务类型。
+
+本地图片路径通过会话文件系统服务读取，并以 `data:` URL 发送，字节不进入对话；图片支持 `jpg`、`jpeg`、`png`、`webp`、`bmp`，单张不超过 20 MB。参考视频和音频由网关拉取，因此必须是 `https` 或 `oss://` URL。
 
 <a id="security-and-failure-boundaries"></a>
 ## 安全与失败边界
@@ -88,3 +112,4 @@ kind: "package-reference"
 - token 与列表缓存只在当前进程中保存，重启后会重建。
 - 账号权限和额度由推理网关校验。
 - 官网目录首次应答前不公布任何模型，因此登录后无法访问官网的客户端无法开始对话。
+- `video_generate` 未开放 `file` 和 `link` 素材槽位，因此暂不能用文档和网页作视频参考。
