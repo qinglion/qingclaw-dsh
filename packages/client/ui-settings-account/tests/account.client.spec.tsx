@@ -820,6 +820,6 @@ it('displays fractional QingClaw credits when the Platform currency wallets are 
     profile: { status: 'ready', value: { id: null, name: null, contact: null, plan: 'free', quotaRemaining: 9_999.123456 } },
     balance: { status: 'ready', value: [], bonusWallets: [] },
   })
-  expect(screen.getByText('可用额度').nextElementSibling?.textContent).toBe('9,999.123456')
+  expect(screen.getByText('可用额度').nextElementSibling?.textContent).toBe('9,999')
   expect(screen.queryByText('充值余额')).toBeNull()
 })

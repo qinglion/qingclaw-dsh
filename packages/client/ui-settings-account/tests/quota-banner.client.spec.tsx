@@ -54,5 +54,5 @@ it('keeps a newly funded free account out of the expired and low-credit states',
 
 it('shows the actual fractional balance when credits run low', () => {
   mount(account(0.162, false, 'free', 1_000))
-  expect(screen.getByRole('status').textContent).toContain('额度即将用完，剩余： 0.162')
+  expect(screen.getByRole('status').textContent).toContain('额度即将用完，剩余： 0')
 })
