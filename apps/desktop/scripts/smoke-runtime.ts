@@ -43,6 +43,8 @@ export async function smokeDesktopRuntime(
   const hostEnvironment = {
     ...Object.fromEntries(Object.entries(environment).filter(([name]) => !/^(?:npm|pnpm|corepack)_/iu.test(name))),
     DSH_HOME: home, HOME: home, USERPROFILE: home,
+    // Intel CI runners can take longer than the 60s production deadline to render Office output.
+    DSH_OFFICE_KIT_TIMEOUT_MS: '300000',
     XDG_CONFIG_HOME: home, XDG_CACHE_HOME: home, XDG_STATE_HOME: home,
     APPDATA: home, LOCALAPPDATA: home,
     npm_config_userconfig: join(home, 'npmrc'), npm_config_globalconfig: join(home, 'npmrc'),

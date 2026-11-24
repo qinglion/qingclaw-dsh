@@ -299,6 +299,8 @@
       name: '@deepseek-ai/dsh-office-kit'
       config:
         outputDirectory: !!js dshHomePath('office-kit', 'outputs')
+        # The packaged runtime smoke raises this on slow Intel runners; production keeps 60s.
+        timeoutMs: !!js Number(process.env.DSH_OFFICE_KIT_TIMEOUT_MS ?? 60_000)
 
     # Every profile uses the packaged Office skills. Desktop supplies their Python
     # environment through the primary runtime named by DSH_PRIMARY_RUNTIME and
