@@ -13,8 +13,8 @@
 - button "Context injection skill-catalog"
 - button "Context injection time-context"
 - paragraph: partial
-- status: Deep diving
-- text: Deep diving for {{duration}} ···
+- status: Thinking
+- text: Thinking for {{duration}} ···
 - button "2 queued messages"
 - textbox "Cmd/Ctrl+Enter steers all queued messages"
 - button "Add files or run commands"

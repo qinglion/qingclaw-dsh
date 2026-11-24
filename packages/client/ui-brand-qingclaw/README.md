@@ -25,7 +25,7 @@ This package supplies the layered QingClaw product mark and locale-owned product
 <a id="use-this-package"></a>
 ## Use this package
 
-Load this package as a browser plugin after the sidebar and conversation packages. The QingClaw distribution bundle performs that composition for shipped QingClaw builds. It replaces the sidebar mark and name and the mark beside the blank-session headline. The two offset Qinglion layers distinguish QingClaw while retaining the product-family geometry and colors.
+Load this package as a browser plugin after the sidebar and conversation packages. The QingClaw distribution bundle performs that composition for shipped QingClaw builds. It replaces the sidebar mark and name and the mark beside the blank-session headline. The two offset Qinglion layers distinguish QingClaw while retaining the product-family geometry and colors. The artwork is the shared `QingClawMark` primitive from [ui-primitives](../ui-primitives/README.md#component-catalog), so brand seats and Chat's running activity row draw one geometry.
 
 -----
 

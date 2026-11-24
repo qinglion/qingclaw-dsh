@@ -14,8 +14,8 @@
 - button "Context injection time-context"
 - text: Running
 - button "Ask question waiting"
-- status: Deep diving
-- text: "Deep diving for {{duration}} ··· Interjection: include the word BANANA in your final reply."
+- status: Thinking
+- text: "Thinking for {{duration}} ··· Interjection: include the word BANANA in your final reply."
 - button "Copy"
 - region "Ready to continue?":
   - text: Checkpoint
