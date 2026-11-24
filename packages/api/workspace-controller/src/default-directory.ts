@@ -32,12 +32,14 @@ export function validateDocumentsDirectory(directory: string, platform: NodeJS.P
  * @param documentsDirectory - explicit deployment override for the system Documents directory.
  * @param signal - caller lifetime and lookup deadline.
  * @param internals - platform facts and native command runner.
+ * @param parentName - directory under Documents that owns the default Workspace.
  * @returns the absolute candidate path.
  */
 export async function defaultWorkspaceDirectory(
   documentsDirectory: string | undefined,
   signal: AbortSignal,
   internals: DocumentsDirectoryInternals = {},
+  parentName = 'deepseek-harness',
 ): Promise<string> {
   const platform = internals.platform ?? process.platform
   const paths = platform === 'win32' ? win32 : posix
@@ -74,5 +76,5 @@ export async function defaultWorkspaceDirectory(
   }
   directory = validateDocumentsDirectory(directory, platform)
   signal.throwIfAborted()
-  return paths.join(directory, 'deepseek-harness', DEFAULT_WORKSPACE_DIRECTORY)
+  return paths.join(directory, parentName, DEFAULT_WORKSPACE_DIRECTORY)
 }

@@ -60,6 +60,12 @@ export type RosterPreset = AgentPresetRoster['presets'][number]
 /** The roster, or the message to show in its place. */
 export type RosterRead = { ok: true; value: AgentPresetRoster } | { ok: false; error: string }
 
+/** Profiles may reserve presets for a dedicated launch surface. */
+export function presetVisible(id: string): boolean {
+  const hidden: unknown = (globalThis as { __DSH_HIDDEN_PRESET_CHOICES__?: unknown }).__DSH_HIDDEN_PRESET_CHOICES__
+  return !Array.isArray(hidden) || !hidden.includes(id)
+}
+
 const EMPTY_ROSTER: AgentPresetRoster = { presets: [] }
 
 /**
@@ -69,7 +75,7 @@ const EMPTY_ROSTER: AgentPresetRoster = { presets: [] }
  */
 export async function readRoster(ctx: ClientContext): Promise<RosterRead> {
   const result = await ctx.remote.agentPresets.list()
-  if (result.ok) return { ok: true, value: result.value }
+  if (result.ok) return { ok: true, value: { ...result.value, presets: result.value.presets.filter(preset => presetVisible(preset.id)) } }
   // Agent presets are optional: without that service every session uses the
   // Host composition, so callers receive the same empty roster as a mounted
   // service with no configured roots.

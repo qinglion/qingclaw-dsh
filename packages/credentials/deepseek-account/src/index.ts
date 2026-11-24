@@ -126,7 +126,8 @@ export class DeepSeekAccount extends TypertRemoteService {
    * Latest ready profile read and the grant token it was read with. Binding the token keeps a
    * cached identity from answering for a credential that has since changed.
    */
-  private lastProfile: { readonly token: string; readonly profile: Extract<AccountDetails['profile'], { status: 'ready' }> } | undefined
+  private lastProfile: { readonly token: string; readonly revision: number; readonly profile: Extract<AccountDetails['profile'], { status: 'ready' }> } | undefined
+  private usageRevision = 0
   private detailsLifetime = new AbortController()
   private closed = false
   private removing: Promise<AccountView> | undefined
@@ -227,15 +228,29 @@ export class DeepSeekAccount extends TypertRemoteService {
   @Remote
   async getProfile(client: AccountClientMetadata): Promise<AccountDetails['profile'] | null> {
     const lifetime = this.detailsLifetime
+    const revision = this.usageRevision
     const stored = await this.readCurrentGrant(lifetime)
     if (stored === null || lifetime.signal.aborted) return null
     const result = await this.getDetail('profile', this.detailHeaders(client), { lifetime, stored })
-    if (this.detailsLifetime !== lifetime) return null
+    if (this.detailsLifetime !== lifetime || this.usageRevision !== revision) return null
     if (result !== null) this.cacheProfile(stored.token, result)
     if (result?.status !== 'failed') return result
     // Only this same grant's last ready read may stand in for a failed refresh.
-    const cached = this.lastProfile?.token === stored.token ? this.lastProfile.profile : undefined
+    const cached = this.lastProfile?.token === stored.token && this.lastProfile.revision === revision ? this.lastProfile.profile : undefined
     return cached ?? result
+  }
+
+  /**
+   * Refresh account observers after a backend usage reconciliation for this grant.
+   * @param expectedToken - device grant whose usage was reconciled.
+   */
+  async refreshUsage(expectedToken: string): Promise<void> {
+    const lifetime = this.detailsLifetime
+    const stored = await this.readCurrentGrant(lifetime)
+    if (!stored || stored.token !== expectedToken || lifetime !== this.detailsLifetime || this.removing) return
+    this.usageRevision++
+    if (this.attempt?.initialProfile?.token === expectedToken) delete this.attempt.initialProfile
+    this.changed('snapshot')
   }
 
   /**
@@ -339,7 +354,7 @@ export class DeepSeekAccount extends TypertRemoteService {
     if (profile.status !== 'ready') return
     // Identity publishers re-read the session snapshot; wake them only when the stable ID changes.
     const previous = this.lastProfile?.profile.value.id || null
-    this.lastProfile = { token, profile }
+    this.lastProfile = { token, revision: this.usageRevision, profile }
     if (previous !== (profile.value.id || null)) this.changed('identity')
   }
 
@@ -707,18 +722,34 @@ export class DeepSeekAccount extends TypertRemoteService {
         try { url = new URL(req.url ?? '/', callbackOrigin) }
         catch { res.writeHead(400, { 'cache-control': 'no-store' }).end(); return }
         if (url.origin !== callbackOrigin.origin || url.pathname !== '/oauth/callback') { await next(); return }
-        const receivedCode = url.searchParams.get('code')
+        const receivedCodes = url.searchParams.getAll('code')
+        const receivedErrors = url.searchParams.getAll('error')
+        const receivedCode = receivedCodes[0]
         const receivedState = url.searchParams.get('state') ?? ''
         const validState = Buffer.byteLength(receivedState) === Buffer.byteLength(state)
           && timingSafeEqual(Buffer.from(receivedState), Buffer.from(state))
-        if (req.method !== 'GET' || !validState || !receivedCode
-          || url.searchParams.getAll('state').length !== 1 || url.searchParams.getAll('code').length !== 1) {
+        const approved = receivedCodes.length === 1 && receivedCode !== undefined && receivedCode.length > 0
+          && receivedErrors.length === 0
+        const denied = receivedErrors.length === 1 && receivedErrors[0] === 'access_denied'
+          && receivedCodes.length === 0
+        if (req.method !== 'GET' || !validState || url.searchParams.getAll('state').length !== 1
+          || (!approved && !denied)) {
           res.writeHead(400, { 'cache-control': 'no-store' }).end(); return
         }
         if (signal.aborted || attempt.callback !== undefined || attempt.view.phase !== 'waiting-browser') {
           res.writeHead(410, { 'cache-control': 'no-store' }).end(); return
         }
         attempt.callback = res
+        if (denied) {
+          // The Platform consent page already cancelled its one-time authorization. Settle the
+          // local authorization seam immediately so the Desktop UI leaves its waiting state and
+          // the held loopback response is closed by the normal cancelled-attempt path.
+          this.ctx.authorization.cancel(KEY)
+          return
+        }
+        if (receivedCode === undefined) {
+          res.writeHead(400, { 'cache-control': 'no-store' }).end(); return
+        }
         code.resolve(receivedCode)
       })
       signal.throwIfAborted()

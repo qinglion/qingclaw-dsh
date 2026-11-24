@@ -13,8 +13,8 @@
 - button "Context injection skill-catalog"
 - button "Context injection time-context"
 - paragraph: partial
-- status: Deep diving
-- text: Deep diving for {{duration}} ···
+- status: Thinking
+- text: Thinking for {{duration}} ···
 - list:
   - listitem:
     - img "Queued message image"

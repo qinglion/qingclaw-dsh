@@ -1,4 +1,7 @@
-.root { position: relative; flex: 1; min-width: 0; }
+.root { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; }
+.root[data-wide='false'], .root[data-wide='false'] .tools { flex-direction: column; }
+.tools { display: flex; flex: none; align-items: center; }
+.root > .anchor { flex: 1; min-width: 0; }
 .root[data-inset='true'] { margin-inline: 2px; }
 .notifications { position: absolute; inset-inline: 0; bottom: calc(100% + 4px); z-index: 1; }
 .anchor { width: 100%; }

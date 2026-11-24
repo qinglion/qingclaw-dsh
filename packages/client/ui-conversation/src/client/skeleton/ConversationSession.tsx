@@ -110,13 +110,16 @@ export function ConversationSessionHeader({
   renderSlot, renderFactorySlot, open, useContextMenu, selectView, setPinned, t, useEntryPins, useEntryActions,
 }: ConversationSessionHeaderProps) {
   const { getTriggerProps } = useContextMenu()
-  const tabs = useConversationViews(value => value)
+  const registered = useConversationViews(value => value)
+  const tabs = useMemo(() => hideChrome
+    ? registered.filter(tab => tab.id === FIXED_VIEW_ID || tab.supportsBlankSession)
+    : registered, [registered, hideChrome])
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const unpinned = useEntryPins(ids => ids)
   const hasEntryActions = useEntryActions(registered => registered)
-  const showTabs = !hideChrome && tabs.length > 1
+  const showTabs = tabs.length > 1
   const tabRow = useRef<HTMLDivElement>(null)
   const [visibleViewLimit, setVisibleViewLimit] = useState(1)
   // Observe only the available row width; individual tabs are not measured.

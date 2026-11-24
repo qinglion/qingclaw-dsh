@@ -15,6 +15,7 @@ export {
   DEFAULT_MAX_TOKENS,
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
 } from './defaults.ts'
+export { providerError } from './transport.ts'
 export { DeepSeekAdapter } from './adapter.ts'
 export type { DeepSeekRequestAuth, DeepSeekAdapterOptions, DeepSeekCatalogModel, DeepSeekConnectionOptions } from './types.ts'
 export {

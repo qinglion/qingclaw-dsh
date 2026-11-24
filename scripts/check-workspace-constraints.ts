@@ -59,6 +59,13 @@ const publicNativePackages = new Set([
 ])
 /** Public source home recorded in maintained package manifests. */
 const publishedRepositoryUrl = 'git+https://github.com/deepseek-ai/deepseek-harness.git'
+/**
+ * Source home for packages the QingClaw distribution owns. They ship in the dsh
+ * release family beside upstream packages but are maintained in this fork.
+ */
+const distributionRepositoryUrl = 'git+https://github.com/qinglion/qingclaw-dsh.git'
+/** Repository URLs a release member may advertise as its source. */
+const releaseRepositoryUrls = new Set([publishedRepositoryUrl, distributionRepositoryUrl])
 /** Packages that participate in the experimental policy. */
 const experimentalPackageDirectory = /^packages\/experimental\/[^/]+$/
 /** Private reference tool run from the repository; it publishes no files. */
@@ -548,9 +555,10 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
       errors.push(`${label}: release member must set publishConfig.access to "public"`)
     }
     if (manifest.repository?.type !== 'git'
-      || manifest.repository.url !== publishedRepositoryUrl
+      || manifest.repository.url === undefined
+      || !releaseRepositoryUrls.has(manifest.repository.url)
       || manifest.repository.directory !== dir) {
-      errors.push(`${label}: release member repository must use ${publishedRepositoryUrl} with directory ${dir}`)
+      errors.push(`${label}: release member repository must use ${[...releaseRepositoryUrls].join(' or ')} with directory ${dir}`)
     }
   } else if (!experimentalPackageDirectory.test(dir) && manifest.private !== true) {
     errors.push(`${label}: package.json must set "private": true`)

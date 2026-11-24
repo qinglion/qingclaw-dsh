@@ -1,0 +1,22 @@
+.trigger {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.trigger:hover, .trigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); }
+.trigger:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); }
+.track { stroke: var(--dsw-alias-border-default, var(--dsw-alias-label-tertiary)); }
+.value { stroke: currentColor; }
+.popover { min-width: 210px; }
+.content { padding: 8px 10px; font-size: 13px; color: var(--dsw-alias-label-primary); }
+.source { padding-bottom: 9px; border-bottom: 1px solid var(--dsw-alias-border-default, var(--dsw-alias-label-tertiary)); }
+.rows { margin: 9px 0 0; }
+.rows div { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding-block: 3px; }
+.rows dt { color: var(--dsw-alias-label-secondary); }
+.rows dd { margin: 0; font-variant-numeric: tabular-nums; }

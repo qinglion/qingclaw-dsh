@@ -201,7 +201,9 @@ describe('deriveTurnTokenUsage', () => {
       event(7, 'step/end', { turn: 1, step: 2 }),
       event(8, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
     ]
-    expect(deriveTurnTokenUsage(events)).toEqual({ uncachedInputTokens: 200, outputTokens: 40, totalTokens: 345 })
+    expect(deriveTurnTokenUsage(events)).toEqual({
+      uncachedInputTokens: 200, outputTokens: 40, totalTokens: 345, partialCacheReadTokens: 50,
+    })
   })
 
   it('sums multiple steps and preserves distinct attributed routes', () => {

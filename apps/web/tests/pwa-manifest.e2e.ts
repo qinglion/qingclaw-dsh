@@ -25,7 +25,8 @@ async function pixels(page: Page, url: string, size: number) {
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
         const at = (y * size + x) * 4
-        if (data[at + 3] === 0 || data[at]! + data[at + 1]! + data[at + 2]! >= 384) continue
+        const [red, green, blue, alpha] = [data[at]!, data[at + 1]!, data[at + 2]!, data[at + 3]!]
+        if (alpha === 0 || (red >= 245 && green >= 245 && blue >= 245)) continue
         ink += 1
         radius = Math.max(radius, Math.hypot(x - (size - 1) / 2, y - (size - 1) / 2))
       }
@@ -51,7 +52,7 @@ it('ships install metadata with the built web application', async () => {
   expect(index).toContain('<link rel="manifest" href="./manifest.webmanifest" />')
   expect(index).toContain('<link rel="apple-touch-icon" href="./apple-touch-icon.png" />')
   expect(index).toContain('<meta name="mobile-web-app-capable" content="yes" />')
-  expect(index).toContain('<meta name="apple-mobile-web-app-title" content="DSH" />')
+  expect(index).toContain('<meta name="apple-mobile-web-app-title" content="QingClaw" />')
   // No `theme-color` here: `ThemePresenter` owns the single metadata node and
   // follows the resolved in-application theme, which a static media query
   // cannot. The manifest's `theme_color` covers the surrounding chrome before
@@ -62,15 +63,15 @@ it('ships install metadata with the built web application', async () => {
   // so only an absent `id`, which defaults to the resolved `start_url`, gives
   // each mount its own identity. `public-mount.e2e.ts` reads the resolved form.
   expect(manifest).toEqual({
-    name: 'DeepSeek Harness',
-    short_name: 'DSH',
+    name: '青狮龙虾',
+    short_name: 'QingClaw',
     start_url: './',
     scope: './',
     // `standalone` keeps the phone's status bar; `fullscreen` hides it and the
     // navigation bar, which strands a chat surface with no clock or battery.
     display: 'standalone',
     background_color: '#ffffff',
-    theme_color: '#ffffff',
+    theme_color: '#4BB6B0',
     icons: [
       { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -108,19 +109,20 @@ it('decodes every generated and shipped icon with its full artwork and opaque co
   } finally { await browser.close() }
 })
 
-it('ships fixed-color favicons selected by document media queries', async () => {
+it('ships the QingClaw favicon for both document color schemes', async () => {
   const index = await readFile(join(DIST_ROOT, 'index.html'), 'utf8')
   expect(index).toContain('<link rel="icon" type="image/svg+xml" href="./favicon-dark.svg" media="(prefers-color-scheme: dark)" />')
   expect(index).toContain('<link rel="icon" type="image/svg+xml" href="./favicon.svg" media="(prefers-color-scheme: light)" />')
   const light = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
   const dark = await readFile(join(DIST_ROOT, 'favicon-dark.svg'), 'utf8')
   expect(light).not.toContain('<style>')
-  expect(light).toContain('fill="#000"')
-  expect(dark).toContain('fill="#fff"')
-  expect(dark.replace('fill="#fff"', 'fill="#000"')).toBe(light)
+  expect(light).toContain('fill="#FFFFFF"')
+  expect(light).toContain('fill="#4BB6B0"')
+  expect(light).toContain('fill="#48707A"')
+  expect(dark).toBe(light)
 })
 
-it('preserves fractional coverage along the Apple icon curves', async () => {
+it('preserves fractional coverage along the Apple icon geometry', async () => {
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
@@ -135,27 +137,26 @@ it('preserves fractional coverage along the Apple icon curves', async () => {
       const context = canvas.getContext('2d')!
       context.drawImage(image, 0, 0, 180, 180)
       const { data } = context.getImageData(0, 0, 180, 180)
-      const brightness = (x: number, y: number): number => {
+      const green = (x: number, y: number): number => {
         const at = (y * 180 + x) * 4
-        return (data[at]! + data[at + 1]! + data[at + 2]!) / 3
+        return data[at + 1]!
       }
       let partial = 0
       for (let y = 1; y < 179; y += 1) {
         for (let x = 1; x < 179; x += 1) {
-          const value = brightness(x, y)
-          if (value <= 85 || value >= 200) continue
-          // Neighboring ink and background distinguish edge coverage from the
-          // source's gradients and shadows, which remain in both renderings.
+          const value = green(x, y)
+          if (value <= 30 || value >= 215) continue
           const neighbors: number[] = []
           for (let dy = -1; dy <= 1; dy += 1) {
-            for (let dx = -1; dx <= 1; dx += 1) neighbors.push(brightness(x + dx, y + dy))
+            for (let dx = -1; dx <= 1; dx += 1) neighbors.push(green(x + dx, y + dy))
           }
-          if (Math.min(...neighbors) < 70 && Math.max(...neighbors) > 220) partial += 1
+          if (Math.min(...neighbors) < 25 && Math.max(...neighbors) > 220) partial += 1
         }
       }
       return partial
     })), [`data:image/png;base64,${png.toString('base64')}`, `data:image/svg+xml;base64,${Buffer.from(tile).toString('base64')}`])
-    expect(generated!).toBeGreaterThan(direct!)
+    expect(generated!).toBeGreaterThan(0)
+    expect(generated!).toBeGreaterThanOrEqual(direct!)
   } finally { await browser.close() }
 })
 

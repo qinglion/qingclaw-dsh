@@ -1,0 +1,17 @@
+.page { height: 100%; min-width: 0; overflow: auto; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
+.content { max-width: 960px; margin: 0 auto; padding: 32px clamp(20px, 4vw, 52px) 56px; }
+:global([data-platform='darwin']) .content { padding-top: calc(32px + var(--dsh-frame-top-clearance, 0px)); }
+.header, .actions, .tabs, .row, .sectionHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.header, .row, .sectionHead { justify-content: space-between; }
+.header { margin-bottom: 24px; }
+.page h1, .page h2, .page p { margin: 0; }
+.page h1 { font-size: 26px; font-weight: 500; }
+.page h2 { font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.tabs { padding-bottom: 12px; margin-bottom: 22px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+.list { list-style: none; padding: 0; margin: 0; }
+.row { padding-block: 14px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+.muted, .date { color: var(--dsw-alias-label-secondary); font-size: 13px; overflow-wrap: anywhere; }
+.body { display: grid; gap: 16px; }
+.package { background: none; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; padding: 4px 0; overflow-wrap: anywhere; }
+.package:hover { text-decoration: underline; }
+.body code { white-space: pre-wrap; overflow-wrap: anywhere; }

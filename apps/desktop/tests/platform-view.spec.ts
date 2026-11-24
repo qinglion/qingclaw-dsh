@@ -144,6 +144,7 @@ it('injects the deployment and client identity headers only at the Platform orig
     'x-deployment': 'harness', cookie: 'route=user; gate=synthetic', 'x-client-bundle-id': '',
     'x-client-platform': 'desktop-mac', 'x-client-version': '1.2.3', 'x-client-locale': 'en_US',
     'x-client-timezone-offset': String(-new Date().getTimezoneOffset() * 60),
+    'x-dsh-auth-token': 'fixture-secret',
   })
   // A redirect to another origin keeps the injected headers out of the follow-up request.
   expect(interceptHeaders(1, 'https://login.example.com/authorize', request)).toEqual({})
@@ -233,6 +234,7 @@ it('injects deployment headers only at the Platform origin and excludes them fro
       cookie: 'route=new; browser=keep; gate=private', accept: 'application/json', 'x-private-gate': 'private', 'x-client-platform': 'desktop-mac',
       'x-client-bundle-id': '', 'x-client-version': '1.2.3', 'x-client-locale': 'en_US',
       'x-client-timezone-offset': String(-new Date().getTimezoneOffset() * 60),
+      'x-dsh-auth-token': 'fixture-secret',
     } })
   }
   intercept({ id: 1, url: 'https://other.example/api', requestHeaders: {

@@ -43,6 +43,10 @@ declare module '@deepseek-ai/cordis' {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** Compact controls beside the account menu, stacked in the collapsed rail. */
+    'settings.launcher.tools': { kind: 'list'; scope: 'root'; owner: { wide: boolean } }
+    /** Additional actions inside the signed-in account menu. */
+    'settings.launcher.actions': { kind: 'list'; scope: 'root'; owner: { onDismiss: () => void } }
     /** Notifications anchored at the account menu; the contribution owns its markup and lifecycle. */
     'settings.launcher.notifications': { kind: 'single'; scope: 'root'; owner: AccountNotificationsOwnerProps }
   }

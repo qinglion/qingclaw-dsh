@@ -59,6 +59,8 @@ Desktop microphone access is restricted to audio requests from the primary `dsh-
 
 Press F12 (Fn+F12 on media-key keyboards), Command+Option+I on macOS, or Ctrl+Shift+I on Windows to toggle DevTools for the focused application page, including in packaged builds. The application menu shows a localized “Developer tools” command in a separate group before Hide and Quit (before Exit on Windows). Windows exposes it in the titlebar application popup; its hidden native application menu registers the shortcuts. macOS and Linux keep a hidden F12 shortcut alias in their application menus. Update overlays and packaged embedded browser guests disable DevTools.
 
+Open **Connect phone** in the sidebar footer after signing in. Scan the QingClaw website QR code, sign in with the same WeChat account on the phone and approve its connection request on the computer. Keep the desktop app online while using the mobile browser. Reopen **Connect phone** and select **Disconnect** to revoke access. Signing out or quitting the app also ends the connection.
+
 <a id="terminal-command"></a>
 
 ## Terminal command
@@ -83,13 +85,13 @@ The mandatory update confirmation includes the installation wait notice on Windo
 
 The confirmation is skipped when the installer restart already confirmed task interruption, when the fatal-recovery dialog exits or restarts, when the development Restart App and Host command runs, and during operating-system shutdown, restart, or log-off: Windows sets this on the definitive session-end message; macOS sets it on the power-off notification, and because another application can still cancel that shutdown, the next focus or show of the main window clears it. Installer-owned quit cancels any pending ordinary quit decision; late inspection results and dialog answers cannot open another confirmation or repeat cleanup. A user-initiated update download that finishes while the window is hidden defers its Install and Restart confirmation until the window is shown again; the mandatory flow keeps its taskbar and Dock attention. The Windows installer and uninstaller tell a user whose application is still running to quit it from the system tray. Desktop does not enable scheduled tasks by default, so the scheduled-task explanations appear only once that feature is on; reminders fire only in loaded sessions, and unloaded sessions are neither counted nor resumed until they are opened.
 
-The tray renderer enlarges the whale by 20% around the tile center while preserving the background and aspect ratio; application and installer icons retain their original proportions.
+The tray renderer enlarges the QingClaw mark by 20% around the tile center while preserving the background and aspect ratio; application and installer icons retain their original proportions.
 
 <a id="key-technical-decisions"></a>
 
 ## Key technical decisions
 
-The original artwork lives in `resources/icon.png` and `resources/icon.svg`; platform adaptations retain the whale and gradients in `resources/icon-windows.*` and `resources/icon-macos.*`. Export each platform SVG as a transparent 1024×1024 PNG. Electron-builder generates the multi-size ICO for the Windows application, installer, and uninstaller ([Windows icon requirements](https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-construction)). The installation pages use matching artwork in both themes; the uninstaller's welcome and finish pages share `installer/assets/uninstaller-sidebar.png`, converted to a 164×314 BMP during preparation.
+The original layered QingClaw artwork lives in `resources/icon.png` and `resources/icon.svg`; platform adaptations place the brand-teal mark on a white tile in `resources/icon-windows.*` and `resources/icon-macos.*`. Export each platform SVG as a transparent 1024×1024 PNG. Electron-builder generates the multi-size ICO for the Windows application, installer, and uninstaller ([Windows icon requirements](https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-construction)). The installation pages use matching artwork in both themes; the uninstaller's welcome and finish pages share `installer/assets/uninstaller-sidebar.png`, converted to a 164×314 BMP during preparation.
 
 Shortcut overrides are stored in `app.getPath('userData')/keybindings.json`, separately from `DSH_HOME`. The main process validates and serializes changes before publishing accepted bindings. Failed reads retain the last accepted bindings and block edits, including Restore All; unreadable and future-version files remain unchanged. Development can isolate these preferences with `DSH_DESKTOP_USER_DATA_DIR`; the launcher prints its resolved path. See the [shortcut service](../../packages/client/shortcuts/README.md) for format and conflict semantics.
 

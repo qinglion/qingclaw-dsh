@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
-import SessionStore from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
@@ -253,6 +253,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 15,
       cacheReadTokens: 2,
       cacheWriteTokens: 4,
+      unreportedCacheReadAttempts: 1,
     })
   })
 
@@ -264,8 +265,37 @@ describe('tokenUsage session projection', () => {
     expect(projected(ctx, session)).toEqual({
       uncachedInputTokens: 9,
       outputTokens: 1,
+      unreportedCacheReadAttempts: 1,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
+    })
+  })
+
+  it('replaces unknown cache coverage with an explicit zero in the final sample', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    const counts = { inputTokens: 18, outputTokens: 2, totalTokens: 20 }
+    usageChunk(session, counts, 1, 1)
+    expect(projected(ctx, session).unreportedCacheReadAttempts).toBe(1)
+    finalUsage(session, { ...counts, cacheReadTokens: 0 }, 1, 1)
+    expect(projected(ctx, session)).toEqual({ ...ZERO, uncachedInputTokens: 18, outputTokens: 2 })
+  })
+
+  it('rebuilds legacy checkpoints that stored absent cache reads as zero', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    finalUsage(session, { inputTokens: 4, outputTokens: 2, totalTokens: 20 }, 1, 1)
+    const checkpoint = ctx.sessionProjections.checkpoint(session)
+    const row = checkpoint.tokenUsage!
+    const stale = { ...checkpoint, tokenUsage: { ...row, ver: 2 } }
+    expect(ctx.sessionProjections.viewCheckpoint(stale)).not.toHaveProperty('tokenUsage')
+    expect(ctx.sessionProjections.restoreFloor(stale)).toBe(0)
+    const replayed = ctx.sessionProjections.restore(
+      stale, session.snapshotEvents(), SessionLogOffset(0), session.header, session.inheritedEventCount,
+    )
+    expect(replayed.checkpoint.tokenUsage?.ver).toBe(3)
+    expect(replayed.snapshot.values.tokenUsage).toEqual({
+      ...ZERO, uncachedInputTokens: 18, outputTokens: 2, unreportedCacheReadAttempts: 1,
     })
   })
 
@@ -290,6 +320,7 @@ describe('tokenUsage session projection', () => {
     expect(projected(ctx, session)).toEqual({
       uncachedInputTokens: 12,
       outputTokens: 3,
+      unreportedCacheReadAttempts: 1,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
     })

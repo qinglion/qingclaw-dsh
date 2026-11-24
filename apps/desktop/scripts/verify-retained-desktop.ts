@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DesktopRetainedManifest } from '@deepseek-ai/dsh-desktop-publisher/desktop-release-store.ts'
 import type { DesktopPublishConfig } from '@deepseek-ai/dsh-desktop-publisher/desktop-publish-config.ts'
+import { QINGCLAW_DISTRIBUTION } from '../../../distribution/qingclaw.mjs'
 import { verifyMacOSDiskImage, verifyMacOSNotarizedApplication } from './verify-macos-signature.mjs'
 
 /**
@@ -39,6 +40,6 @@ export async function verifyRetainedDesktopSignatures(
   const extracted = await mkdtemp(join(tmpdir(), 'desktop-publish-verify-'))
   try {
     run('/usr/bin/ditto', ['-x', '-k', zipPath, extracted])
-    verifyMacOSNotarizedApplication(join(extracted, 'DeepSeek Harness.app'), config.macOS)
+    verifyMacOSNotarizedApplication(join(extracted, `${QINGCLAW_DISTRIBUTION.productName}.app`), config.macOS)
   } finally { await rm(extracted, { recursive: true, force: true }) }
 }

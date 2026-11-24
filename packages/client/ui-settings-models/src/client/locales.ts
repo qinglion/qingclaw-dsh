@@ -3,7 +3,7 @@
 /** English strings (the key-set source of truth for this pair). */
 export const en = {
   nav: 'Models',
-  deepSeekAccount: 'DeepSeek Account',
+  deepSeekAccount: 'QingClaw Account',
   title: 'Models',
   intro: 'Enter your API keys to use models from the following providers.',
   edit: 'Edit',
@@ -183,7 +183,7 @@ export type ModelsKey = keyof typeof en
 /** Chinese strings (same keys as {@link en}). */
 export const zh: { [Key in keyof typeof en]: string } = {
   nav: '模型',
-  deepSeekAccount: 'DeepSeek 账号',
+  deepSeekAccount: '青狮账号',
   title: '模型',
   intro: '填入各提供商的 API 密钥即可使用其模型。',
   edit: '编辑',
@@ -360,7 +360,7 @@ export const zh: { [Key in keyof typeof en]: string } = {
 /** Japanese copy, checked against the English keys. */
 export const ja = {
   'nav': 'モデル',
-  'deepSeekAccount': 'DeepSeekアカウント',
+  'deepSeekAccount': 'QingClaw アカウント',
   'title': 'モデル',
   'intro': '以下のプロバイダーのモデルを使用するには、APIキーを入力してください。',
   'edit': '編集',
@@ -537,7 +537,7 @@ export const ja = {
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
   nav: 'Modelos',
-  deepSeekAccount: 'Cuenta DeepSeek',
+  deepSeekAccount: 'Cuenta QingClaw',
   title: 'Modelos',
   intro: 'Ingrese sus claves API para usar modelos de los siguientes proveedores.',
   edit: 'Editar',
@@ -714,7 +714,7 @@ export const es = {
 /** French dictionary, checked against the English keys. */
 export const fr = {
   nav: 'Modèles',
-  deepSeekAccount: 'Compte DeepSeek',
+  deepSeekAccount: 'Compte QingClaw',
   title: 'Modèles',
   intro: 'Entrez vos clés API pour utiliser les modèles des fournisseurs suivants.',
   edit: 'Modifier',
@@ -891,7 +891,7 @@ export const fr = {
 /** German dictionary, checked against the English keys. */
 export const de = {
   nav: 'Modelle',
-  deepSeekAccount: 'DeepSeek-Konto',
+  deepSeekAccount: 'QingClaw-Konto',
   title: 'Modelle',
   intro: 'Geben Sie Ihre API-Schlüssel ein, um Modelle der folgenden Anbieter zu verwenden.',
   edit: 'Bearbeiten',
@@ -1068,7 +1068,7 @@ export const de = {
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
   nav: 'Модели',
-  deepSeekAccount: 'DeepSeek Аккаунт',
+  deepSeekAccount: 'Аккаунт QingClaw',
   title: 'Модели',
   intro: 'Введите ключи API, чтобы использовать модели следующих поставщиков.',
   edit: 'Редактировать',
@@ -1245,7 +1245,7 @@ export const ru = {
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
   nav: 'Modelos',
-  deepSeekAccount: 'DeepSeek Conta',
+  deepSeekAccount: 'Conta QingClaw',
   title: 'Modelos',
   intro: 'Insira suas chaves API para usar modelos dos seguintes fornecedores.',
   edit: 'Editar',

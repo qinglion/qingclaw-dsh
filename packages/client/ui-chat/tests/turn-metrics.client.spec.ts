@@ -67,6 +67,12 @@ describe('footer figure formatters', () => {
     expect(formatCacheHitPercent(1, 2, 1)).toBe('50')
   })
 
+  it('distinguishes a small cache hit from an exact zero', () => {
+    expect(formatCacheHitPercent(0, 50_000)).toBe('0')
+    expect(formatCacheHitPercent(1, 50_000)).toBe('<1')
+    expect(formatCacheHitPercent(1, 50_000, 1)).toBe('<0.1')
+  })
+
   it('formats throughput with whole tokens from ten up and one decimal below', () => {
     expect(formatTokensPerSecond(34.4)).toBe('34')
     expect(formatTokensPerSecond(9.96)).toBe('10')

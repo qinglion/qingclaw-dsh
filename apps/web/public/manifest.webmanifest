@@ -1,11 +1,11 @@
 {
-  "name": "DeepSeek Harness",
-  "short_name": "DSH",
+  "name": "青狮龙虾",
+  "short_name": "QingClaw",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#4BB6B0",
   "icons": [
     {
       "src": "icon-192.png",

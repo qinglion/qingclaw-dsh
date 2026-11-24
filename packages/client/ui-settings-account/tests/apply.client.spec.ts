@@ -19,8 +19,10 @@ import type { AccountSectionInjected } from '../src/client/AccountSection.tsx'
 import { CONTACT_CONFIG_GLOBAL } from '../src/contact-config.ts'
 import { AccountPlatformHost } from '../src/client/AccountPlatformHost.tsx'
 import type { AccountPlatformHostInjected } from '../src/client/AccountPlatformHost.tsx'
+import { AccountQuotaTool } from '../src/client/AccountQuotaTool.tsx'
 import { AccountQuotaNotice } from '../src/client/AccountQuotaNotice.tsx'
 import type { AccountQuotaNoticeInjected } from '../src/client/AccountQuotaNotice.tsx'
+import { AccountColdStart } from '../src/client/AccountColdStart.tsx'
 
 const it = createClientTest({ roster: webApp })
 const withoutAccountAccess = createClientTest({ roster: webApp }, { access: action => action !== 'account/watch' })
@@ -61,12 +63,32 @@ it('registers account sign-in in a plain browser without the Desktop-only surfac
     if (reload) await c.reload(SELF)
     await c.mock.streams.opened('account/watch', reload ? 2 : 1)
     expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1)
+    expect(c.ctx.slots.entries('settings.launcher.tools').map(entry => entry.component)).toContain(AccountQuotaTool)
     expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(1)
     expect(quotaNoticeEntry(c)).toBeDefined()
     expect(platformHostEntry(c)).toBeUndefined()
     expect(c.ctx.slots.entries('shell.overlay').some(entry => entry.options.id === 'desktop-onboarding')).toBe(false)
     expect(operations(c).hooks.account.getSnapshot().desktopOnboardingVisible).toBe(false)
   }
+}, 60_000)
+
+it('can suppress the upstream Desktop onboarding for a branded distribution', async ({ start }) => {
+  vi.stubGlobal('dshDesktop', {})
+  vi.stubGlobal(CONTACT_CONFIG_GLOBAL, { desktopOnboarding: false })
+  const c = await start()
+  expect(c.ctx.slots.entries('shell.overlay').some(entry => entry.options.id === 'desktop-onboarding')).toBe(false)
+  expect(operations(c).hooks.account.getSnapshot().desktopOnboardingVisible).toBe(false)
+}, 60_000)
+
+it('registers an account-only cold start when a Desktop distribution forbids API keys', async ({ start }) => {
+  vi.stubGlobal('dshDesktop', {})
+  vi.stubGlobal(CONTACT_CONFIG_GLOBAL, { desktopOnboarding: false, allowApiKey: false })
+  const c = await start()
+  const entry = c.ctx.slots.entries('settings.onboarding').find(entry => entry.options.id === 'account-sign-in')
+  expect(entry?.component).toBe(AccountColdStart)
+  expect(entry).toMatchObject({ options: { order: -10 }, locale: 'settings.account' })
+  expect(operations(c).allowApiKey).toBe(false)
+  expect(c.ctx.slots.entries('shell.overlay').some(entry => entry.options.id === 'desktop-onboarding')).toBe(false)
 }, 60_000)
 
 withoutAccountAccess('opens no account stream and registers no account surface while the current Peer may not watch the account', async ({ start }) => {

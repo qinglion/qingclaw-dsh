@@ -213,6 +213,12 @@ export interface InstallBundleOptions {
   /** The registry asked first; absent, the configured one. The configured fallbacks follow while a registry is unreachable or stale. */
   registry?: Registry
   /**
+   * A short-lived bearer token the installation's registry accepts for reads. It reaches pnpm through the
+   * environment, scoped to that registry's host, and never through the command line, the install log, or the profile;
+   * a registry the caller does not name cannot be scoped, so the token is then unused.
+   */
+  authToken?: string
+  /**
    * The package and manifest version the spec must install. An installation that leaves this package missing or at
    * another version, or that adds or changes another direct dependency, is undone with its profile files and modules
    * before its bundle loads, and fails with `unexpected-package`; one whose package declares no bundle is undone the

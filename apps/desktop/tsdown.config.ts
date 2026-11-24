@@ -54,7 +54,7 @@ export default defineConfig([
     deps: { alwaysBundle: ['@deepseek-ai/dsh-atomic-write', '@deepseek-ai/dsh-error'] },
   },
   {
-    entry: ['lib/types/main.js'],
+    entry: { main: 'lib/types/qingclaw-main.js' },
     plugins: [packagedImportsPlugin(mainProcessImports)],
     define: clientVersionDefine,
     onSuccess: async () => {
@@ -95,6 +95,7 @@ export default defineConfig([
     fixedExtension: false,
     dts: false,
     clean: false,
+    outputOptions: { codeSplitting: false },
     deps: { neverBundle: ['electron'] },
   },
   ...(['preload-app', 'preload-welcome', 'preload-platform-account', 'preload-mandatory', 'preload-update-dialog'] as const).map(name => ({

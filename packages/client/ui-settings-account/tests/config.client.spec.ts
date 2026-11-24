@@ -17,6 +17,8 @@ it('injects configured contact options and removes the listener on disposal', as
   ctx.emit('webserver/index-inject', table, PAGE_PEER)
   expect(table).toEqual([{ kind: 'global', name: CONTACT_CONFIG_GLOBAL, value: {
     contactFormUrl: config.contactFormUrl, contactSource: config.contactSource,
+    desktopOnboarding: true,
+    allowApiKey: true,
   } }])
   await ctx.fiber.dispose()
   table.length = 0
@@ -35,4 +37,17 @@ it('hides the generated account form and releases its policy on disposal', async
   expect(configure).toHaveBeenCalledWith({ auto: false }, fiber)
   await fiber.dispose()
   expect(release).toHaveBeenCalledOnce()
+})
+
+it('injects a branded account-only policy without changing the upstream default', async () => {
+  const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
+  await ctx.plugin({ Config, apply }, { allowApiKey: false, desktopOnboarding: false })
+  const table: IndexInjection[] = []
+  ctx.emit('webserver/index-inject', table, PAGE_PEER)
+  expect(table[0]).toMatchObject({
+    kind: 'global',
+    name: CONTACT_CONFIG_GLOBAL,
+    value: { allowApiKey: false, desktopOnboarding: false },
+  })
 })

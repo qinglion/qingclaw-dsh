@@ -32,7 +32,7 @@ import { bundleManifest, readProfileRegistry, registryArguments, runProfilePnpm,
 import { classifyInstallFailure } from './install-failure.ts'
 import { officialBundleInstallTarget } from './official-install-target.ts'
 import { dependencySpec, InvalidInstallSpecError, parseInstallSpec, pinnedGitOrigin, type ParsedInstallSpec } from './install-spec.ts'
-import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
+import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryAuthEnvironment, registryPlan } from './registry.ts'
 import { flatten, writePluginEnabled } from './patch.ts'
 import { incompatiblePlugin, ManagementFailure } from './failure.ts'
 import { PluginManagerError, readProfileState } from './error.ts'
@@ -970,7 +970,8 @@ export class PluginManager extends TypertRemoteService {
    * `package.json` and `pnpm-lock.yaml` as they were; downloaded files can stay.
    * @param spec One package spec, including local paths relative to the invocation directory.
    * @param options Whether to activate the installed bundle (defaults to true), the request id a cancellation names,
-   * the pending build scripts to allow, whether to save an exact dependency, and the registry asked first.
+   * the pending build scripts to allow, whether to save an exact dependency, the registry asked first, and a
+   * short-lived bearer token for that registry's reads.
    * @returns Package-manager diagnostics, the registries asked, and the observed activation outcome.
    */
   @Remote
@@ -1043,9 +1044,10 @@ export class PluginManager extends TypertRemoteService {
           result.registries.push(registry)
           used = registry
           announce('installing', { registry, index: index + 1, total: plan.length })
+          const environment = options?.authToken === undefined ? {} : registryAuthEnvironment(registry, options.authToken)
           run = await this.runPnpm(
             ['add', installSpec, ...options?.saveExact === true ? ['--save-exact'] : [], ...registryArguments(registry)],
-            control.abort.signal, requestId, options?.expected,
+            control.abort.signal, requestId, options?.expected, environment,
           )
           result.packageResult = run
           if (stopped()) throw new InstallCancelledError()
@@ -1223,13 +1225,15 @@ export class PluginManager extends TypertRemoteService {
   /** Run one pnpm command in the profile, streaming its output as install-log chunks; `expected` is the package an `add` must install. */
   private async runPnpm(
     args: readonly string[], signal?: AbortSignal, requestId?: PluginInstallRequestId, expected?: InstallBundleOptions['expected'],
+    authEnvironment: Readonly<Record<string, string>> = {},
   ): Promise<PackageResult> {
     const jobId = randomUUID()
     const argv = ['pnpm', ...args]
     const cwd = this.profile.dir
     const identity = requestId === undefined ? {} : { requestId }
+    const environment = { ...this.profile.packageManager?.env, ...authEnvironment }
     const task = runProfilePnpm({ ...this.profile, profile: this.profile.name }, args, {
-      execution: 'service', ...this.profile.packageManager ?? { command: this.pnpmCommand },
+      execution: 'service', ...this.profile.packageManager ?? { command: this.pnpmCommand }, env: environment,
       signal: signal === undefined ? this.abort.signal : AbortSignal.any([this.abort.signal, signal]),
       outputBytes: this.outputBytes, activateNewBundles: false, idleTimeoutMs: this.idleTimeoutMs,
       lookupTimeoutMs: this.inspectTimeoutMs, ...expected === undefined ? {} : { expected },

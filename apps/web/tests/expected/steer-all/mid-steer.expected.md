@@ -13,8 +13,8 @@
 - button "Context injection skill-catalog"
 - button "Context injection time-context"
 - button "Think The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that."
-- status: Deep diving
-- text: "Deep diving for {{duration}} ··· Interjection: include the word BANANA in your final reply."
+- status: Thinking
+- text: "Thinking for {{duration}} ··· Interjection: include the word BANANA in your final reply."
 - button "Copy"
 - text: "Interjection: include the word ORANGE in your final reply."
 - button "Copy"

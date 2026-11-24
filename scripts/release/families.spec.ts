@@ -145,6 +145,35 @@ describe('release families', () => {
     ])
   })
 
+  it('packs the QingClaw distribution scope beside upstream members', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-release-scope-'))
+    roots.push(root)
+    write(join(root, 'packages/client/qingclaw/package.json'), JSON.stringify({
+      name: '@qinglion/dsh-qingclaw',
+      version: '0.0.1',
+    }))
+    write(join(root, 'packages/core/example/package.json'), JSON.stringify({
+      name: '@deepseek-ai/dsh-example',
+      version: '0.0.1',
+    }))
+
+    expect(releaseFamily('dsh').members(root).map(entry => entry.name)).toEqual([
+      '@qinglion/dsh-qingclaw',
+      '@deepseek-ai/dsh-example',
+    ])
+  })
+
+  it('rejects a package scope the dsh family does not ship', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-release-foreign-scope-'))
+    roots.push(root)
+    write(join(root, 'packages/core/foreign/package.json'), JSON.stringify({
+      name: '@foreign/dsh-package',
+      version: '0.0.1',
+    }))
+
+    expect(() => releaseFamily('dsh').members(root)).toThrow(/must name a package under/)
+  })
+
   it('bumps private dsh workspaces without adding release tags', () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-release-version-'))
     roots.push(root)

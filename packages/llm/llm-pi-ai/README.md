@@ -133,6 +133,8 @@ Model discovery resolves each route’s credential configuration. A missing requ
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 
+Account plugins can use `createPiAiAdapterForProfile` to bind a provider profile to the host attachment store. They can pass a user gateway key, transport and payload options to `stream` for each request.
+
 <details>
 <summary>Implementation internals — click to expand</summary>
 
@@ -241,7 +243,7 @@ pi-ai events become harness reasoning, text, tool-call, usage, and finish chunks
 
 #### Token effect
 
-Generated content affects later inputs only after the loop records it. pi-ai folds reasoning tokens into output usage when the provider does not report them separately, and preserves its exact `totalTokens` value unchanged.
+Generated content affects later inputs only after the loop records it. pi-ai folds reasoning tokens into output usage when the provider does not report them separately, and preserves its exact `totalTokens` value unchanged. OpenAI Chat Completions retains an explicit zero for cache reads when the provider reports a miss. A missing count stays absent.
 
 #### KV Cache effect
 
