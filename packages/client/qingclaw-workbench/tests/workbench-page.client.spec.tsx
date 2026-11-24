@@ -118,10 +118,6 @@ it('asks for a signed-in account when the private registry refuses the install o
   fireEvent.click(card.getByRole('button', { name: zh.install }))
   expect((await screen.findByRole('alert')).textContent).toBe(zh.signInRequired)
 
-  store.readReadme.mockRejectedValueOnce(Object.assign(new Error('Sign in'), { code: 'qingclaw-workbench/sign-in-required' }))
-  fireEvent.click(card.getByRole('button', { name: '查看自媒体工作台详情' }))
-  const detail = within(await screen.findByRole('region', { name: media.title }))
-  expect(await detail.findByText(zh.signInRequired)).toBeTruthy()
 })
 
 it('asks for the professional plan when the installation needs the licence', async () => {
@@ -142,12 +138,9 @@ it('shows the workbench details and installs the exact selection from that page'
   expect(await screen.findByRole('heading', { name: media.title, level: 1 })).toBeTruthy()
   const detail = within(screen.getByRole('region', { name: media.title }))
   expect(detail.getByText(media.description)).toBeTruthy()
-  expect(await screen.findByRole('heading', { name: '使用指南' })).toBeTruthy()
-  expect(store.readReadme).toHaveBeenCalledWith(media.id, media.version, 'zh')
-  expect(detail.getByRole('heading', { name: zh.versionsTitle })).toBeTruthy()
-  expect(detail.getAllByText(media.version).length).toBeGreaterThan(0)
-  expect(detail.getByRole('heading', { name: zh.sourceTitle })).toBeTruthy()
-  expect(detail.getByText(media.registry)).toBeTruthy()
+  // The detail page is the description plus screenshots; documentation and source facts are gone.
+  expect(detail.queryAllByRole('heading', { level: 2 })).toHaveLength(0)
+  expect(detail.queryByText(media.registry)).toBeNull()
   expect(store.install).not.toHaveBeenCalled()
   expect(store.open).not.toHaveBeenCalled()
 
@@ -168,6 +161,24 @@ it('shows the manifest logo and every preview image the catalog declares', async
   const detail = within(await screen.findByRole('region', { name: media.title }))
   expect(container.querySelector(`img[src="${logo}"]`)).toBeTruthy()
   expect(detail.getAllByAltText('自媒体工作台的界面预览').map(image => image.getAttribute('src'))).toEqual(previews)
+})
+
+it('pages through the declared screenshots and opens one full size', async () => {
+  const previews = ['https://example.com/one.webp', 'https://example.com/two.webp']
+  const { page } = setup([{ ...media, previews }])
+  page()
+  fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
+    .getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  const slides = detail.getAllByRole('button', { name: '放大查看自媒体工作台的截图' })
+  expect(slides).toHaveLength(2)
+
+  fireEvent.click(slides[1] as HTMLElement)
+
+  const lightbox = await screen.findByRole('dialog')
+  expect(lightbox.querySelector('img')?.getAttribute('src')).toBe(previews[1])
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).toBeNull()
 })
 
 it('keeps the single preview and default artwork for catalogs that declare only a cover', async () => {

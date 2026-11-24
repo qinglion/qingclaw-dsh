@@ -11,7 +11,7 @@ English | [中文](README.zh.md)
 
 The Workbenches sidebar entry shows the official QingClaw catalog. In Market, My favorites, or Installed, search by workbench name, package name, author, or category. Install a workbench to open its main panel and pin it to the sidebar.
 
-Select a card to read its summary and the README for the listed version, when available. Returning to the catalog preserves your tab, search, and category filter.
+Select a card to open a product page with the workbench summary and its screenshots in a horizontal, snap-scrolling strip; selecting a screenshot shows it full size. Returning to the catalog preserves your tab, search, and category filter.
 
 ## Table of Contents
 

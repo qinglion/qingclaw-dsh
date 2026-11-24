@@ -9,7 +9,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
 import type { NS, WorkbenchLocaleKey } from './locales.ts'
 import { needsPro, needsSignIn, type WorkbenchPluginItem, type WorkbenchPluginStore } from './workbench-plugin-store.ts'
-import { WorkbenchReadme } from './WorkbenchReadme.tsx'
 import css from './WorkbenchPage.module.css'
 
 export interface WorkbenchPageInjected {
@@ -93,22 +92,38 @@ function WorkbenchCard({ onDetails, ...actions }: ItemActions & {
   </article>
 }
 
-/** Every preview image the manifest declares, falling back to the single legacy cover. */
+/** Horizontal, snap-scrolling screenshots; a click opens the image full size. */
 function WorkbenchPreviews({ item, t }: { item: WorkbenchPluginItem; t: TranslateNS<typeof NS> }): ReactNode {
   const urls = item.previews?.length ? item.previews : item.previewUrl ? [item.previewUrl] : []
+  const [expanded, setExpanded] = useState<string>()
+  useEffect(() => {
+    if (expanded === undefined) return
+    const close = (event: KeyboardEvent): void => { if (event.key === 'Escape') setExpanded(undefined) }
+    window.addEventListener('keydown', close)
+    return () => { window.removeEventListener('keydown', close) }
+  }, [expanded])
   if (!urls.length) return null
-  return <div className={urls.length > 1 ? css.previewGallery : undefined}>
-    {urls.map(url => <WorkbenchPreview key={url} url={url} label={t('preview', { name: item.title })}
-      className={css.detailPreview} />)}
-  </div>
+  return <>
+    <div className={css.previewCarousel} aria-label={t('previews', { name: item.title })}>
+      {urls.map(url => <button key={url} type="button" className={css.previewSlide}
+        onClick={() => setExpanded(url)} aria-label={t('enlarge', { name: item.title })}>
+        <img src={url} alt={t('preview', { name: item.title })} loading="lazy" referrerPolicy="no-referrer" />
+      </button>)}
+    </div>
+    {expanded !== undefined && <div className={css.lightbox} role="dialog" aria-modal="true"
+      aria-label={t('preview', { name: item.title })} onClick={() => setExpanded(undefined)}>
+      <img className={css.lightboxImage} src={expanded} alt="" referrerPolicy="no-referrer"
+        onClick={(event) => { event.stopPropagation() }} />
+      <button type="button" className={css.lightboxClose} aria-label={t('close')}
+        onClick={() => setExpanded(undefined)}>×</button>
+    </div>}
+  </>
 }
 
-function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
+function WorkbenchDetail({ item, t, actions, onBack, error }: {
   item: WorkbenchPluginItem
   t: TranslateNS<typeof NS>
   actions: ItemActions
-  store: WorkbenchPluginStore
-  language: string
   onBack(): void
   error?: WorkbenchLocaleKey
 }): ReactNode {
@@ -142,28 +157,11 @@ function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
       </Button>
     </div>}
     <WorkbenchPreviews item={item} t={t} />
-    <WorkbenchReadme item={item} pluginStore={store} language={language} t={t} />
-    <section className={css.detailSection}>
-      <h2>{t('versionsTitle')}</h2>
-      <div className={css.release}><strong>{item.version}</strong><span>{t('catalogVersion')}</span></div>
-    </section>
-    <section className={css.detailSection}>
-      <h2>{t('sourceTitle')}</h2>
-      <dl className={css.facts}>
-        {item.author && <div><dt>{t('author')}</dt><dd>{item.author}</dd></div>}
-        {item.repositoryUrl && <div><dt>{t('homepage')}</dt><dd>
-          <a href={item.repositoryUrl} target="_blank" rel="noopener noreferrer">{item.repositoryUrl}</a>
-        </dd></div>}
-        <div><dt>{t('packageName')}</dt><dd><code>{item.packageName}</code></dd></div>
-        <div><dt>{t('registry')}</dt><dd><code>{item.registry}</code></dd></div>
-        {item.category && <div><dt>{t('category')}</dt><dd>{item.category}</dd></div>}
-      </dl>
-    </section>
   </section>
 }
 
 /** Keep the current catalog visible during refresh and discard out-of-order responses. */
-export function WorkbenchPage({ pluginStore, t, useLocale }: WorkbenchPageProps): ReactNode {
+export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode {
   const [items, setItems] = useState<readonly WorkbenchPluginItem[] | undefined>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<WorkbenchLocaleKey>()
@@ -175,7 +173,6 @@ export function WorkbenchPage({ pluginStore, t, useLocale }: WorkbenchPageProps)
   const page = useRef<HTMLElement>(null)
   const listHeading = useRef<HTMLHeadingElement>(null)
   const returnTo = useRef<{ button: HTMLButtonElement; scroll: number }>()
-  const language = useLocale(snapshot => snapshot.active)
   const generation = useRef(0)
   const tabsId = useId()
   const load = useCallback(async (refresh = false) => {
@@ -250,7 +247,7 @@ export function WorkbenchPage({ pluginStore, t, useLocale }: WorkbenchPageProps)
     : tab === 'favorites' ? 'emptyFavorites' : tab === 'installed' ? 'emptyInstalled' : 'emptyMarket'
   return <main className={css.page} ref={page}>
     {detail && <div className={css.content}><WorkbenchDetail item={detail} t={t} actions={actions(detail)}
-      store={pluginStore} language={language} onBack={() => { setError(undefined); setDetailId(undefined) }}
+      onBack={() => { setError(undefined); setDetailId(undefined) }}
       {...(error && { error })} /></div>}
     <div className={css.content} hidden={Boolean(detail)}>
       <header className={css.header}>
