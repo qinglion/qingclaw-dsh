@@ -156,6 +156,29 @@ it('shows the workbench details and installs the exact selection from that page'
   expect(store.open).toHaveBeenCalledWith(media.id)
 })
 
+it('shows the manifest logo and every preview image the catalog declares', async () => {
+  const logo = 'https://beta.qingclaw.com/workbenches/desk-logo.webp'
+  const previews = ['https://beta.qingclaw.com/workbenches/one.webp', 'https://beta.qingclaw.com/workbenches/two.webp']
+  const { page } = setup([{ ...media, iconUrl: logo, previews }])
+  const { container } = page()
+  fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
+    .getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  expect(container.querySelector(`img[src="${logo}"]`)).toBeTruthy()
+  expect(detail.getAllByAltText('自媒体工作台的界面预览').map(image => image.getAttribute('src'))).toEqual(previews)
+})
+
+it('keeps the single preview and default artwork for catalogs that declare only a cover', async () => {
+  const { page } = setup([media])
+  const { container } = page()
+  fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
+    .getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  expect(detail.getAllByAltText('自媒体工作台的界面预览').map(image => image.getAttribute('src')))
+    .toEqual([media.previewUrl])
+  expect(container.querySelector('header img')).toBeNull()
+})
+
 it('preserves the tab, search, and category when returning from a workbench detail', async () => {
   const { page } = setup([{ ...media, favorite: true }, { ...notes, favorite: true }])
   page()

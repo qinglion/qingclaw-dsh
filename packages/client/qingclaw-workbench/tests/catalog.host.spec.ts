@@ -19,6 +19,16 @@ it('accepts scoped, pinned workbench packages and resolves only same-origin prev
   expect(() => parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [entry, entry] }, url)).toThrow()
 })
 
+it('resolves the manifest logo and every declared preview from the catalog origin', () => {
+  const row = parse({ ...entry, iconUrl: '/workbenches/desk-logo.webp',
+    previews: ['/workbenches/one.webp', 'https://example.com/off-origin.webp', 7] })[0]
+  expect(row?.iconUrl).toBe('https://beta.qingclaw.com/workbenches/desk-logo.webp')
+  expect(row?.previews).toEqual(['https://beta.qingclaw.com/workbenches/one.webp'])
+  expect(parse({ ...entry, iconUrl: 'https://example.com/logo.webp', previews: 'one.webp' })[0])
+    .not.toHaveProperty('iconUrl')
+  expect(parse({ ...entry, previews: [7] })[0]).not.toHaveProperty('previews')
+})
+
 it('accepts only the registry this deployment configures, with or without its trailing slash', () => {
   const local = { ...entry, registry: 'http://127.0.0.1:4873/' }
   expect(parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [local] }, url, 'http://127.0.0.1:4873/')[0]?.registry)

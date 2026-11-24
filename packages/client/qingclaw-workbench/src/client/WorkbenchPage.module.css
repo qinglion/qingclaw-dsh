@@ -204,6 +204,8 @@
 .detailHeader, .titleLine, .release { display: flex; align-items: center; gap: 10px; }
 .detailHeader { flex-wrap: wrap; gap: 14px; }
 .detailIcon { display: flex; flex: none; }
+.detailLogo { width: 42px; height: 42px; border-radius: var(--dsw-radius-sm); object-fit: contain; }
+.previewGallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .identity { flex: 1 1 180px; min-width: 0; }
 .titleLine { flex-wrap: wrap; }
 .titleLine h1 { margin: 0; font-size: 20px; line-height: 1.4; overflow-wrap: anywhere; }

@@ -56,9 +56,14 @@ export function parseWorkbenchCatalog(value: unknown, source: URL, registry = OF
     names.add(packageName)
     panels.add(panelId)
     const previewUrl = url(row.previewUrl, source, true)
+    const iconUrl = url(row.iconUrl, source, true)
+    const previews = Array.isArray(row.previews)
+      ? row.previews.slice(0, 8).map(item => url(item, source, true)).filter((item): item is string => item !== undefined)
+      : []
     const repositoryUrl = url(row.repositoryUrl, source, false)
     return { packageName, panelId, version, title, description, author, category, registry: expectedRegistry,
-      ...(previewUrl ? { previewUrl } : {}), ...(repositoryUrl ? { repositoryUrl } : {}) }
+      ...(previewUrl ? { previewUrl } : {}), ...(iconUrl ? { iconUrl } : {}),
+      ...(previews.length ? { previews } : {}), ...(repositoryUrl ? { repositoryUrl } : {}) }
   })
 }
 

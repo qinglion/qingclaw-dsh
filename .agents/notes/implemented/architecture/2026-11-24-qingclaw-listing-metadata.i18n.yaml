@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-24-qingclaw-listing-metadata.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-24-qingclaw-listing-metadata.md
+/agent-note-declare-listing-metadata-in-the-package-manifest:
+  en: 9003f91af4c9d1c8
+  zh: 4a227f4c0ae48848
+/agent-note-declare-listing-metadata-in-the-package-manifest/problem:
+  en: 08e9d59a38604043
+  zh: ed07c40275943501
+/agent-note-declare-listing-metadata-in-the-package-manifest/decision:
+  en: dd8ddc283202fb91
+  zh: cceceb2f535977b1
+/agent-note-declare-listing-metadata-in-the-package-manifest/alternatives-considered:
+  en: 3a79eb1976f0b985
+  zh: f5b8ed7a3dcc52f3
+/agent-note-declare-listing-metadata-in-the-package-manifest/testing:
+  en: a52119b1fd9fa2df
+  zh: 15ff83752cf83ae7
+/agent-note-declare-listing-metadata-in-the-package-manifest/consequences:
+  en: f774fd30768ee957
+  zh: 89b66dfc93a51a8f

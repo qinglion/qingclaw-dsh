@@ -5,7 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@qinglion/dsh-qingclaw-workbench/remote'
 import type { WorkbenchCatalogEntry } from '../types.ts'
-import { WorkbenchPanelIcon } from './WorkbenchPanelIcon.tsx'
+import { workbenchPanelIcon } from './WorkbenchPanelIcon.tsx'
 
 export interface WorkbenchPluginItem extends WorkbenchCatalogEntry {
   readonly id: string
@@ -94,7 +94,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       // Existing plugins retain ownership of any launcher they registered.
       if (!ctx.slots.spec('sidebar.panellist') || hasSidebar(entry.panelId)) continue
       sidebars.set(entry.panelId, ctx.slots.register({ name: 'sidebar.panellist', id: entry.panelId as MainPanelId,
-        label: entry.title }, WorkbenchPanelIcon))
+        label: entry.title }, workbenchPanelIcon(entry.iconUrl)))
     }
   }
 

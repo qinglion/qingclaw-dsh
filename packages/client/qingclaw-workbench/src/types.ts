@@ -58,7 +58,12 @@ export interface WorkbenchCatalogEntry {
   readonly author: string
   readonly category: string
   readonly registry: string
+  /** First preview image, kept for catalogs and clients that predate `previews`. */
   readonly previewUrl?: string
+  /** Sidebar and card logo declared by the workbench manifest. */
+  readonly iconUrl?: string
+  /** Every preview image the workbench manifest declares, in display order. */
+  readonly previews?: readonly string[]
   readonly repositoryUrl?: string
 }
 

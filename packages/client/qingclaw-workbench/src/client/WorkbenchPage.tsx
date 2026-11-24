@@ -66,8 +66,9 @@ function WorkbenchCard({ onDetails, ...actions }: ItemActions & {
 }): ReactNode {
   const { item, t } = actions
   const [failedIcon, setFailedIcon] = useState<string>()
+  const cover = item.previewUrl ?? item.previews?.[0]
   return <article className={css.card} aria-label={item.title}>
-    {item.previewUrl && <WorkbenchPreview url={item.previewUrl} label={t('preview', { name: item.title })} className={css.preview} />}
+    {cover && <WorkbenchPreview url={cover} label={t('preview', { name: item.title })} className={css.preview} />}
     <div className={css.cardBody}>
       <div className={css.cardHeading}>
         {item.iconUrl && failedIcon !== item.iconUrl && <img className={css.icon} src={item.iconUrl} alt="" loading="lazy"
@@ -82,6 +83,16 @@ function WorkbenchCard({ onDetails, ...actions }: ItemActions & {
       <WorkbenchActions {...actions} />
     </div>
   </article>
+}
+
+/** Every preview image the manifest declares, falling back to the single legacy cover. */
+function WorkbenchPreviews({ item, t }: { item: WorkbenchPluginItem; t: TranslateNS<typeof NS> }): ReactNode {
+  const urls = item.previews?.length ? item.previews : item.previewUrl ? [item.previewUrl] : []
+  if (!urls.length) return null
+  return <div className={urls.length > 1 ? css.previewGallery : undefined}>
+    {urls.map(url => <WorkbenchPreview key={url} url={url} label={t('preview', { name: item.title })}
+      className={css.detailPreview} />)}
+  </div>
 }
 
 function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
@@ -101,7 +112,11 @@ function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
       <IconChevronDownOutlineRegular size={14} aria-hidden="true" />{t('backToWorkbench')}
     </button>
     <header className={css.detailHeader}>
-      <span className={css.detailIcon} aria-hidden="true"><PluginArtworkDefault size={42} /></span>
+      <span className={css.detailIcon} aria-hidden="true">
+        {item.iconUrl
+          ? <img className={css.detailLogo} src={item.iconUrl} alt="" referrerPolicy="no-referrer" />
+          : <PluginArtworkDefault size={42} />}
+      </span>
       <div className={css.identity}>
         <div className={css.titleLine}><h1 id={titleId} ref={heading} tabIndex={-1}>{item.title}</h1><Tag tone="neutral">{item.version}</Tag></div>
         <span className={css.packageName}>{item.packageName}</span>
@@ -110,7 +125,7 @@ function WorkbenchDetail({ item, t, actions, store, language, onBack, error }: {
     </header>
     {item.description && <p className={css.summary}>{item.description}</p>}
     {error && <p className={css.error} role="alert">{t(error)}</p>}
-    {item.previewUrl && <WorkbenchPreview url={item.previewUrl} label={t('preview', { name: item.title })} className={css.detailPreview} />}
+    <WorkbenchPreviews item={item} t={t} />
     <WorkbenchReadme item={item} pluginStore={store} language={language} t={t} />
     <section className={css.detailSection}>
       <h2>{t('versionsTitle')}</h2>
