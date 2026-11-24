@@ -7,15 +7,16 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-account/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { createElement } from 'react'
-import { IconCodeOutlineRegular, IconUploadOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCodeOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CreatorCenter, type CenterInputs } from './CreatorCenter.tsx'
 import { PublishPanel, publishPrompt, type PublishInputs } from './PublishPanel.tsx'
+import { PUBLISH_ID, publishDefinition } from './publish-tab.ts'
 import { en, NS, zh } from './locales.ts'
 
 const PANEL = 'qingclaw-creator' as MainPanelId
-const PUBLISH_PANEL = 'qingclaw-publish' as MainPanelId
-export const inject = ['locale', 'slots', 'layout', 'remote.account', 'remote', 'accountUi', 'workspaces', 'uiWorkspace']
+export const inject = ['locale', 'slots', 'layout', 'remote.account', 'remote', 'accountUi', 'workspaces', 'uiWorkspace', 'sidebarRightTabs']
 
 /** Mount the creator center only for the currently authenticated creator or administrator. */
 export function apply(ctx: Context): void {
@@ -66,10 +67,13 @@ export function apply(ctx: Context): void {
             yield scope.slots.register({ name: 'main', key: PANEL, locale: NS, inject: () => inputs }, CreatorCenter)
             yield scope.slots.register({ name: 'sidebar.panellist', id: PANEL, order: -19, label: () => t('center'), locale: NS },
               ({ size }) => createElement(IconCodeOutlineRegular, { size }))
-            yield scope.slots.register({ name: 'main', key: PUBLISH_PANEL, locale: NS, inject: () => publish }, PublishPanel)
-            yield scope.slots.register({ name: 'sidebar.panellist', id: PUBLISH_PANEL, order: -18, label: () => t('publish'), locale: NS },
-              ({ size }) => createElement(IconUploadOutlineRegular, { size }))
           }))
+          // The publish page contributes its own guide card, so an empty right
+          // Sidebar offers it beside the files, terminal, and browser doors.
+          scope.effect(() => scope.sidebarRightTabs.register(publishDefinition(t)), 'qingclaw-creator: publish type')
+          scope.effect(() => scope.slots.inject('sidebar.right.pane.tab', () => scope.slots.register(
+            { name: 'sidebar.right.pane.tab', key: PUBLISH_ID, locale: NS, inject: () => publish }, PublishPanel)),
+          'qingclaw-creator: publish page')
         },
       })
       dispose = () => { void attached.dispose() }

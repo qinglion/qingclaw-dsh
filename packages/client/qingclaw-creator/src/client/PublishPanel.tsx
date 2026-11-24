@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { WorkspaceId, WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { getWorkspacePublishCandidates } from './project-api.ts'
 import type { PublishCandidate } from '../project-types.ts'
@@ -26,7 +27,7 @@ export function publishPrompt(candidate: PublishCandidate): string {
 
 interface Group { workspace: PublishWorkspace; candidates: PublishCandidate[] }
 
-type Props = PropsRuntime<'main'> & PropsLocale<typeof NS> & InjectFace<PublishInputs>
+type Props = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<typeof NS> & InjectFace<PublishInputs>
 
 /**
  * Publish panel: every plugin package the registered workspaces hold, so a
