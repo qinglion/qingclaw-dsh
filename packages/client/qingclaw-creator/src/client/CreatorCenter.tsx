@@ -12,7 +12,7 @@ import css from './CreatorCenter.module.css'
 type Translate = TranslateNS<typeof NS>
 export interface CenterInputs {
   userId: string
-  resume(workspace: WorkspaceId, directory: string): void
+  resume(workspace: WorkspaceId): void
   hooks: { workspaces: HostObservable<WorkspaceSnapshot> }
 }
 type Props = PropsRuntime<'main'> & PropsLocale<typeof NS> & InjectFace<CenterInputs>

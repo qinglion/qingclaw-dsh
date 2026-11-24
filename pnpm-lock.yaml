@@ -3863,12 +3863,6 @@ importers:
       tar:
         specifier: 7.5.22
         version: 7.5.22
-      tinyglobby:
-        specifier: 0.2.17
-        version: 0.2.17
-      yaml:
-        specifier: ^2.9.0
-        version: 2.9.0
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~

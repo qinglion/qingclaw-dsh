@@ -1,14 +1,12 @@
 import { constants } from 'node:fs'
-import { lstat, open, realpath } from 'node:fs/promises'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { lstat, open, readdir, realpath } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-deepseek-account'
 import type {} from '@deepseek-ai/dsh-workspace'
-import { glob } from 'tinyglobby'
-import { parse } from 'yaml'
-import type { CreatorVersion } from './types.ts'
-import type { PluginProject } from './project-types.ts'
+import { PROJECT_PATH } from './types.ts'
+import type { PluginProject, WorkspacePluginState } from './project-types.ts'
 
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
@@ -18,8 +16,9 @@ function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
-async function readMetadata(path: string, parseFile: (source: string) => unknown): Promise<Record<string, unknown>> {
+async function readManifest(directory: string): Promise<Record<string, unknown>> {
   try {
+    const path = join(directory, 'package.json')
     if (!(await lstat(path)).isFile()) return {}
     const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     try {
@@ -27,7 +26,8 @@ async function readMetadata(path: string, parseFile: (source: string) => unknown
       if (!stat.isFile() || stat.size > 256 * 1024) return {}
       const data = Buffer.alloc(stat.size)
       const { bytesRead } = await file.read(data, 0, data.length, 0)
-      return record(parseFile(data.toString('utf8', 0, bytesRead)))
+      const parsed: unknown = JSON.parse(data.toString('utf8', 0, bytesRead))
+      return record(parsed)
     } finally {
       await file.close()
     }
@@ -37,7 +37,7 @@ async function readMetadata(path: string, parseFile: (source: string) => unknown
   }
 }
 
-function pluginProject(manifest: Record<string, unknown>, directory: string): PluginProject | undefined {
+function pluginProject(manifest: Record<string, unknown>): PluginProject | undefined {
   const dsh = record(manifest.dsh)
   const qingclaw = record(manifest.qingclaw)
   const panelId = text(record(qingclaw.workbench).panelId)
@@ -51,82 +51,79 @@ function pluginProject(manifest: Record<string, unknown>, directory: string): Pl
   const description = text(manifest.description)
   const author = text(manifest.author) ?? text(record(manifest.author).name)
   return {
-    directory, name, version, title: text(dsh.displayName) ?? text(manifest.displayName) ?? name,
+    name, version, title: text(dsh.displayName) ?? text(manifest.displayName) ?? name,
     kind: panelId ? 'workbench' : skill ? 'skill' : 'plugin',
     ...(description && { description }), ...(author && { author }), ...(panelId && { panelId }),
   }
 }
 
-/** Inspect the root and declared npm/pnpm workspace members, never following links outside the workspace. */
-export async function detectPluginProjects(path: string): Promise<PluginProject[]> {
-  const root = await realpath(path)
-  const [manifest, pnpm] = await Promise.all([
-    readMetadata(join(root, 'package.json'), JSON.parse), readMetadata(join(root, 'pnpm-workspace.yaml'), parse),
-  ])
-  const projects: PluginProject[] = []
-  const rootProject = pluginProject(manifest, '.')
-  if (rootProject) projects.push(rootProject)
-  const npm = Array.isArray(manifest.workspaces) ? manifest.workspaces : record(manifest.workspaces).packages
-  const patterns = Array.isArray(pnpm.packages) ? pnpm.packages : npm
-  if (!Array.isArray(patterns)) return projects
-  const members = patterns.filter((p): p is string => typeof p === 'string' && !isAbsolute(p.replace(/^!/, ''))
-    && !p.includes('..') && !p.includes('\\') && !p.includes(':'))
-  if (!members.length) return projects
-  const dirs = await glob(members, { cwd: root, onlyDirectories: true, followSymbolicLinks: false,
-    ignore: ['**/node_modules/**', '**/.git/**'], dot: false })
-  for (const member of dirs.sort()) {
-    const dir = member.replace(/\/$/, '')
-    const real = await realpath(join(root, dir)).catch(() => undefined)
-    if (!real) continue
-    const local = relative(root, real).split(sep).join('/')
-    if (!local || local !== dir || isAbsolute(local)) continue
-    const project = pluginProject(await readMetadata(join(real, 'package.json'), JSON.parse), dir)
-    if (project) projects.push(project)
-  }
-  return projects
+/**
+ * Read one directory's manifest. The creator center passes the workspace root;
+ * publishing passes the package directory the request names, so a collection
+ * workspace can publish any plugin package it holds.
+ * @param directory - absolute directory holding a `package.json`.
+ * @returns the recognized project, or undefined when the manifest declares none.
+ */
+export async function detectPluginProject(directory: string): Promise<PluginProject | undefined> {
+  return pluginProject(await readManifest(await realpath(directory)))
 }
-
-/** The Host service that exchanges the signed-in account for a private-registry read token. */
-interface RegistryAuthorizationReader {
-  registryAuthorization(registry: string): Promise<{ readonly token: string }>
-}
-
-/** The QingClaw private registry the product publishes to and reads from. */
-const REGISTRY = 'https://npm.qingclaw.com/'
 
 /**
- * Ask the Host for the signed-in account's token that reads the private registry.
- * @param ctx - Host context that provides the workbench service owning the exchange.
- * @returns the bearer token.
+ * Directories one lookup may inspect before asking for an explicit directory.
+ * A collection workspace stays far below this; dependency and VCS trees are
+ * skipped rather than counted.
  */
-async function registryToken(ctx: Context): Promise<string> {
-  const access = ctx.get('qingclawWorkbench') as RegistryAuthorizationReader | undefined
-  if (!access) throw new Error('registry_unavailable')
-  return (await access.registryAuthorization(REGISTRY)).token
-}
+const MAX_LOOKUP_DIRECTORIES = 10_000
 
-/** Read only version metadata exposed for this exact package by the QingClaw registry. */
-export async function readRegistryHistory(name: string, signal: AbortSignal, token: string): Promise<CreatorVersion[]> {
-  if (!/^@qinglion\/[a-z0-9][a-z0-9._~-]*$/.test(name)) return []
-  const response = await fetch(new URL(encodeURIComponent(name), REGISTRY), {
-    headers: { accept: 'application/json', authorization: 'Bearer ' + token }, redirect: 'error',
-    signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
-  })
-  if (response.status === 404) return []
-  if (!response.ok) throw new Error('registry_unavailable')
-  const body = record(await response.json())
-  if (body.name !== name || typeof body.versions !== 'object' || body.versions === null || Array.isArray(body.versions)) {
-    throw new Error('invalid_registry_response')
+/**
+ * Find the workspace directories whose manifest declares exactly this package
+ * and version. Publishing uses it when the request names no directory, so a
+ * collection workspace resolves its own subdirectory instead of the model
+ * guessing one. The shallowest directory wins because a copy nested deeper is
+ * a pack or build artifact, not the project; equal depths report ambiguity.
+ * Hidden, dependency, and linked directories are never entered.
+ * @param root - the workspace real path.
+ * @param name - exact package name.
+ * @param version - exact package version.
+ * @returns matching workspace-relative directories, `.` for the root; more than one means equal depth.
+ */
+export async function findPluginPackages(root: string, name: string, version: string): Promise<string[]> {
+  let level: { relative: string; directory: string }[] = [{ relative: '.', directory: root }]
+  let inspected = 0
+  while (level.length) {
+    const found: string[] = []
+    const next: { relative: string; directory: string }[] = []
+    for (const { relative, directory } of level) {
+      if (++inspected > MAX_LOOKUP_DIRECTORIES) {
+        throw new Error('工作区目录过多，请指定要发布的包目录。')
+      }
+      const project = await detectPluginProject(directory)
+      if (project?.name === name && project.version === version) {
+        found.push(relative)
+        if (found.length > 1) return found
+      }
+      let entries
+      try {
+        entries = await readdir(directory, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue
+        next.push({ relative: relative === '.' ? entry.name : relative + '/' + entry.name, directory: join(directory, entry.name) })
+      }
+    }
+    if (found.length) return found
+    level = next
   }
-  const times = record(body.time)
-  return Object.keys(body.versions).map((version) => {
-    const date = times[version]
-    const published_at = typeof date === 'string' && Number.isFinite(Date.parse(date)) ? new Date(date).toISOString() : null
-    return { version, published_at }
-  }).sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
+  return []
 }
 
-/** Cache creator access per desktop grant for repeated local manifest scans. */
+/**
+ * Cache creator access per desktop grant for repeated local manifest scans.
+ * @param ctx - Host context providing the signed-in account.
+ * @returns a reader that reports creator access for the current grant.
+ */
 export function createProjectAccess(ctx: Context): () => Promise<boolean> {
   // Directory probes are local and repeat while the user edits. Share the role lookup for this
   // grant; writes (registry publish and listing) are independently authorized by their server.
@@ -140,33 +137,61 @@ export function createProjectAccess(ctx: Context): () => Promise<boolean> {
     }).then(profile => profile?.status === 'ready' && (profile.value.role === 'admin' || profile.value.role === 'creator')).catch(() => false)
     role = { token: session.token, until: Date.now() + 120_000, check }
     const allowed = await check
-    if (!allowed && role?.check === check) role = undefined
+    if (!allowed && role.check === check) role = undefined
     return allowed
   }
 }
 
-/** Resolve only registered workspace IDs received from the local desktop client. */
-export function registerProjectRoutes(ctx: Context, canReadProjects = createProjectAccess(ctx)): () => void {
-  return ctx.connection.fetch.register({ path: '/api/qingclaw-creator/project', methods: ['GET'], requestBody: 'buffered', fetch: async (request) => {
-    if (!await canReadProjects()) {
+/** One registered workspace the project route may inspect. */
+export interface ProjectWorkspace {
+  readonly path: string
+}
+
+/** What the project route reads; the creator center owns it. */
+export interface ProjectRouteInputs {
+  /** Whether the caller holds creator access. */
+  canReadProjects(): Promise<boolean>
+  /** Resolve the registered workspace named by the request's `workspace` parameter. */
+  workspace(id: string | null): ProjectWorkspace | undefined
+}
+
+/**
+ * Answer one discovery request: the plugin the workspace root manifest
+ * declares, when any. Discovery never changes what the workspace can publish;
+ * the publishing tool is offered to every signed-in creator.
+ * @param inputs - resolved access and workspace lookup.
+ * @returns the Fetch handler for {@link registerProjectRoutes}.
+ */
+export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => Promise<Response> {
+  return async (request) => {
+    if (!await inputs.canReadProjects()) {
       return Response.json({ error: 'creator_required' }, { status: 403 })
     }
-    const id = new URL(request.url).searchParams.get('workspace')
-    const workspace = ctx.workspaceRegistry.list().find(item => item.id === id)
+    const workspace = inputs.workspace(new URL(request.url).searchParams.get('workspace'))
     if (!workspace) return Response.json({ error: 'workspace_not_found' }, { status: 404 })
+    let project: PluginProject | undefined
     try {
-      const projects = await detectPluginProjects(workspace.path)
-      const name = new URL(request.url).searchParams.get('package')
-      const headers = { 'cache-control': 'no-store' }
-      if (name === null) return Response.json({ projects }, { headers })
-      if (!projects.some(project => project.name === name)) return Response.json({ error: 'project_not_found' }, { status: 404 })
-      try {
-        return Response.json({ versions: await readRegistryHistory(name, request.signal, await registryToken(ctx)) }, { headers })
-      } catch {
-        return Response.json({ error: 'registry_unavailable' }, { status: 502 })
-      }
+      project = await detectPluginProject(workspace.path)
     } catch {
       return Response.json({ error: 'workspace_unavailable' }, { status: 404 })
     }
-  } })
+    const state: WorkspacePluginState = { ...(project && { project }) }
+    return Response.json(state, { headers: { 'cache-control': 'no-store' } })
+  }
+}
+
+/**
+ * Serve the discovery route over registered workspaces received from the local desktop client.
+ * @param ctx - Host context providing the connection and workspace registry.
+ * @param canReadProjects - creator access reader; defaults to the account-backed one.
+ * @returns the effect disposer removing the route.
+ */
+export function registerProjectRoutes(ctx: Context, canReadProjects = createProjectAccess(ctx)): () => Promise<void> {
+  return ctx.connection.fetch.register({
+    path: PROJECT_PATH, methods: ['GET'], requestBody: 'buffered',
+    fetch: projectRoute({
+      canReadProjects,
+      workspace: id => ctx.workspaceRegistry.list().find(item => item.id === id),
+    }),
+  })
 }

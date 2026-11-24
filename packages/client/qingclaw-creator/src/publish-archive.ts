@@ -1,18 +1,19 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open, realpath } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { promisify } from 'node:util'
 import { gunzip } from 'node:zlib'
 import { Parser } from 'tar'
-import { detectPluginProjects } from './project.ts'
+import { detectPluginProject, findPluginPackages } from './project.ts'
 
 export const registry = 'https://npm.qingclaw.com/'
 const unzip = promisify(gunzip)
 const maxPackage = 25 * 1024 * 1024
 
 export interface PublishTarget {
-  directory: string
+  /** Workspace-relative package directory; omitted resolves it from the package name and version. */
+  directory?: string
   packageName: string
   version: string
   archive: string
@@ -47,18 +48,55 @@ async function readManifest(bytes: Buffer): Promise<Record<string, unknown>> {
   return manifest as Record<string, unknown>
 }
 
+/**
+ * Resolve one workspace-relative package directory, rejecting absolute paths,
+ * parent segments, and links that leave the workspace.
+ * @param root - the workspace's real path.
+ * @param directory - the request's workspace-relative directory, `.` for the root.
+ * @returns the real directory path.
+ */
+export async function packageDirectory(root: string, directory: string): Promise<string> {
+  const segments = directory.split('/')
+  if (directory !== '.' && (!/^[a-zA-Z0-9._@-]+(?:\/[a-zA-Z0-9._@-]+)*$/.test(directory)
+    || segments.some(segment => segment === '.' || segment === '..'))) {
+    throw new Error('包目录必须是工作区内的相对路径。')
+  }
+  const resolved = join(root, directory)
+  if (await realpath(resolved).catch(() => undefined) !== resolved) throw new Error('工作区目录已变更。')
+  return resolved
+}
+
+/**
+ * Resolve the directory this request publishes. A named directory must hold the
+ * requested package and version; an unnamed request resolves the one workspace
+ * directory whose manifest declares them.
+ * @param root - the workspace real path.
+ * @param target - the request's package identity and optional directory.
+ * @returns the real package directory.
+ */
+async function targetDirectory(root: string, target: PublishTarget): Promise<string> {
+  if (target.directory !== undefined) {
+    const directory = await packageDirectory(root, target.directory)
+    const project = await detectPluginProject(directory)
+    if (!project || project.name !== target.packageName || project.version !== target.version) {
+      throw new Error('当前会话工作区中的包或版本已变更。')
+    }
+    return directory
+  }
+  const matches = await findPluginPackages(root, target.packageName, target.version)
+  const [match] = matches
+  if (match === undefined) throw new Error('工作区中没有找到该包名和版本对应的插件目录，请指定要发布的目录。')
+  if (matches.length > 1) throw new Error('工作区中有多个目录声明了该包名和版本，请指定要发布的目录：' + matches.join('、'))
+  return join(root, match)
+}
+
 /** Capture and validate exactly the tarball produced by npm pack before requesting a publishing grant. */
 export async function inspectArchive(workspace: string, target: PublishTarget) {
   if (!/^@qinglion\/[a-z0-9][a-z0-9._~-]*$/.test(target.packageName)
       || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(target.version)
       || !/^[a-zA-Z0-9_][a-zA-Z0-9._~+-]*\.tgz$/.test(target.archive)) throw new Error('无效的目标包或归档文件名。')
   const root = await realpath(workspace)
-  const projects = await detectPluginProjects(root)
-  if (!projects.some(p => p.directory === target.directory && p.name === target.packageName && p.version === target.version)) {
-    throw new Error('当前会话工作区中的包或版本已变更。')
-  }
-  const directory = join(root, target.directory)
-  if (await realpath(directory) !== directory) throw new Error('工作区目录已变更。')
+  const directory = await targetDirectory(root, target)
   const archivePath = join(directory, target.archive)
   const before = await lstat(archivePath)
   if (!before.isFile()) throw new Error('包归档应为普通文件。')
@@ -86,5 +124,5 @@ export async function inspectArchive(workspace: string, target: PublishTarget) {
     && config.registry !== registry.slice(0, -1))) throw new Error('包的发布地址必须指向青狮 npm。')
   const tag = config.tag ?? 'latest'
   if (typeof tag !== 'string' || !/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(tag)) throw new Error('发布标签无效。')
-  return { bytes, manifest, integrity, tag }
+  return { bytes, manifest, integrity, tag, directory: relative(root, directory) || '.' }
 }

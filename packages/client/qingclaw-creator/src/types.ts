@@ -1,6 +1,9 @@
 /** Owner-peer fetch route. The Host attaches QingClaw account credentials. */
 export const CREATOR_PATH = '/api/qingclaw-creator/account'
 
+/** Workspace project route: the plugin the workspace root manifest declares. */
+export const PROJECT_PATH = '/api/qingclaw-creator/project'
+
 export interface CreatorVersion {
   version: string
   published_at?: string | null

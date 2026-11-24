@@ -10,13 +10,12 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { createElement } from 'react'
 import { IconCodeOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CreatorCenter, type CenterInputs } from './CreatorCenter.tsx'
-import { registerReleaseTab } from './release-tab.tsx'
 import { en, NS, zh } from './locales.ts'
 
 const PANEL = 'qingclaw-creator' as MainPanelId
-export const inject = ['locale', 'slots', 'layout', 'remote.account', 'remote', 'accountUi', 'workspaces', 'uiWorkspace', 'sessions', 'conversation']
+export const inject = ['locale', 'slots', 'layout', 'remote.account', 'remote', 'accountUi', 'workspaces', 'uiWorkspace']
 
-/** Mount both creator surfaces only for the currently authenticated creator or administrator. */
+/** Mount the creator center only for the currently authenticated creator or administrator. */
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja: en, es: en, fr: en, de: en, ru: en, pt: en }), 'qingclaw-creator: locale')
   const t = ctx.locale.bind(NS)
@@ -45,12 +44,9 @@ export function apply(ctx: Context): void {
           const active = () => !closed && currentId === userId
           const inputs: CenterInputs = {
             userId, hooks: { workspaces: scope.workspaces.list },
-            resume(workspaceId, directory) {
+            resume(workspaceId) {
               if (!active()) return
-              scope.uiWorkspace.startSession(workspaceId, {
-                agentPreset: 'cordis',
-                ...(directory === '.' ? {} : { prompt: t('openPackage', { directory }), whenDraftExists: 'append' as const }),
-              })
+              scope.uiWorkspace.startSession(workspaceId, { agentPreset: 'cordis' })
             },
           }
           scope.slots.inject('main', () => scope.slots.inject('sidebar.panellist', function* () {
@@ -58,7 +54,6 @@ export function apply(ctx: Context): void {
             yield scope.slots.register({ name: 'sidebar.panellist', id: PANEL, order: -19, label: () => t('center'), locale: NS },
               ({ size }) => createElement(IconCodeOutlineRegular, { size }))
           }))
-          scope.effect(() => registerReleaseTab(scope), 'qingclaw-creator: release view')
         },
       })
       dispose = () => { void attached.dispose() }

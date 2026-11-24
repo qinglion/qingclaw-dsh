@@ -1,6 +1,5 @@
-/** Metadata read from package manifests in one registered plugin workspace. */
+/** Metadata read from a plugin package manifest. */
 export interface PluginProject {
-  directory: string
   name: string
   version: string
   title: string
@@ -8,4 +7,10 @@ export interface PluginProject {
   description?: string
   author?: string
   panelId?: string
+}
+
+/** What one workspace's root manifest discloses to the creator center. */
+export interface WorkspacePluginState {
+  /** Recognized plugin package at the workspace root; absent when the root manifest declares none. */
+  project?: PluginProject
 }

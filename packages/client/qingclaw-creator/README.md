@@ -11,7 +11,9 @@ English | [中文](README.zh.md)
 
 The built-in sidebar workbench is available to QingClaw creators and administrators. It lists the account’s npm packages and their versions. Choose a version to request a market listing. Publishing uses the signed-in QingClaw account.
 
-My plugins lists each package under its market listing title and keeps the package name beneath it. Recognized package directories expose a Release tab in the conversation. It shows project metadata and the package’s release history. The primary action sends a normal request to the current conversation.
+My plugins lists each package under its market listing title and keeps the package name beneath it. Local projects lists every registered workspace with the plugin its root manifest declares, if any. The list is discovery only: the publishing tool is offered to the signed-in creator in every session, so a collection workspace publishes the package in whichever subdirectory the request names.
+
+A listing request is refused until the published release declares its catalog metadata in `qingclaw`; the refusal names the missing fields.
 
 ## Table of Contents
 
@@ -28,11 +30,11 @@ My plugins lists each package under its market listing title and keeps the packa
 
 #### What the model sees
 
-The Release action requests the bundled `qingclaw-plugin-publish` skill for the selected package directory and exact version. A natural-language publishing request uses the same skill. The skill supplies the account identifier for the `qingclaw_publish_package` tool.
+The `qingclaw_publish_package` tool is available in every session of a signed-in creator; the workspace needs no detected plugin. An explicit publishing request loads the bundled `qingclaw-plugin-publish` skill, which supplies the `@qinglion` package name, the exact version, and the account identifier the tool requires. Package directories resolve against the Session's own directory, so a Session created on a branch publishes from its worktree. The tool takes the package directory when the request knows it, reuses the directory this Session published last, and otherwise resolves the one directory whose manifest declares that package and version; equal candidates are refused with the list so the user can choose.
 
 #### Token effect
 
-The instruction includes the local directory, package name and version. Loading the skill adds the publishing steps and the non-secret account identifier. The tool verifies the archive and reports the package name and version. Desktop obtains the publishing credential directly from the website, and reads the private registry — the version history and the pre-publish version check — with the account token the workbench Host service exchanges from the same signed-in session.
+The tool arguments carry the workspace-relative package directory, the package name, and the version. Loading the skill adds the publishing steps and the non-secret account identifier. The tool verifies the archive built from that directory and reports the package name and version. Desktop obtains the publishing credential directly from the website, and reads the private registry with the account token the workbench Host service exchanges from the same signed-in session.
 
 #### KV Cache effect
 
@@ -42,10 +44,14 @@ Registry inventory and application state appear only in the UI. The publishing p
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- Local projects reads only each workspace’s root manifest. A package inside a collection workspace is published by naming its directory, not by discovery.
+- Publishing needs the resolved package directory to hold a recognized plugin manifest whose name and version match the request. An unnamed request resolves the shallowest such directory; equal-depth matches are refused with the candidates.
+- The Session's package choice lives in the Host process. A restarted client asks again the first time a Session publishes.
 - Releases and listing requests accept only `@qinglion/` package names whose exact version exists in the QingClaw registry.
+- A listing request is refused until the release declares `qingclaw.name` and `qingclaw.description`, and, for a workbench, `qingclaw.workbench.icon` and at least two `previews`.
 - A package published under a shared legacy account has no verified owner, so it appears in the Creator center only after an administrator assigns it.
 
 <a id="dev-note"></a>
 ### Dev Note
 
-Client and Host suites cover the package inventory, listing requests, release history and the publishing tool against recorded account responses.
+Client and Host suites cover the package inventory, listing requests, workspace discovery, and the publishing tool against recorded account responses.

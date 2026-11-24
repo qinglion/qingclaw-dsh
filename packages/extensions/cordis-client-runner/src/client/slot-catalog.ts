@@ -2586,7 +2586,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.session\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      '@qinglion/dsh-qingclaw-creator ReleaseView id \'qingclaw-release\'',
       'client-ui-chat ChatView id \'chat\'',
       'client-ui-trajectory TrajectoryView id \'trajectory\'',
       'experimental-client-ui-stats StatsView id \'stats\'',
@@ -4873,7 +4872,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       '@qinglion/dsh-qingclaw-creator ({ size }) => createElement(IconCodeOutlineRegular, { siz…',
       '@qinglion/dsh-qingclaw-workbench WorkbenchPanelIcon',
-      '@qinglion/dsh-qingclaw-workbench WorkbenchPanelIcon',
+      '@qinglion/dsh-qingclaw-workbench workbenchPanelIcon(entry.iconUrl)',
       'client-ui-plugin-manager PluginsPanelIcon',
       'client-ui-schedule TaskManagerIcon',
     ],

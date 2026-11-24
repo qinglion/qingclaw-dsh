@@ -4,17 +4,20 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { CreatorCenter } from '../src/client/CreatorCenter.tsx'
 import { getMyPackages, submitListing } from '../src/client/api.ts'
+import { getWorkspacePluginState } from '../src/client/project-api.ts'
 import { zh } from '../src/client/locales.ts'
 
 vi.mock('../src/client/api.ts', () => ({
   getMyPackages: vi.fn(), submitListing: vi.fn(),
 }))
+vi.mock('../src/client/project-api.ts', () => ({
+  getWorkspacePluginState: vi.fn(),
+}))
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-function mount() {
+function mount(useWorkspaces: ComponentProps<typeof CreatorCenter>['useWorkspaces'] = () => []) {
   const props = {
-    userId: '9', t: (key: keyof typeof zh) => zh[key], resume: vi.fn(),
-    useWorkspaces: () => [],
+    userId: '9', t: (key: keyof typeof zh) => zh[key], resume: vi.fn(), useWorkspaces,
   }
   return render(<CreatorCenter {...props as ComponentProps<typeof CreatorCenter>} />)
 }
@@ -30,6 +33,19 @@ it('offers listing only for an existing personal registry version and refreshes 
   expect(await screen.findByText(zh.pending)).toBeTruthy()
   expect(submitListing).toHaveBeenCalledWith(row.name, '1.0.0', expect.any(AbortSignal))
   expect(screen.queryByRole('button', { name: zh.request })).toBeNull()
+})
+
+it('shows the listing rejection that names the manifest fields still missing', async () => {
+  const name = '@qinglion/dsh-media-desk'
+  const title = '自媒体工作台'
+  const message = '该版本缺少上架必填信息：侧边 logo、工作台预览图（至少 2 张）。请在 package.json 的 qingclaw 中补充后重新发版。'
+  vi.mocked(getMyPackages).mockResolvedValue([{ name, title, description: '', latest_version: '2.7.3',
+    versions: [{ version: '2.7.3' }] }])
+  vi.mocked(submitListing).mockRejectedValue(new Error(message))
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: title }))
+  fireEvent.click(screen.getByRole('button', { name: zh.request }))
+  expect(await screen.findByText(message)).toBeTruthy()
 })
 
 it('lists a package by its market title and keeps its package name visible', async () => {
@@ -50,7 +66,32 @@ it('shows only the title, the tabs, and refresh above the package list', async (
   const nav = screen.getByRole('navigation')
   expect(Array.from(nav.querySelectorAll('button'), button => button.textContent)).toEqual([zh.packages, zh.local])
   fireEvent.click(screen.getByRole('button', { name: zh.local }))
-  expect(await screen.findByText(zh.emptyLocal)).toBeTruthy()
+  expect(await screen.findByText(zh.noWorkspaces)).toBeTruthy()
+})
+
+it('discovers the root plugin of each workspace and opens its session', async () => {
+  const project = { name: '@qinglion/desk', title: 'Desk', version: '1.0.0', kind: 'workbench' }
+  const resume = vi.fn()
+  vi.mocked(getMyPackages).mockResolvedValue([])
+  vi.mocked(getWorkspacePluginState).mockResolvedValue({ project })
+  const props = {
+    userId: '9', t: (key: keyof typeof zh) => zh[key], resume,
+    useWorkspaces: () => [{ workspaceId: 'w1', title: 'Project' }],
+  }
+  render(<CreatorCenter {...props as ComponentProps<typeof CreatorCenter>} />)
+  fireEvent.click(screen.getByRole('button', { name: zh.local }))
+  expect(await screen.findByText(project.name + ' · Project')).toBeTruthy()
+  expect(screen.getByText(project.version)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: project.title }))
+  expect(resume).toHaveBeenCalledWith('w1')
+})
+
+it('keeps a collection workspace visible when its root manifest declares no plugin', async () => {
+  vi.mocked(getMyPackages).mockResolvedValue([])
+  vi.mocked(getWorkspacePluginState).mockResolvedValue({})
+  mount(() => [{ workspaceId: 'w1', title: 'Collection' }])
+  fireEvent.click(screen.getByRole('button', { name: zh.local }))
+  expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
 })
 
 it('allows relisting the highest delisted version and keeps superseded or lower npm versions read-only', async () => {
@@ -69,5 +110,5 @@ it('allows relisting the highest delisted version and keeps superseded or lower 
   expect(screen.getByText(zh.superseded)).toBeTruthy()
   expect(screen.getAllByRole('button', { name: zh.request })).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: zh.request }))
-  await waitFor(() => expect(submitListing).toHaveBeenCalledWith(name, highest, expect.any(AbortSignal)))
+  await waitFor(() => { expect(submitListing).toHaveBeenCalledWith(name, highest, expect.any(AbortSignal)) })
 })

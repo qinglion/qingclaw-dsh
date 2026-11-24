@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { detectPluginProjects, readRegistryHistory } from '../src/project.ts'
+import { afterEach, beforeEach, expect, it } from 'vitest'
+import { detectPluginProject, projectRoute } from '../src/project.ts'
+import type { ProjectRouteInputs } from '../src/project.ts'
 
 let root: string
 beforeEach(async () => { root = await mkdtemp(join(tmpdir(), 'qingclaw-plugin-project-')) })
@@ -14,38 +15,49 @@ async function manifest(dir: string, value: object) {
   await writeFile(join(dir, 'package.json'), JSON.stringify(value))
 }
 
-it('discovers a new manifest in an initially empty local workspace without mistaking ordinary npm packages for plugins', async () => {
-  expect(await detectPluginProjects(root)).toEqual([])
+it('discovers a new manifest in an initially empty workspace without mistaking ordinary npm packages for plugins', async () => {
+  expect(await detectPluginProject(root)).toBeUndefined()
   await manifest(root, { name: '@qinglion/other', version: '1.0.0', main: 'index.js' })
-  expect(await detectPluginProjects(root)).toEqual([])
+  expect(await detectPluginProject(root)).toBeUndefined()
   await manifest(root, plugin)
-  expect(await detectPluginProjects(root)).toMatchObject([{ name: '@qinglion/desk', directory: '.', kind: 'workbench', panelId: 'desk', author: 'Creator' }])
+  expect(await detectPluginProject(root)).toMatchObject({ name: '@qinglion/desk', kind: 'workbench', panelId: 'desk', author: 'Creator' })
 })
 
-it.each(['npm','pnpm'])('discovers declared %s members while respecting exclusions, symlinks and the workspace boundary', async (manager) => {
-  const dir = join(root, 'workspace')
-  const patterns = ['packages/*', '!packages/skip', '../outside']
-  await manifest(dir, manager === 'npm' ? { workspaces: { packages: patterns } } : {})
-  if (manager === 'pnpm') await writeFile(join(dir, 'pnpm-workspace.yaml'), 'packages:\n' + patterns.map(p => "  - '" + p + "'").join('\n'))
-  await manifest(join(root, 'outside'), plugin)
-  await Promise.all(['one','two','skip'].map(folder => manifest(join(dir, 'packages', folder), { ...plugin, name: '@qinglion/' + folder })))
-  await symlink(join(root, 'outside'), join(dir, 'packages', 'symlink'))
-  expect((await detectPluginProjects(dir)).map(x => x.directory)).toEqual(['packages/one','packages/two'])
+it('reads only the directory it is given, so a collection workspace keeps its packages out of discovery', async () => {
+  await manifest(root, { name: 'collection', version: '1.0.0' })
+  await writeFile(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n")
+  await manifest(join(root, 'packages', 'one'), { ...plugin, name: '@qinglion/one' })
+  expect(await detectPluginProject(root)).toBeUndefined()
+  expect(await detectPluginProject(join(root, 'packages', 'one'))).toMatchObject({ name: '@qinglion/one' })
 })
 
-it('reads exact package versions and timestamps with the account registry token', async () => {
-  const name = '@qinglion/dsh-media-desk'
-  const fetch = vi.spyOn(globalThis, 'fetch')
-  try {
-    fetch.mockResolvedValueOnce(Response.json({ name, versions: { '2.0.0': {}, '2.7.2': {} }, time: { '2.7.2': '2026-11-19T00:00:00Z' } }))
-    expect(await readRegistryHistory(name, new AbortController().signal, 'read-token')).toEqual([
-      { version: '2.7.2', published_at: '2026-11-19T00:00:00.000Z' }, { version: '2.0.0', published_at: null },
-    ])
-    expect(fetch.mock.calls[0]?.[0]?.toString()).toBe('https://npm.qingclaw.com/%40qinglion%2Fdsh-media-desk')
-    expect(fetch.mock.calls[0]?.[1]?.headers).toEqual({ accept: 'application/json', authorization: 'Bearer read-token' })
-    fetch.mockResolvedValueOnce(new Response(null, { status: 403 }))
-    await expect(readRegistryHistory(name, new AbortController().signal, 'read-token')).rejects.toThrow('registry_unavailable')
-    fetch.mockResolvedValueOnce(new Response(null, { status: 404 }))
-    expect(await readRegistryHistory(name, new AbortController().signal, 'read-token')).toEqual([])
-  } finally { fetch.mockRestore() }
+const url = 'https://local.test/api/qingclaw-creator/project?workspace=w1'
+
+function route(overrides: Partial<ProjectRouteInputs> = {}) {
+  const inputs: ProjectRouteInputs = {
+    canReadProjects: async () => true,
+    workspace: id => id === 'w1' ? { path: root } : undefined,
+    ...overrides,
+  }
+  return projectRoute(inputs)
+}
+
+it('reports the root project for a registered workspace without changing what it can publish', async () => {
+  await manifest(root, plugin)
+  const response = await route()(new Request(url))
+  expect(response.status).toBe(200)
+  const body = await response.json() as { project?: { name: string } }
+  expect(body.project?.name).toBe('@qinglion/desk')
+  await rm(join(root, 'package.json'))
+  const empty = await route()(new Request(url))
+  expect(await empty.json()).toEqual({})
+})
+
+it('refuses unknown callers and workspaces and reports an unreadable one', async () => {
+  await manifest(root, plugin)
+  expect((await route({ canReadProjects: async () => false })(new Request(url))).status).toBe(403)
+  expect((await route({ workspace: () => undefined })(new Request(url))).status).toBe(404)
+  const fetch = route()
+  await rm(root, { recursive: true, force: true })
+  expect((await fetch(new Request(url))).status).toBe(404)
 })

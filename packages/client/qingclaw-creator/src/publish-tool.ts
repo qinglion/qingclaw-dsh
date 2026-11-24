@@ -1,11 +1,11 @@
 import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import type { Context } from '@deepseek-ai/cordis'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { publish } from 'libnpmpublish'
 import { inspectArchive, registry, type PublishTarget } from './publish-archive.ts'
-import { detectPluginProjects } from './project.ts'
 
 const accountChanged = '青狮账号已更改，请从当前会话重新发起发布。'
 
@@ -30,27 +30,51 @@ async function publishedIntegrity(
   return version.dist.integrity
 }
 
-function projectWorkspace(ctx: Context, sessionId: SessionId) {
-  return ctx.workspaceRegistry.list().find(workspace => workspace.sessionIds.includes(sessionId))
+/** The Session working-directory service this tool reads when the composition mounts it. */
+interface WorkingDirectoryReader {
+  get(session: Session): string
 }
 
-/** Publish the captured archive through npm's own library without exposing the account grant to a child process. */
+/**
+ * Directory a publish request resolves package directories against: the
+ * Session's current directory, which is its branch worktree for a Session
+ * created on a branch, or the directory the Session was created in.
+ * @param ctx - Host context that may provide the working-directory service.
+ * @param session - Session the publish request belongs to.
+ * @returns the absolute publishing root.
+ */
+function publishRoot(ctx: Context, session: Session): string {
+  const service = ctx.get('workingDirectory') as WorkingDirectoryReader | undefined
+  const root = service?.get(session) ?? session.header.cwd
+  if (root === undefined) throw new Error('当前会话没有工作目录，无法定位要发布的包。')
+  return root
+}
+
+/**
+ * Publish the captured archive through npm's own library without exposing the account grant to a child process.
+ * @param ctx - Host context providing the signed-in account.
+ * @param root - resolves the directory the request publishes in; re-read before each write.
+ * @param target - the package name, version, archive, and account, plus the optional directory.
+ * @param signal - aborts the publish.
+ * @param registryUrl - registry to publish to.
+ * @returns the published identity, the resolved directory, and whether this call wrote it.
+ */
 export async function publishPackage(
   ctx: Context,
-  sessionId: SessionId,
+  root: () => string,
   target: PublishTarget & { account: string },
   signal: AbortSignal,
   registryUrl = registry,
 ) {
-  const workspace = projectWorkspace(ctx, sessionId)
+  const directory = root()
   const session = await ctx.deepseekAccount.getPlatformSession()
-  if (!workspace || !session) throw new Error('请在已登录青狮的插件工作区中发布。')
-  const prepared = await inspectArchive(workspace.path, target)
+  if (!session) throw new Error('请先登录青狮后再发布。')
+  const prepared = await inspectArchive(directory, target)
   const verifyAccount = async () => {
     signal.throwIfAborted()
     const now = await ctx.deepseekAccount.getPlatformSession()
-    if (now?.origin !== session.origin || now.token !== session.token
-        || projectWorkspace(ctx, sessionId)?.id !== workspace.id) throw new Error(accountChanged)
+    if (now?.origin !== session.origin || now.token !== session.token) throw new Error(accountChanged)
+    if (root() !== directory) throw new Error('发布期间会话目录已变更，请重新发起发布。')
   }
   await verifyAccount()
   const headers = new Headers(session.requestHeaders)
@@ -84,7 +108,7 @@ export async function publishPackage(
     if (known && known !== prepared.integrity) throw new Error('该版本已被其他内容占用，请更新版本号后重新打包。')
     return known
   }
-  const result = { packageName: target.packageName, version: target.version, integrity: prepared.integrity }
+  const result = { packageName: target.packageName, version: target.version, integrity: prepared.integrity, directory: prepared.directory }
   const alreadyPublished = await inspectVersion()
   await verifyAccount()
   if (alreadyPublished) return { ...result, status: 'already_published' }
@@ -121,14 +145,22 @@ export async function publishPackage(
   throw new Error(failureCode || '私服尚未返回对应版本，请稍后重试。')
 }
 
-/** Install one deferred native tool for the authoring skill in registered plugin workspaces. */
+/**
+ * Install one deferred native tool for the authoring skill in every session of a signed-in creator.
+ * @param ctx - Host context providing the tools registry.
+ * @param canReadProjects - creator access reader.
+ */
 export function registerPublishTool(ctx: Context, canReadProjects: () => Promise<boolean>): void {
+  // The package directory this Session already published from, relative to the
+  // Session's directory. Asking once is enough: a later request reuses it, and a
+  // stale entry is dropped when it no longer holds the requested package.
+  const bound = new Map<SessionId, string>()
   ctx.tools.register(defineTool({
     name: 'qingclaw_publish_package',
-    description: 'Publish a reviewed npm pack archive from this plugin workspace to QingClaw with the signed-in creator account. Use after an explicit publish request and the qingclaw-plugin-publish skill.',
+    description: 'Publish a reviewed npm pack archive from a package directory inside the session directory, which is the branch worktree for a session created on a branch, to QingClaw with the signed-in creator account. Use after an explicit publish request and the qingclaw-plugin-publish skill.',
     deferLoading: true, timeoutMs: 120000,
     parameters: {
-      directory: { type: 'string', required: true, description: 'Workspace-relative package directory, or a dot for its root.' },
+      directory: { type: 'string', description: 'Package directory relative to the session directory, a dot for the session directory itself. Omit it to reuse the package this session published last, or to resolve the one directory whose manifest declares this package and version.' },
       packageName: { type: 'string', required: true, description: 'The exact @qinglion package name.' },
       version: { type: 'string', required: true, description: 'Version from npm pack.' },
       archive: { type: 'string', required: true, description: 'Tarball filename from npm pack in that package directory.' },
@@ -139,18 +171,30 @@ export function registerPublishTool(ctx: Context, canReadProjects: () => Promise
       schema: { type: 'object', additionalProperties: false, properties: {
         packageName: { type: 'string', required: true }, version: { type: 'string', required: true },
         integrity: { type: 'string', required: true }, status: { type: 'string', required: true },
+        directory: { type: 'string', required: true },
       } },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
     },
     async execute(args, exec) {
       if (!exec.agent) throw new Error('当前工具仅支持工作区会话。')
-      return publishPackage(ctx, exec.agent.session.id, args, exec.signal)
+      const session = exec.agent.session
+      const chosen = args.directory ?? bound.get(session.id)
+      try {
+        const result = await publishPackage(
+          ctx,
+          () => publishRoot(ctx, session),
+          chosen === undefined ? args : { ...args, directory: chosen },
+          exec.signal,
+        )
+        bound.set(session.id, result.directory)
+        return result
+      } catch (error) {
+        bound.delete(session.id)
+        throw error
+      }
     },
-  }), { when: async ({ agent, signal }) => {
-    const workspace = projectWorkspace(ctx, agent.session.id)
-    if (signal.aborted || !workspace) return false
-    try {
-      return (await detectPluginProjects(workspace.path)).length > 0 && !signal.aborted && await canReadProjects()
-    } catch { return false }
+  }), { when: async ({ signal }) => {
+    if (signal.aborted) return false
+    return await canReadProjects()
   } })
 }
