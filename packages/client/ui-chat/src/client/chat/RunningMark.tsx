@@ -9,7 +9,7 @@ import css from './ChatView.module.css'
 export function RunningMark() {
   return (
     <span className={css.runningIcon} aria-hidden="true">
-      <QingClawMark className={css.runningMark} />
+      <QingClawMark className={css.runningMark} animated />
     </span>
   )
 }

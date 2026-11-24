@@ -34,4 +34,16 @@ describe('QingClawMark', () => {
     expect(filled.getAttribute('width')).toBe('100%')
     expect(filled.getAttribute('height')).toBe('100%')
   })
+
+  it('wraps the layers in the beat and notch drivers only while animated', () => {
+    const still = markRoot(render(<QingClawMark />).container)
+    expect(still.querySelectorAll('g[class]:not([class=""])')).toHaveLength(0)
+    const alive = markRoot(render(<QingClawMark animated />).container)
+    const drivers = [...alive.querySelectorAll('g[class]:not([class=""])')].map(node => node.getAttribute('class'))
+    expect(drivers).toHaveLength(2)
+    expect(drivers[0]).not.toBe('')
+    expect(drivers[0]).not.toBe(drivers[1])
+    expect(alive.querySelector('[fill="#4BB6B0"]')).not.toBeNull()
+    expect(alive.querySelectorAll('path')).toHaveLength(5)
+  })
 })
