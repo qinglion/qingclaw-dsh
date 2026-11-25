@@ -6,8 +6,11 @@ async function projectAt(query: Record<string, string>, signal: AbortSignal): Pr
   const url = new URL(PROJECT_PATH.slice(1), document.baseURI)
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value)
   const response = await creatorFetch(url, { method: 'GET', signal })
-  if (response.status === 401 || response.status === 403) throw new Error('creator_required')
-  if (!response.ok) throw new Error('directory_unavailable')
+  if (!response.ok) {
+    // Name the refusal so the page can show why it could not read the directory.
+    const detail = await response.json().catch(() => null) as { error?: string } | null
+    throw new Error(detail?.error ?? 'http_' + response.status)
+  }
   const body = await response.json() as WorkspacePluginState
   return body.project
 }

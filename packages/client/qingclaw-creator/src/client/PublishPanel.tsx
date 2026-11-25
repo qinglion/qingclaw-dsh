@@ -29,7 +29,7 @@ export function publishPrompt(candidate: PublishCandidate): string {
 /** Where the page stands for one Session. */
 type View =
   | { readonly kind: 'loading' }
-  | { readonly kind: 'failed' }
+  | { readonly kind: 'failed'; readonly reason: string }
   | { readonly kind: 'choose' }
   | { readonly kind: 'project'; readonly directory: string; readonly project: PluginProject }
 
@@ -99,8 +99,10 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
         const root = await getSessionPlugin(sessionId, cwd, controller.signal)
         if (controller.signal.aborted) return
         setView(root === undefined ? { kind: 'choose' } : { kind: 'project', directory: '.', project: root })
-      } catch {
-        if (!controller.signal.aborted) setView({ kind: 'failed' })
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setView({ kind: 'failed', reason: error instanceof Error ? error.message : 'unknown' })
+        }
       }
     })()
     return () => { controller.abort() }
@@ -115,8 +117,8 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
       writeBinding(key, relative)
       setEntry('')
       setView({ kind: 'project', directory: relative, project: found })
-    } catch {
-      setView({ kind: 'failed' })
+    } catch (error) {
+      setView({ kind: 'failed', reason: error instanceof Error ? error.message : 'unknown' })
     }
   }
   const requestListing = async (chosen: PublishCandidate): Promise<void> => {
@@ -140,7 +142,9 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
       <Button variant="ghost" disabled={view.kind === 'loading'} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button>
     </div>
     {view.kind === 'loading' && <p className={css.hint}>{t('loading')}</p>}
-    {view.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeReadFailed')}>{t('publishReadFailed')}</CreatorNotice>}
+    {view.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeReadFailed')}>
+      {t('publishReadFailed')}（{view.reason}）
+    </CreatorNotice>}
     {view.kind === 'project' && candidate !== undefined && <div className={css.card}>
       <div className={css.cardHead}>
         <p className={css.name}>{candidate.project.title}</p>
