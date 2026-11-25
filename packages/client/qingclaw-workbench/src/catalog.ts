@@ -60,10 +60,20 @@ export function parseWorkbenchCatalog(value: unknown, source: URL, registry = OF
     const previews = Array.isArray(row.previews)
       ? row.previews.slice(0, 8).map(item => url(item, source, true)).filter((item): item is string => item !== undefined)
       : []
+    const links = Array.isArray(row.links)
+      ? row.links.slice(0, 8).flatMap((item) => {
+        if (!record(item)) return []
+        const target = url(item.url, source, false)
+        const title = typeof item.title === 'string' && item.title.trim() ? item.title.trim().slice(0, 200) : undefined
+        const image = url(item.image, source, false)
+        return target && title ? [{ url: target, title, ...(image ? { image } : {}) }] : []
+      })
+      : []
     const repositoryUrl = url(row.repositoryUrl, source, false)
     return { packageName, panelId, version, title, description, author, category, registry: expectedRegistry,
       ...(previewUrl ? { previewUrl } : {}), ...(iconUrl ? { iconUrl } : {}),
-      ...(previews.length ? { previews } : {}), ...(repositoryUrl ? { repositoryUrl } : {}) }
+      ...(previews.length ? { previews } : {}), ...(links.length ? { links } : {}),
+      ...(repositoryUrl ? { repositoryUrl } : {}) }
   })
 }
 

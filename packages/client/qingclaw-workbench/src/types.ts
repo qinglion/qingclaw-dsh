@@ -48,6 +48,13 @@ export interface ProEntitlement {
   readonly endsAt: string | null
 }
 
+/** One related-resource card a release declares, resolved into a title and cover when it is published. */
+export interface WorkbenchLink {
+  readonly url: string
+  readonly title: string
+  readonly image?: string
+}
+
 /** An official desktop workbench already adapted to the Cordis bundle protocol. */
 export interface WorkbenchCatalogEntry {
   readonly packageName: string
@@ -64,6 +71,8 @@ export interface WorkbenchCatalogEntry {
   readonly iconUrl?: string
   /** Every preview image the workbench manifest declares, in display order. */
   readonly previews?: readonly string[]
+  /** Related resources the release links to, shown as cards on the product page. */
+  readonly links?: readonly WorkbenchLink[]
   readonly repositoryUrl?: string
 }
 

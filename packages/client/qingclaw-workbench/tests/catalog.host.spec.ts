@@ -40,6 +40,17 @@ it('keeps scalable artwork the catalog serves, so an icon may be an SVG', () => 
   ])
 })
 
+it('keeps the related-resource cards the catalog resolved', () => {
+  const row = parse({ ...entry, links: [
+    { url: 'https://weixin.qq.com/sph/AHfxwU7MP7', title: '视频号', image: 'https://cdn.example.com/cover.webp' },
+    { url: 'http://insecure.example.com', title: 'insecure' },
+    { url: 'https://ok.example.com', title: '  ' },
+  ] })[0]
+  expect(row?.links).toEqual([
+    { url: 'https://weixin.qq.com/sph/AHfxwU7MP7', title: '视频号', image: 'https://cdn.example.com/cover.webp' },
+  ])
+})
+
 it('accepts only the registry this deployment configures, with or without its trailing slash', () => {
   const local = { ...entry, registry: 'http://127.0.0.1:4873/' }
   expect(parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [local] }, url, 'http://127.0.0.1:4873/')[0]?.registry)

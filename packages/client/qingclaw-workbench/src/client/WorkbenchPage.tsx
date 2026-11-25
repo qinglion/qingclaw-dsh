@@ -166,6 +166,16 @@ function WorkbenchDetail({ item, t, actions, onBack, error }: {
     {item.description && <p className={css.summary}>{item.description}</p>}
     {error && <p className={css.error} role="alert">{t(error)}</p>}
     <WorkbenchPreviews item={item} t={t} />
+    {item.links?.length ? <section className={css.linksSection}>
+      <h2>{t('relatedLinks')}</h2>
+      <div className={css.links}>
+        {item.links.map(link => <a key={link.url} className={css.linkCard} href={link.url}
+          target="_blank" rel="noopener noreferrer">
+          {link.image && <img className={css.linkImage} src={link.image} alt="" loading="lazy" referrerPolicy="no-referrer" />}
+          <span className={css.linkTitle}>{link.title}</span>
+        </a>)}
+      </div>
+    </section> : null}
     {confirming && <Modal open onClose={() => setConfirming(false)}
       title={t('confirmUninstallTitle', { name: item.title })} closeLabel={t('close')}
       description={t('confirmUninstallDescription')}

@@ -33,6 +33,8 @@ kind: "package-reference"
 
 每个上架版本都要在 `qingclaw` 中声明目录元数据：多语言的 `name` 与 `description`（当前必须提供中文 `zh`）；工作台还要提供 `workbench.icon` 和至少两张 `workbench.previews` 图片路径。图片随包分发（例如 `./assets/workbench/icon.svg`），图标和预览图可以是目录能提供的任意图片类型，包括 SVG、PNG、WebP 与 JPEG；创作者不需要官网仓库的写权限；上架时官网把图片存进配置好的对象存储（生产是 COS），目录从那里提供。缺少声明的字段或文件时上架申请会被拒绝并指出缺的是什么，目录按该版本声明的 `iconUrl` 与 `previews` 让侧栏入口和详情页展示它们。
 
+版本还可以在 `qingclaw.links` 里声明最多 8 个相关资源链接（例如视频号内容）。发布时会读取每个链接的标题和封面并随版本保存，详情页据此显示一张可点开原网页的资源卡片。
+
 构建好插件后，在「插件 → 添加插件」中输入本地包目录的绝对路径并安装，然后从侧栏打开验证。需要分发时，可以用青狮的发布技能将插件发布到私有 npm。在「创作者中心 → 我的插件」选择已发布的版本，申请上架，管理员审核后，该版本会进入工作台目录。[自媒体工作台示例](https://github.com/qinglion/dsh-media-desk)
 
 已有集成可以继续调用 `getFeed(refresh)` 读取 Feed v1，默认地址为 `https://qingclaw.com/api/workbench-feed`。刷新失败时，该接口可返回上次通过校验的内容。将 `cacheFile` 配置为仅当前用户可访问的绝对路径，即可跨重启保留这份缓存。`feedUrl` 可覆盖旧版 Feed 的地址。目录和 Feed 共用 `cacheTtlMs`、`fetchTimeoutMs` 和 `maxResponseBytes` 配置。`registry` 指定目录条目必须匹配的私有 npm，默认 `https://npm.qingclaw.com/`；只有该部署同时签发读取授权时，才应指向别的私服。

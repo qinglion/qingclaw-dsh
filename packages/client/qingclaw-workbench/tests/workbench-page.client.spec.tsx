@@ -193,6 +193,19 @@ it('keeps the single preview and default artwork for catalogs that declare only 
   expect(container.querySelector('header img')).toBeNull()
 })
 
+it('shows related-resource cards that open the declared links', async () => {
+  const links = [{ url: 'https://weixin.qq.com/sph/AHfxwU7MP7', title: '视频号', image: 'https://cdn.example.com/cover.webp' }]
+  const { page } = setup([{ ...media, links }])
+  page()
+  fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
+    .getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  expect(detail.getByRole('heading', { name: zh.relatedLinks })).toBeTruthy()
+  const card = detail.getByRole('link', { name: '视频号' })
+  expect(card.getAttribute('href')).toBe(links[0].url)
+  expect(card.getAttribute('target')).toBe('_blank')
+})
+
 it('offers an update when the catalog version is newer than the installed one', async () => {
   const { store, page } = setup([{ ...media, installed: true, installable: false, openable: true,
     installedVersion: '0.9.0', updateAvailable: true }])

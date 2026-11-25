@@ -15,6 +15,7 @@ Listing a new version silently replaced the catalog entry's curated title with t
 - Publishing checks the same fields against the packed archive, so a release that could never be listed fails at `npm pack` time with the missing keys instead of later at the listing request. The archive cap, the registry's request limit, and the website's inspection limit stay at 100 MB.
 - The workbench directory publishes `iconUrl` and `previews` from the approved release and keeps `previewUrl` as the first preview for older clients. Publishing extracts the declared images from the verified archive, attaches them to the release, and stores them in the website's configured object storage (COS in production), so no website-side upload step exists and the archive is not re-read per request.
 - The desktop catalog parser accepts both fields, the sidebar launcher draws the declared logo, and the detail page shows every preview.
+- A release may also declare up to eight `qingclaw.links`. Publishing resolves each link's title and cover on the server, restricted to public HTTPS with bounded time and bytes, and stores the cards with the release so the catalog never fetches a third-party page per request.
 
 ## Alternatives considered
 

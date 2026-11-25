@@ -24,6 +24,18 @@ export function listingMetadataIssues(manifest: Record<string, unknown>, files: 
   if (text(record(qingclaw.name).zh) === undefined) issues.push('缺少 qingclaw.name.zh')
   if (text(record(qingclaw.description).zh) === undefined) issues.push('缺少 qingclaw.description.zh')
 
+  if (qingclaw.links !== undefined) {
+    const links = Array.isArray(qingclaw.links) ? qingclaw.links : []
+    const valid = links.length >= 1 && links.length <= 8 && links.every((link) => {
+      if (typeof link !== 'string' || link.length > 2048) return false
+      try {
+        const parsed = new URL(link)
+        return parsed.protocol === 'https:' && parsed.hostname !== '' && parsed.username === '' && parsed.password === ''
+      } catch { return false }
+    })
+    if (!valid) issues.push('qingclaw.links 必须是 1 至 8 个 https 链接')
+  }
+
   const workbench = record(qingclaw.workbench)
   if (text(workbench.panelId) === undefined) return issues
 

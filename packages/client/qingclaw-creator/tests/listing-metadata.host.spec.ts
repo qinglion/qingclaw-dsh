@@ -50,6 +50,16 @@ it('rejects images the published archive cannot serve', () => {
   ])
 })
 
+it('checks the related links a release declares', () => {
+  const base = { name: { zh: '插件' }, description: { zh: '描述' } }
+  expect(listingMetadataIssues({ qingclaw: { ...base, links: ['https://weixin.qq.com/sph/AHfxwU7MP7'] } }, files))
+    .toEqual([])
+  expect(listingMetadataIssues({ qingclaw: { ...base, links: ['http://insecure.example.com'] } }, files))
+    .toEqual(['qingclaw.links 必须是 1 至 8 个 https 链接'])
+  expect(listingMetadataIssues({ qingclaw: { ...base, links: Array(9).fill('https://a.example.com') } }, files))
+    .toEqual(['qingclaw.links 必须是 1 至 8 个 https 链接'])
+})
+
 it('refuses to inspect an archive whose manifest cannot be listed', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'qingclaw-listing-'))
   try {
