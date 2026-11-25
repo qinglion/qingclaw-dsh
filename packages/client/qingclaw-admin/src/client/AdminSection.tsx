@@ -134,28 +134,50 @@ function Management({ t }: AdminSectionProps) {
           </div>
           {errors ? <p role="alert" className={css.empty}>{errorText(errors, t)}</p>
             : !filtered(filter).length && <p className={css.empty}>{t(loading ? 'loading' : filter === 'all' ? 'empty' : filter === 'toReview' ? 'noReview' : 'noPublished')}</p>}
-          {!errors && filtered(filter).map(pkg => <section className={css.package} key={pkg.package_name}>
-            <h2>{pkg.title}</h2>
-            <p className={css.metadata}><code>{pkg.package_name}</code>{pkg.latest_version && <span>{t('latest')} {pkg.latest_version}</span>}
-              {pkg.currentVersion ? <span>{t('marketVersion')} {pkg.currentVersion}</span>
-                : pkg.highestVersion && <span>{t('highestListed')} {pkg.highestVersion}</span>}
-              <span>{pkg.owner_id ? t('owner') + ' #' + pkg.owner_id : t('unowned')}</span></p>
-            {pkg.description && <p className={css.metadata}>{pkg.description}</p>}
-            {pkg.canAssign && <AssignOwner t={t} revision={revision} busy={busy}
-              save={owner => mutate('owner', { package_name: pkg.package_name, owner_id: owner }, 'ownerSaved')}/>}
-            {pkg.versions.map(({ version, submission, blocked }) => submission
-              ? <PublicationRow key={version} item={submission} t={t} busy={busy || loading}
-                blocked={blocked} canReview={reviewable(submission)} publish={() => mutate('list', { id: String(submission.id) }, 'queued')}
-                delist={() => mutate('delist', { id: String(submission.id) }, 'delisted')}
-                reject={reason => mutate('reject', { id: String(submission.id), reason }, 'returned')}/>
-              : <p key={version} className={css.metadata}><code>{version}</code><Tag tone="neutral">{t(blocked ? 'versionBlocked' : 'unsubmitted')}</Tag></p>)}
-          </section>)}
+          {!errors && filtered(filter).map(pkg => <PackageCard key={pkg.package_name} pkg={pkg} t={t}
+            busy={busy} loading={loading} revision={revision} mutate={mutate}/>)}
         </>}
         {section === 'users' && <Users t={t} busy={busy} revision={revision} refresh={refreshList}
           save={(userId, next) => mutate('role', { id: String(userId), role: next }, 'saved')}/>}
       </section>
     </div>
   </main>
+}
+
+
+/** Versions one card shows before the rest collapse behind a toggle. */
+const VERSIONS_SHOWN = 5
+
+/** One package card: its listing metadata, then the versions it holds. */
+function PackageCard({ pkg, t, busy, loading, revision, mutate }: {
+  pkg: ReturnType<typeof groupPackages>[number]
+  t: T
+  busy: boolean
+  loading: boolean
+  revision: number
+  mutate: (action: string, params: Record<string, string>, done: QingClawAdminLocaleKey) => Promise<boolean>
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? pkg.versions : pkg.versions.slice(0, VERSIONS_SHOWN)
+  return <section className={css.package}>
+    <h2>{pkg.title}</h2>
+    <p className={css.metadata}><code>{pkg.package_name}</code>{pkg.latest_version && <span>{t('latest')} {pkg.latest_version}</span>}
+      {pkg.currentVersion ? <span>{t('marketVersion')} {pkg.currentVersion}</span>
+        : pkg.highestVersion && <span>{t('highestListed')} {pkg.highestVersion}</span>}
+      <span>{pkg.owner_id ? t('owner') + ' #' + String(pkg.owner_id) : t('unowned')}</span></p>
+    {pkg.description && <p className={css.metadata}>{pkg.description}</p>}
+    {pkg.canAssign && <AssignOwner t={t} revision={revision} busy={busy}
+      save={owner => mutate('owner', { package_name: pkg.package_name, owner_id: owner }, 'ownerSaved')}/>}
+    {shown.map(({ version, submission, blocked }) => submission
+      ? <PublicationRow key={version} item={submission} t={t} busy={busy || loading}
+        blocked={blocked} canReview={reviewable(submission)} publish={() => mutate('list', { id: String(submission.id) }, 'queued')}
+        delist={() => mutate('delist', { id: String(submission.id) }, 'delisted')}
+        reject={reason => mutate('reject', { id: String(submission.id), reason }, 'returned')}/>
+      : <p key={version} className={css.metadata}><code>{version}</code><Tag tone="neutral">{t(blocked ? 'versionBlocked' : 'unsubmitted')}</Tag></p>)}
+    {pkg.versions.length > VERSIONS_SHOWN && <Button size="sm" variant="ghost" aria-expanded={expanded}
+      onClick={() => { setExpanded(value => !value) }}>
+      {expanded ? t('collapseVersions') : t('showAllVersions') + ' · ' + String(pkg.versions.length)}</Button>}
+  </section>
 }
 
 /** Join immutable registry versions to their newest market application. Keep legacy market records visible. */

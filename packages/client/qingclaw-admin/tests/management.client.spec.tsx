@@ -53,6 +53,26 @@ it('allows admins to publish, return, and grant creator roles through the Host',
   expect(fetch.mock.calls.find(([url]) => url.searchParams.get('action') === 'role')?.[0].searchParams.get('role')).toBe('creator')
 })
 
+it('shows the newest versions first and collapses the rest behind a toggle', async () => {
+  const versions = ['8.0.0', '7.0.0', '6.0.0', '5.0.0', '4.0.0', '3.0.0', '2.0.0', '1.0.0']
+    .map(version => ({ version, published_at: null }))
+  vi.stubGlobal('__DSH_TRANSPORT__', { fetch: async (url: URL) =>
+    url.searchParams.get('action') === 'packages'
+      ? Response.json({ packages: [{ package_name: '@qinglion/big', owner_id: 7, description: '',
+        latest_version: '8.0.0', versions }] })
+      : Response.json({ publications: [] }) })
+  render(<AdminSection role="admin" userId="1" t={t}/>)
+  await screen.findByRole('heading', { name: '@qinglion/big' })
+  expect(screen.getByText('8.0.0')).toBeTruthy()
+  expect(screen.getByText('4.0.0')).toBeTruthy()
+  expect(screen.queryByText('3.0.0')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: en.showAllVersions + ' · 8' }))
+  expect(await screen.findByText('3.0.0')).toBeTruthy()
+  expect(screen.getByText('1.0.0')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: en.collapseVersions }))
+  expect(screen.queryByText('3.0.0')).toBeNull()
+})
+
 it('shows review failures and keeps the submission retryable', async () => {
   vi.stubGlobal('__DSH_TRANSPORT__', { fetch: async (url: URL) =>
     url.searchParams.get('action') === 'packages' ? Response.json(registry) : url.searchParams.get('action') === 'list'
