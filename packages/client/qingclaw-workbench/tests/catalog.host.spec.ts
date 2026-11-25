@@ -29,6 +29,17 @@ it('resolves the manifest logo and every declared preview from the catalog origi
   expect(parse({ ...entry, previews: [7] })[0]).not.toHaveProperty('previews')
 })
 
+it('keeps scalable artwork the catalog serves, so an icon may be an SVG', () => {
+  const row = parse({ ...entry, iconUrl: '/workbenches/desk-logo.svg',
+    previewUrl: '/workbenches/desk.svg', previews: ['/workbenches/one.svg', '/workbenches/two.webp'] })[0]
+  expect(row?.iconUrl).toBe('https://beta.qingclaw.com/workbenches/desk-logo.svg')
+  expect(row?.previewUrl).toBe('https://beta.qingclaw.com/workbenches/desk.svg')
+  expect(row?.previews).toEqual([
+    'https://beta.qingclaw.com/workbenches/one.svg',
+    'https://beta.qingclaw.com/workbenches/two.webp',
+  ])
+})
+
 it('accepts only the registry this deployment configures, with or without its trailing slash', () => {
   const local = { ...entry, registry: 'http://127.0.0.1:4873/' }
   expect(parseWorkbenchCatalog({ schemaVersion: 1, workbenches: [local] }, url, 'http://127.0.0.1:4873/')[0]?.registry)

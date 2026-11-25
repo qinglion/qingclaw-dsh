@@ -31,7 +31,7 @@ kind: "package-reference"
 
 插件可以用同一个 ID 注册 `main` 主面板和 `sidebar.panellist` 侧栏入口，方便上架前在本地打开。把这个 ID 填入 `package.json` 的 `qingclaw.workbench.panelId`。已上架的插件如果只注册了主面板，官方目录也会为它补上侧栏入口。
 
-每个上架版本都要在 `qingclaw` 中声明目录元数据：多语言的 `name` 与 `description`（当前必须提供中文 `zh`）；工作台还要提供 `workbench.icon` 和至少两张 `workbench.previews` 图片路径。图片随包分发（例如 `./assets/workbench/icon.webp`），创作者不需要官网仓库的写权限；上架时官网把图片存进配置好的对象存储（生产是 COS），目录从那里提供。缺少声明的字段或文件时上架申请会被拒绝并指出缺的是什么，目录按该版本声明的 `iconUrl` 与 `previews` 让侧栏入口和详情页展示它们。
+每个上架版本都要在 `qingclaw` 中声明目录元数据：多语言的 `name` 与 `description`（当前必须提供中文 `zh`）；工作台还要提供 `workbench.icon` 和至少两张 `workbench.previews` 图片路径。图片随包分发（例如 `./assets/workbench/icon.svg`），图标和预览图可以是目录能提供的任意图片类型，包括 SVG、PNG、WebP 与 JPEG；创作者不需要官网仓库的写权限；上架时官网把图片存进配置好的对象存储（生产是 COS），目录从那里提供。缺少声明的字段或文件时上架申请会被拒绝并指出缺的是什么，目录按该版本声明的 `iconUrl` 与 `previews` 让侧栏入口和详情页展示它们。
 
 构建好插件后，在「插件 → 添加插件」中输入本地包目录的绝对路径并安装，然后从侧栏打开验证。需要分发时，可以用青狮的发布技能将插件发布到私有 npm。在「创作者中心 → 我的插件」选择已发布的版本，申请上架，管理员审核后，该版本会进入工作台目录。[自媒体工作台示例](https://github.com/qinglion/dsh-media-desk)
 
