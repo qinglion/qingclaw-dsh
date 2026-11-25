@@ -1,10 +1,12 @@
 export const NS = 'qingclaw.creator'
 export const zh = {
   local: '本机项目', noWorkspaces: '还没有工作区，请先打开一个目录。',
-  unrecognizedRoot: '根目录未识别到插件；会话里可以用发布工具发布子目录中的包。',
+  unrecognizedRoot: '会话目录的根目录未识别到插件。',
   scanFailed: '部分工作区读取失败，可刷新重试。',
   center: '创作者中心', packages: '我的插件', publish: '发布',
-  publishDescription: '把工作区里的插件包发布到青狮 npm',
+  publishDescription: '把这个会话目录里的插件包发布到青狮 npm',
+  publishDirectory: '子目录，如 dsh-codex', publishUse: '使用该目录',
+  publishMissing: '该目录里没有可发布的插件包。',
   publishEmpty: '已注册的工作区里没有找到可发布的插件包。',
   reload: '刷新', history: '版本历史', packageListEmpty: '你还没有发布到青狮 npm 的包。', loading: '加载中…',
   marketVersion: '市场当前', request: '申请上架',
@@ -16,10 +18,12 @@ export const zh = {
 export type CreatorKey = keyof typeof zh
 export const en: Record<CreatorKey, string> = {
   local: 'Local projects', noWorkspaces: 'No workspaces yet. Open a directory first.',
-  unrecognizedRoot: 'No plugin at the workspace root. Sessions can publish a package in a subdirectory through the tool.',
+  unrecognizedRoot: 'No plugin was found at the root of the session directory.',
   scanFailed: 'Some workspaces could not be read. Refresh to retry.',
   center: 'Creator center', packages: 'My plugins', publish: 'Publish',
-  publishDescription: 'Publish a plugin package from this workspace to QingClaw npm',
+  publishDescription: 'Publish the plugin package of this session directory to QingClaw npm',
+  publishDirectory: 'Subdirectory, for example dsh-codex', publishUse: 'Use this directory',
+  publishMissing: 'That directory holds no publishable plugin package.',
   publishEmpty: 'No publishable plugin package was found in the registered workspaces.',
   reload: 'Refresh', history: 'Version history', packageListEmpty: 'You have not published any packages to the QingClaw registry yet.', loading: 'Loading…',
   marketVersion: 'Market version', request: 'Request listing',

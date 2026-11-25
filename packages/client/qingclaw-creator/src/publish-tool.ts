@@ -1,10 +1,10 @@
 import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { publish } from 'libnpmpublish'
+import { sessionDirectory } from './project.ts'
 import { inspectArchive, registry, type PublishTarget } from './publish-archive.ts'
 
 const accountChanged = '青狮账号已更改，请从当前会话重新发起发布。'
@@ -30,25 +30,7 @@ async function publishedIntegrity(
   return version.dist.integrity
 }
 
-/** The Session working-directory service this tool reads when the composition mounts it. */
-interface WorkingDirectoryReader {
-  get(session: Session): string
-}
 
-/**
- * Directory a publish request resolves package directories against: the
- * Session's current directory, which is its branch worktree for a Session
- * created on a branch, or the directory the Session was created in.
- * @param ctx - Host context that may provide the working-directory service.
- * @param session - Session the publish request belongs to.
- * @returns the absolute publishing root.
- */
-function publishRoot(ctx: Context, session: Session): string {
-  const service = ctx.get('workingDirectory') as WorkingDirectoryReader | undefined
-  const root = service?.get(session) ?? session.header.cwd
-  if (root === undefined) throw new Error('当前会话没有工作目录，无法定位要发布的包。')
-  return root
-}
 
 /**
  * Publish the captured archive through npm's own library without exposing the account grant to a child process.
@@ -182,7 +164,7 @@ export function registerPublishTool(ctx: Context, canReadProjects: () => Promise
       try {
         const result = await publishPackage(
           ctx,
-          () => publishRoot(ctx, session),
+          () => sessionDirectory(ctx, session),
           chosen === undefined ? args : { ...args, directory: chosen },
           exec.signal,
         )

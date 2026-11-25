@@ -5,7 +5,7 @@ import { join, relative } from 'node:path'
 import { promisify } from 'node:util'
 import { gunzip } from 'node:zlib'
 import { Parser } from 'tar'
-import { detectPluginProject, findPluginPackages } from './project.ts'
+import { detectPluginProject, findPluginPackages, packageDirectory } from './project.ts'
 
 export const registry = 'https://npm.qingclaw.com/'
 const unzip = promisify(gunzip)
@@ -46,24 +46,6 @@ async function readManifest(bytes: Buffer): Promise<Record<string, unknown>> {
   const manifest: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error('Invalid manifest')
   return manifest as Record<string, unknown>
-}
-
-/**
- * Resolve one workspace-relative package directory, rejecting absolute paths,
- * parent segments, and links that leave the workspace.
- * @param root - the workspace's real path.
- * @param directory - the request's workspace-relative directory, `.` for the root.
- * @returns the real directory path.
- */
-export async function packageDirectory(root: string, directory: string): Promise<string> {
-  const segments = directory.split('/')
-  if (directory !== '.' && (!/^[a-zA-Z0-9._@-]+(?:\/[a-zA-Z0-9._@-]+)*$/.test(directory)
-    || segments.some(segment => segment === '.' || segment === '..'))) {
-    throw new Error('包目录必须是工作区内的相对路径。')
-  }
-  const resolved = join(root, directory)
-  if (await realpath(resolved).catch(() => undefined) !== resolved) throw new Error('工作区目录已变更。')
-  return resolved
 }
 
 /**

@@ -1,23 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
-import type { WorkspaceId, WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { getWorkspacePublishCandidates } from './project-api.ts'
-import type { PublishCandidate } from '../project-types.ts'
+import { getSessionPlugin, getSessionProjectAt } from './project-api.ts'
+import type { PluginProject, PublishCandidate } from '../project-types.ts'
 import type { NS } from './locales.ts'
 import css from './CreatorCenter.module.css'
 
-export interface PublishWorkspace { workspaceId: WorkspaceId; title: string }
-
-/** What the publish panel calls into: the sidebar list and the publish actions. */
+/** What the publish page calls into: it writes the request into the Session that owns the page. */
 export interface PublishInputs {
-  hooks: { workspaces: HostObservable<WorkspaceSnapshot> }
-  publish(workspace: PublishWorkspace, candidate: PublishCandidate): void
-  startWorkspace(workspace: PublishWorkspace): void
+  publish(sessionId: SessionId, candidate: PublishCandidate): void
 }
 
-/** The request one publish action sends to a new conversation. */
+/** The request one publish action writes into the conversation. */
 export function publishPrompt(candidate: PublishCandidate): string {
   const target = JSON.stringify({
     directory: candidate.directory, packageName: candidate.project.name, version: candidate.project.version,
@@ -25,52 +21,62 @@ export function publishPrompt(candidate: PublishCandidate): string {
   return '请使用 qingclaw-plugin-publish 技能，将当前工作区中指定目录的包版本发布到青狮 npm 私服。目标包信息：' + target
 }
 
-interface Group { workspace: PublishWorkspace; candidates: PublishCandidate[] }
-
 type Props = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<typeof NS> & InjectFace<PublishInputs>
 
 /**
- * Publish panel: every plugin package the registered workspaces hold, so a
- * collection workspace offers its own subdirectories. One action starts a
- * conversation that publishes the chosen package through the skill.
+ * Publish page: the plugin this Session's own directory holds, published by
+ * writing a request into that conversation. A collection workspace usually has
+ * no plugin at its root, so the page asks for the one directory to publish
+ * instead of listing every package underneath it.
  */
-export function PublishPanel({ useWorkspaces, publish, startWorkspace, t }: Pick<Props, 'useWorkspaces' | 'publish' | 'startWorkspace' | 't'>) {
-  const workspaces = useWorkspaces(snapshot => snapshot.items)
-  const [groups, setGroups] = useState<Group[]>([])
+export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' | 'publish' | 't'>) {
+  const [project, setProject] = useState<PluginProject>()
+  const [directory, setDirectory] = useState('.')
+  const [entry, setEntry] = useState('')
+  const [missing, setMissing] = useState(false)
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [revision, refresh] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
-    setLoading(true); setFailed(false)
-    void (async () => {
-      const result: Group[] = []
-      let errors = false
-      for (const workspace of workspaces) {
-        if (controller.signal.aborted) return
-        try {
-          const candidates = await getWorkspacePublishCandidates(workspace.workspaceId, controller.signal)
-          if (candidates.length) result.push({ workspace, candidates })
-        } catch { errors = true }
-      }
-      if (!controller.signal.aborted) { setGroups(result); setLoading(false); setFailed(errors) }
-    })()
+    setLoading(true); setFailed(false); setMissing(false)
+    void getSessionPlugin(sessionId, controller.signal).then((found) => {
+      if (controller.signal.aborted) return
+      setProject(found); setDirectory('.'); setEntry(''); setLoading(false)
+    }).catch(() => { if (!controller.signal.aborted) { setLoading(false); setFailed(true) } })
     return () => { controller.abort() }
-  }, [workspaces, revision])
+  }, [sessionId, revision])
+  const useDirectory = async (): Promise<void> => {
+    const relative = entry.trim()
+    if (!relative) return
+    setMissing(false); setFailed(false)
+    try {
+      const found = await getSessionProjectAt(sessionId, relative, new AbortController().signal)
+      if (found === undefined) { setMissing(true); return }
+      setProject(found); setDirectory(relative)
+    } catch { setFailed(true) }
+  }
+  const candidate: PublishCandidate | undefined = project && { directory, project }
   return <section className={css.body}>
     <div className={css.sectionHead}><h2>{t('publish')}</h2>
       <Button variant="ghost" disabled={loading} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button></div>
-    {failed && <p role="alert">{t('scanFailed')}</p>}
-    {loading ? <p>{t('loading')}</p> : groups.length ? groups.map(group => <div key={group.workspace.workspaceId}>
-      <p className={css.muted}>{group.workspace.title}</p>
-      <ul className={css.list}>{group.candidates.map(candidate => <li className={css.row} key={candidate.directory}>
+    {loading ? <p>{t('loading')}</p> : failed ? <p role="alert">{t('scanFailed')}</p> : candidate
+      ? <ul className={css.list}><li className={css.row}>
         <div>
-          <button className={css.package} onClick={() => { startWorkspace(group.workspace) }}>{candidate.project.title}</button>
+          <p className={css.package}>{candidate.project.title}</p>
           <p className={css.muted}>{candidate.project.name} · {candidate.directory}</p>
         </div>
         <div className={css.actions}><code>{candidate.project.version}</code>
-          <Button variant="outline" onClick={() => { publish(group.workspace, candidate) }}>{t('publish')}</Button></div>
-      </li>)}</ul>
-    </div>) : <p className={css.muted}>{t('publishEmpty')}</p>}
+          <Button variant="outline" onClick={() => { publish(sessionId, candidate) }}>{t('publish')}</Button></div>
+      </li></ul>
+      : <>
+        <p className={css.muted}>{t('unrecognizedRoot')}</p>
+        <label className={css.sectionHead}>
+          <input className={css.package} value={entry} placeholder={t('publishDirectory')}
+            onChange={(event) => { setEntry(event.target.value); setMissing(false) }} />
+          <Button variant="outline" disabled={!entry.trim()} onClick={() => { void useDirectory() }}>{t('publishUse')}</Button>
+        </label>
+        {missing && <p role="alert">{t('publishMissing')}</p>}
+      </>}
   </section>
 }

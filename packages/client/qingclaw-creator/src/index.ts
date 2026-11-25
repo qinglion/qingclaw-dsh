@@ -7,7 +7,7 @@ import { registerPublishTool } from './publish-tool.ts'
 import { createProjectAccess, registerProjectRoutes } from './project.ts'
 import { CREATOR_PATH } from './types.ts'
 
-export const inject = ['workspaceRegistry', 'deepseekAccount', 'connection', 'skills', 'tools']
+export const inject = ['workspaceRegistry', 'sessions', 'deepseekAccount', 'connection', 'skills', 'tools']
 
 const root = '/auth-api/v0/dsh'
 const routes = {

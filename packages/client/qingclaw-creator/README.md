@@ -11,7 +11,7 @@ English | [中文](README.zh.md)
 
 The built-in sidebar workbench is available to QingClaw creators and administrators. It lists the account’s npm packages and their versions. Choose a version to request a market listing. Publishing uses the signed-in QingClaw account.
 
-My plugins lists each package under its market listing title and keeps the package name beneath it. Local projects lists every registered workspace with the plugin its root manifest declares, if any. The right Sidebar's start page offers a Publish card beside the files, terminal, and browser doors. It lists every plugin package each workspace holds — including the packages a collection workspace keeps in subdirectories — and starts a conversation that publishes the chosen one. The list is discovery only: the publishing tool is offered to the signed-in creator in every session, so a collection workspace publishes the package in whichever subdirectory the request names.
+My plugins lists each package under its market listing title and keeps the package name beneath it. Local projects lists every registered workspace with the plugin its root manifest declares, if any. The right Sidebar's start page offers a Publish card beside the files, terminal, and browser doors. It shows the plugin the current Session's directory declares and writes the publish request into that conversation. When that directory's root holds no plugin, it asks for the one subdirectory to publish instead of listing every package underneath. The list is discovery only: the publishing tool is offered to the signed-in creator in every session, so a collection workspace publishes the package in whichever subdirectory the request names.
 
 A listing request is refused until the published release declares its catalog metadata in `qingclaw`; the refusal names the missing fields.
 
@@ -47,7 +47,7 @@ Registry inventory and application state appear only in the UI. The publishing p
 - Local projects reads only each workspace’s root manifest. A package inside a collection workspace is published by naming its directory, not by discovery.
 - Publishing needs the resolved package directory to hold a recognized plugin manifest whose name and version match the request. An unnamed request resolves the shallowest such directory; equal-depth matches are refused with the candidates.
 - The Session's package choice lives in the Host process. A restarted client asks again the first time a Session publishes.
-- The Publish page walks each registered workspace on refresh, bounded by one directory budget; a very large repository makes that refresh slower.
+- The Publish page resolves one directory at a time: the Session directory or the subdirectory the user names. It never enumerates the packages underneath.
 - Releases and listing requests accept only `@qinglion/` package names whose exact version exists in the QingClaw registry.
 - A listing request is refused until the release declares `qingclaw.name` and `qingclaw.description`, and, for a workbench, `qingclaw.workbench.icon` and at least two `previews`.
 - A package published under a shared legacy account has no verified owner, so it appears in the Creator center only after an administrator assigns it.

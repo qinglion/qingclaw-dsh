@@ -16,7 +16,7 @@ import { PUBLISH_ID, publishDefinition } from './publish-tab.ts'
 import { en, NS, zh } from './locales.ts'
 
 const PANEL = 'qingclaw-creator' as MainPanelId
-export const inject = ['locale', 'slots', 'layout', 'remote.account', 'remote', 'accountUi', 'workspaces', 'uiWorkspace', 'sidebarRightTabs']
+export const inject = ['locale', 'slots', 'layout', 'remote.account', 'remote', 'accountUi', 'workspaces', 'uiWorkspace', 'sidebarRightTabs', 'sessions']
 
 /** Mount the creator center only for the currently authenticated creator or administrator. */
 export function apply(ctx: Context): void {
@@ -53,14 +53,11 @@ export function apply(ctx: Context): void {
             },
           }
           const publish: PublishInputs = {
-            hooks: { workspaces: scope.workspaces.list },
-            publish(workspace, candidate) {
+            publish(sessionId, candidate) {
               if (!active()) return
-              scope.uiWorkspace.startSession(workspace.workspaceId, { agentPreset: 'cordis', prompt: publishPrompt(candidate) })
-            },
-            startWorkspace(workspace) {
-              if (!active()) return
-              scope.uiWorkspace.startSession(workspace.workspaceId, { agentPreset: 'cordis' })
+              const session = scope.sessions.binding(sessionId)?.session
+              if (!session) return
+              void session.prompt([{ type: 'text', text: publishPrompt(candidate) }], 'queue').catch(() => undefined)
             },
           }
           scope.slots.inject('main', () => scope.slots.inject('sidebar.panellist', function* () {

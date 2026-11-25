@@ -32,11 +32,13 @@ it('reads only the directory it is given, so a collection workspace keeps its pa
 })
 
 const url = 'https://local.test/api/qingclaw-creator/project?workspace=w1'
+const sessionUrl = 'https://local.test/api/qingclaw-creator/project?session=s1'
 
 function route(overrides: Partial<ProjectRouteInputs> = {}) {
   const inputs: ProjectRouteInputs = {
     canReadProjects: async () => true,
     workspace: id => id === 'w1' ? { path: root } : undefined,
+    session: id => id === 's1' ? root : undefined,
     ...overrides,
   }
   return projectRoute(inputs)
@@ -53,15 +55,17 @@ it('reports the root project for a registered workspace without changing what it
   expect(await empty.json()).toEqual({})
 })
 
-it('lists every plugin package a workspace holds for the publish panel', async () => {
-  await manifest(root, { ...plugin, name: '@qinglion/root' })
-  await manifest(join(root, 'packages', 'one'), { ...plugin, name: '@qinglion/one' })
-  await manifest(join(root, 'packages', 'one', 'packed', 'package'), { ...plugin, name: '@qinglion/staged' })
-  await manifest(join(root, 'node_modules', 'shadow'), { ...plugin, name: '@qinglion/shadow' })
-  const response = await route()(new Request(url + '&scope=candidates'))
-  const body = await response.json() as { candidates: { directory: string; project: { name: string } }[] }
-  expect(body.candidates.map(candidate => candidate.directory)).toEqual(['.', 'packages/one', 'packages/one/packed/package'])
-  expect(body.candidates.map(candidate => candidate.project.name)).toEqual(['@qinglion/root', '@qinglion/one', '@qinglion/staged'])
+it('answers for a session directory and for one named directory inside it', async () => {
+  await manifest(root, { name: 'collection', version: '1.0.0' })
+  await manifest(join(root, 'dsh-codex'), { ...plugin, name: '@qinglion/dsh-codex' })
+  const empty = await route()(new Request(sessionUrl))
+  expect(await empty.json()).toEqual({})
+  const named = await route()(new Request(sessionUrl + '&directory=dsh-codex'))
+  expect(await named.json()).toMatchObject({ project: { name: '@qinglion/dsh-codex' } })
+  const escaped = await route()(new Request(sessionUrl + '&directory=../outside'))
+  expect(escaped.status).toBe(404)
+  const unknown = await route({ session: () => undefined })(new Request(sessionUrl))
+  expect(unknown.status).toBe(404)
 })
 
 it('refuses unknown callers and workspaces and reports an unreadable one', async () => {

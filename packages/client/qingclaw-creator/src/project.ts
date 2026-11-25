@@ -2,6 +2,8 @@ import { constants } from 'node:fs'
 import { lstat, open, readdir, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Session } from '@deepseek-ai/dsh-session'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-deepseek-account'
 import type {} from '@deepseek-ai/dsh-workspace'
@@ -55,6 +57,43 @@ function pluginProject(manifest: Record<string, unknown>): PluginProject | undef
     kind: panelId ? 'workbench' : skill ? 'skill' : 'plugin',
     ...(description && { description }), ...(author && { author }), ...(panelId && { panelId }),
   }
+}
+
+/**
+ * Resolve one directory named relative to a root, rejecting absolute paths,
+ * parent segments, and links that leave the root.
+ * @param root - the real path the request is relative to.
+ * @param directory - the request's relative directory, `.` for the root.
+ * @returns the real directory path.
+ */
+export async function packageDirectory(root: string, directory: string): Promise<string> {
+  const segments = directory.split('/')
+  if (directory !== '.' && (!/^[a-zA-Z0-9._@-]+(?:\/[a-zA-Z0-9._@-]+)*$/.test(directory)
+    || segments.some(segment => segment === '.' || segment === '..'))) {
+    throw new Error('包目录必须是工作区内的相对路径。')
+  }
+  const resolved = join(root, directory)
+  if (await realpath(resolved).catch(() => undefined) !== resolved) throw new Error('工作区目录已变更。')
+  return resolved
+}
+
+/** The Session working-directory service this package reads when the composition mounts it. */
+interface WorkingDirectoryReader {
+  get(session: Session): string
+}
+
+/**
+ * Directory a Session works in: its current directory, which is its branch
+ * worktree for a Session created on a branch, or the directory it was created in.
+ * @param ctx - Host context that may provide the working-directory service.
+ * @param session - Session to locate.
+ * @returns the absolute directory.
+ */
+export function sessionDirectory(ctx: Context, session: Session): string {
+  const service = ctx.get('workingDirectory') as WorkingDirectoryReader | undefined
+  const root = service?.get(session) ?? session.header.cwd
+  if (root === undefined) throw new Error('当前会话没有工作目录，无法定位要发布的包。')
+  return root
 }
 
 /**
@@ -168,13 +207,16 @@ export interface ProjectRouteInputs {
   canReadProjects(): Promise<boolean>
   /** Resolve the registered workspace named by the request's `workspace` parameter. */
   workspace(id: string | null): ProjectWorkspace | undefined
+  /** Resolve the directory of the Session named by the request's `session` parameter. */
+  session(id: string | null): string | undefined
 }
 
 /**
- * Answer one discovery request: the plugin the workspace root manifest
- * declares, when any. Discovery never changes what the workspace can publish;
- * the publishing tool is offered to every signed-in creator.
- * @param inputs - resolved access and workspace lookup.
+ * Answer one discovery request: the plugin the requested directory's manifest
+ * declares, when any. The publish page asks with `session` for the Session's
+ * own directory and names a `directory` inside it only when the root holds no
+ * plugin; the creator center asks with `workspace` for its inventory.
+ * @param inputs - resolved access, workspace, and session lookups.
  * @returns the Fetch handler for {@link registerProjectRoutes}.
  */
 export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => Promise<Response> {
@@ -182,23 +224,21 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
     if (!await inputs.canReadProjects()) {
       return Response.json({ error: 'creator_required' }, { status: 403 })
     }
-    const workspace = inputs.workspace(new URL(request.url).searchParams.get('workspace'))
-    if (!workspace) return Response.json({ error: 'workspace_not_found' }, { status: 404 })
-    if (new URL(request.url).searchParams.get('scope') === 'candidates') {
-      try {
-        return Response.json({ candidates: await listPluginPackages(workspace.path) }, { headers: { 'cache-control': 'no-store' } })
-      } catch {
-        return Response.json({ error: 'workspace_unavailable' }, { status: 404 })
-      }
-    }
-    let project: PluginProject | undefined
+    const params = new URL(request.url).searchParams
+    const headers = { 'cache-control': 'no-store' }
+    const sessionRoot = inputs.session(params.get('session'))
+    const root = sessionRoot ?? inputs.workspace(params.get('workspace'))?.path
+    if (root === undefined) return Response.json({ error: 'target_not_found' }, { status: 404 })
+    const directory = params.get('directory')
     try {
-      project = await detectPluginProject(workspace.path)
+      const project = await detectPluginProject(
+        directory === null ? root : await packageDirectory(await realpath(root), directory),
+      )
+      const state: WorkspacePluginState = { ...(project && { project }) }
+      return Response.json(state, { headers })
     } catch {
-      return Response.json({ error: 'workspace_unavailable' }, { status: 404 })
+      return Response.json({ error: 'directory_unavailable' }, { status: 404 })
     }
-    const state: WorkspacePluginState = { ...(project && { project }) }
-    return Response.json(state, { headers: { 'cache-control': 'no-store' } })
   }
 }
 
@@ -214,6 +254,15 @@ export function registerProjectRoutes(ctx: Context, canReadProjects = createProj
     fetch: projectRoute({
       canReadProjects,
       workspace: id => ctx.workspaceRegistry.list().find(item => item.id === id),
+      session: (id) => {
+        const session = id === null ? undefined : ctx.sessions.get(id as SessionId)
+        if (session === undefined) return
+        try {
+          return sessionDirectory(ctx, session)
+        } catch {
+          return undefined
+        }
+      },
     }),
   })
 }
