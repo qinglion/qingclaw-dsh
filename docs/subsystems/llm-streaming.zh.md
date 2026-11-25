@@ -571,6 +571,12 @@ interface LlmModelInfo {
    * omits it, and no model request or Session event carries it.
    */
   badge?: LlmModelBadge
+  /**
+   * Relative request cost a catalog advertises for this model, in the catalog
+   * owner's unit. Display data only: no model request or Session event carries
+   * it, and an absent value means the catalog prices no multiple.
+   */
+  rate?: number
 }
 ```
 
