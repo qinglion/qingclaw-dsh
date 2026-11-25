@@ -3,6 +3,7 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import { submitListing } from './api.ts'
 import { getSessionPlugin, getSessionProjectAt } from './project-api.ts'
 import type { PluginProject, PublishCandidate } from '../project-types.ts'
 import type { NS } from './locales.ts'
@@ -72,6 +73,7 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
   const [entry, setEntry] = useState('')
   const [missing, setMissing] = useState(false)
   const [revision, refresh] = useState(0)
+  const [listing, setListing] = useState<{ readonly kind: 'idle' | 'pending' | 'done' | 'failed'; readonly message?: string }>({ kind: 'idle' })
   const key = String(sessionId)
   useEffect(() => {
     const controller = new AbortController()
@@ -115,6 +117,16 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
   }
   const candidate: PublishCandidate | undefined = view.kind === 'project'
     ? { directory: view.directory, project: view.project } : undefined
+  const requestListing = async (chosen: PublishCandidate): Promise<void> => {
+    setListing({ kind: 'pending' })
+    try {
+      await submitListing(chosen.project.name, chosen.project.version, new AbortController().signal)
+      setListing({ kind: 'done', message: t('submitted') })
+    } catch (error) {
+      // The website owns the listing requirements; show its own refusal verbatim.
+      setListing({ kind: 'failed', message: error instanceof Error && error.message ? error.message : t('loadFailure') })
+    }
+  }
   return <section className={css.body}>
     <div className={css.sectionHead}><h2>{t('publish')}</h2>
       <Button variant="ghost" disabled={view.kind === 'loading'} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button></div>
@@ -128,8 +140,11 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
       <div className={css.actions}><code>{candidate.project.version}</code>
         {candidate.directory === '.' ? null : <Button variant="ghost" onClick={() => { writeBinding(key, undefined); refresh(n => n + 1) }}>
           {t('publishChange')}</Button>}
-        <Button variant="outline" onClick={() => { publish(sessionId, candidate) }}>{t('publish')}</Button></div>
+        <Button variant="outline" onClick={() => { publish(sessionId, candidate) }}>{t('publish')}</Button>
+        <Button variant="ghost" disabled={listing.kind === 'pending'} onClick={() => { void requestListing(candidate) }}>
+          {t('publishList')}</Button></div>
     </li></ul>}
+    {listing.message !== undefined && <p role={listing.kind === 'failed' ? 'alert' : 'status'}>{listing.message}</p>}
     {view.kind === 'choose' && <>
       <p className={css.muted}>{t('unrecognizedRoot')}</p>
       <div className={css.sectionHead}>

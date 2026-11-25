@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PublishPanel, publishPrompt } from '../src/client/PublishPanel.tsx'
+import { submitListing } from '../src/client/api.ts'
 import { getSessionPlugin, getSessionProjectAt } from '../src/client/project-api.ts'
 import { zh } from '../src/client/locales.ts'
 import type { PluginProject } from '../src/project-types.ts'
 
 vi.mock('../src/client/project-api.ts', () => ({ getSessionPlugin: vi.fn(), getSessionProjectAt: vi.fn() }))
+vi.mock('../src/client/api.ts', () => ({ submitListing: vi.fn() }))
 afterEach(() => { cleanup(); vi.resetAllMocks(); window.localStorage.clear() })
 
 const desk: PluginProject = { name: '@qinglion/desk', title: 'Desk', version: '1.0.0', kind: 'plugin' }
@@ -63,6 +65,24 @@ it('drops an association whose directory no longer holds a package', async () =>
   mount()
   expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
   expect(window.localStorage.getItem(BINDING)).toBeNull()
+})
+
+it('requests the listing for the same package version from the page', async () => {
+  vi.mocked(getSessionPlugin).mockResolvedValue(desk)
+  vi.mocked(submitListing).mockResolvedValue({})
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: zh.publishList }))
+  await waitFor(() => { expect(submitListing).toHaveBeenCalledWith(desk.name, desk.version, expect.any(AbortSignal)) })
+  expect(await screen.findByText(zh.submitted)).toBeTruthy()
+})
+
+it('shows the website refusal verbatim when a listing is declined', async () => {
+  const message = '该版本缺少上架必填信息：侧边 logo、工作台预览图（至少 2 张）。请在 package.json 的 qingclaw 中补充后重新发版。'
+  vi.mocked(getSessionPlugin).mockResolvedValue(desk)
+  vi.mocked(submitListing).mockRejectedValue(new Error(message))
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: zh.publishList }))
+  expect((await screen.findByRole('alert')).textContent).toBe(message)
 })
 
 it('says so when the chosen directory holds no plugin', async () => {
