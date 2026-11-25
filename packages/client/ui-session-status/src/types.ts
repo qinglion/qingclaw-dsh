@@ -12,6 +12,19 @@ export interface SessionReadState {
   readonly manualUnread: boolean
 }
 
+/**
+ * Desktop shell surface for the application icon badge.
+ *
+ * Only the Desktop application document receives this bridge; browsers and shells without an icon badge omit it.
+ */
+export interface DesktopAttentionBridge {
+  /**
+   * Report how many Sessions finished a turn the user has not read.
+   * @param count - unread completions to badge; 0 removes the badge.
+   */
+  update(count: number): void
+}
+
 /** Explicit marks replace the manual reminder; automatic acknowledgements only advance the read position. */
 export type SessionReadAction =
   | { readonly type: 'unread' }

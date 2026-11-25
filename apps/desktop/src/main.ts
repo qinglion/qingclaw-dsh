@@ -70,6 +70,7 @@ import { readDesktopSettings } from './settings.ts'
 import { readDesktopLocaleCache, writeDesktopLocaleCache } from './locale-cache.ts'
 import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
+import { DesktopAppBadge } from './app-badge.ts'
 import { DesktopBrowserGuests } from './browser-guests.ts'
 import { installDesktopShortcuts } from './keyboard.ts'
 import { DesktopUpdateOverlays } from './update-overlay.ts'
@@ -501,6 +502,7 @@ async function main(): Promise<void> {
   let hostUrl: string | undefined
   let hostCookie: string | undefined
   const browserGuests = new DesktopBrowserGuests(() => hostUrl)
+  const appBadge = new DesktopAppBadge()
   let injections: readonly unknown[] = []
   let welcomeBackend: DesktopWelcomeBackend | undefined
   let reportedLaunch = false
@@ -923,6 +925,15 @@ async function main(): Promise<void> {
       || !event.senderFrame.url.startsWith(`${SCHEME}://app/`)) return
     if (source !== 'light' && source !== 'dark' && source !== 'system') return
     nativeTheme.themeSource = source
+  })
+  // The application badge mirrors the unread completions the page counts; nothing else sets it.
+  ipcMain.on(DESKTOP_IPC.attentionBadge, (event, count: unknown) => {
+    const window = mainWindow
+    if (window === undefined || event.sender !== window.webContents
+      || event.senderFrame !== window.webContents.mainFrame
+      || !event.senderFrame.url.startsWith(`${SCHEME}://app/`)) return
+    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) return
+    appBadge.set(count)
   })
   ipcMain.handle(DESKTOP_IPC.localeBootstrap, async (event) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame
@@ -1383,7 +1394,12 @@ async function main(): Promise<void> {
       window.on('focus', () => { sessionEnding = false })
       window.on('show', () => { sessionEnding = false })
     }
-    window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
+    window.on('closed', () => {
+      if (mainWindow !== window) return
+      mainWindow = undefined
+      // The page that reported reminders is gone with its window.
+      appBadge.clear()
+    })
     window.webContents.on('console-message', (details) => {
       if (details.level !== 'error') return
       rendererConsole.push(`${details.sourceId}:${String(details.lineNumber)} ${details.message}`)

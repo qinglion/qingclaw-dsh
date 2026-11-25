@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-25-desktop-unread-completion-badge.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-desktop-unread-completion-badge.md
+/agent-note-desktop-application-badge-for-unread-turn-completions:
+  en: 621eba6238f4a5d1
+  zh: 6303315f47fec4e2
+/agent-note-desktop-application-badge-for-unread-turn-completions/problem:
+  en: 604dbe91afef7610
+  zh: 06c2fea974aa2476
+/agent-note-desktop-application-badge-for-unread-turn-completions/decision:
+  en: 4f436f89efda63f5
+  zh: 9a0fcaf52fcc111b
+/agent-note-desktop-application-badge-for-unread-turn-completions/alternatives-considered:
+  en: 0a4502daf009a049
+  zh: 857d437d29afafe3
+/agent-note-desktop-application-badge-for-unread-turn-completions/consequences:
+  en: 1ae3709d94a11865
+  zh: 8bfc348efc0db7b3

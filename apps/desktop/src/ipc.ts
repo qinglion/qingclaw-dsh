@@ -1,4 +1,5 @@
 import type { DesktopFileActions } from '@deepseek-ai/dsh-client-ui-file-actions/types'
+import type { DesktopAttentionBridge } from '@deepseek-ai/dsh-client-ui-session-status/types'
 /** Typed preload operations exposed only by the Electron shell. */
 
 export type { DesktopChannelState, DesktopChannelChangeResult } from '@deepseek-ai/dsh-client-ui-settings-general/types'
@@ -33,6 +34,7 @@ export const DESKTOP_IPC = {
   fileDragStart: 'dsh-desktop:file-drag-start',
   fileDragRelease: 'dsh-desktop:file-drag-release',
   deviceInfo: 'dsh-desktop:device-info',
+  attentionBadge: 'dsh-desktop:attention-badge',
   localeBootstrap: 'dsh-desktop:locale-bootstrap',
   localeChanged: 'dsh-desktop:locale-changed',
   updatesChannelGet: 'dsh-desktop:updates-channel-get',
@@ -112,6 +114,8 @@ export interface DshDesktopProductApi {
   readonly fileDrag: DesktopFileDrag
   readonly keyboard: DesktopKeyboardApi
   readonly shortcuts: DesktopShortcutsApi
+  /** Application icon badge for unread turn completions. */
+  readonly attention: DesktopAttentionBridge
   /**
    * Local machine description for the feedback questionnaire.
    * @returns `name=value` fields separated by `; `, with no hostname, user name, or serial number.
