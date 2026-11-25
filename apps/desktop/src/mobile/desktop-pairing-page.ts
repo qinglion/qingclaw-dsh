@@ -3,14 +3,14 @@ export function desktopPairingPage(locale: 'zh' | 'en', desktopTheme: string): s
   const strings = zh
     ? {
       title: '连接手机',
-      hint: '用微信扫码，登录与电脑相同的账号，然后在电脑上同意连接。',
+      hint: '用微信扫码，登录与电脑相同的账号，然后在电脑上同意连接。链接会保存在本机，重启电脑端后仍可继续使用。',
       loading: '正在连接青狮官网…',
       waiting: '等待手机配对',
       reconnecting: '正在重新连接官网…',
       connected: '手机已连接',
       away: '已配对，手机暂离',
       awayHint: '在手机上重新打开配对页面即可恢复连接。',
-      connectedHint: '可以关闭此窗口。断开后，手机需要重新扫码。',
+      connectedHint: '可以关闭此窗口；重启电脑端后，手机用同一链接即可继续连接。断开后，手机需要重新扫码。',
       requested: '手机请求连接',
       denied: '已拒绝本次申请',
       requestHint: '同意后，这部手机可以查看此电脑的会话并发送消息。',
@@ -34,14 +34,14 @@ export function desktopPairingPage(locale: 'zh' | 'en', desktopTheme: string): s
     }
     : {
       title: 'Connect a phone',
-      hint: 'Scan with WeChat, sign in with the account on this computer, then approve the request here.',
+      hint: 'Scan with WeChat, sign in with the account on this computer, then approve the request here. The link is stored on this computer, so it keeps working after a restart.',
       loading: 'Connecting to QingClaw…',
       waiting: 'Waiting for your phone',
       reconnecting: 'Reconnecting to QingClaw…',
       connected: 'Phone connected',
       away: 'Paired · Phone offline',
       awayHint: 'Reopen the pairing page on your phone to reconnect.',
-      connectedHint: 'You can close this window. After disconnecting, scan a new code to pair again.',
+      connectedHint: 'You can close this window; after a desktop restart the phone keeps working with the same link. After disconnecting, scan a new code to pair again.',
       requested: 'A phone is requesting access',
       denied: 'Connection request denied',
       requestHint: 'Allow this phone to view conversations on this computer and send messages.',

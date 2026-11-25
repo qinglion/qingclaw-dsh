@@ -25,8 +25,21 @@ export class MobilePairingWindow {
     return this.opening
   }
 
-  private stop(): Promise<void> {
-    this.stopping ??= this.bridge.stop().finally(() => { this.stopping = undefined })
+  /**
+   * Ends the management window. The relay stays mounted unless the caller also stops the
+   * bridge, because the phone keeps its room and link while the desktop is running.
+   * @param options - `preserveRoom` forwards to the bridge stop.
+   * @returns resolution once the window and any requested bridge stop complete.
+   */
+  async dispose(options?: { preserveRoom?: boolean }): Promise<void> {
+    this.disposed = true
+    if (this.window && !this.window.isDestroyed()) this.window.destroy()
+    await this.opening?.catch(() => undefined)
+    await this.stop(options)
+  }
+
+  private stop(options?: { preserveRoom?: boolean }): Promise<void> {
+    this.stopping ??= this.bridge.stop(options).finally(() => { this.stopping = undefined })
     return this.stopping
   }
 
@@ -76,8 +89,6 @@ export class MobilePairingWindow {
       })
       win.on('closed', () => {
         if (this.window === win) this.window = undefined
-        const room = this.bridge.snapshot()
-        if (!this.disposed && !room.paired && !room.denied) void this.stop().catch(() => undefined)
       })
       await win.loadURL(bootstrap)
       if (!win.isDestroyed()) {
@@ -86,16 +97,10 @@ export class MobilePairingWindow {
       }
     } catch {
       if (this.window && !this.window.isDestroyed()) this.window.destroy()
-      await this.stop().catch(() => undefined)
+      // A window that failed to load leaves any working pairing untouched.
+      if (!this.disposed) await this.stop({ preserveRoom: true }).catch(() => undefined)
       // Electron loadURL errors may contain the local bootstrap secret.
       throw new Error('Could not open the phone pairing window')
     }
-  }
-
-  async dispose(): Promise<void> {
-    this.disposed = true
-    if (this.window && !this.window.isDestroyed()) this.window.destroy()
-    await this.opening?.catch(() => undefined)
-    await this.stop()
   }
 }

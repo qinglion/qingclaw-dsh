@@ -22,6 +22,7 @@ import {
   nativeImage,
   nativeTheme,
   protocol,
+  safeStorage,
   session,
   shell,
   type IpcMainInvokeEvent,
@@ -39,6 +40,7 @@ import { DesktopBackendController } from './backend-controller.ts'
 import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
 import { readDeviceInfo } from './device-info.ts'
 import { RemoteMobileBridge } from './mobile/remote-mobile-bridge.ts'
+import { PairingStore } from './mobile/pairing-store.ts'
 import { DesktopMobileAccount, registerMobileRoom } from './mobile-account.ts'
 import { MobilePairingWindow } from './mobile-pairing-window.ts'
 import { desktopUpdateReadyConfirmation, formatDesktopMessage, resolveDesktopLocale, resolveDesktopStartupLocale } from './locale.ts'
@@ -267,6 +269,37 @@ function platformLoginUrl(authorizeUrl: string): string {
   const url = new URL(authorizeUrl)
   url.searchParams.set('theme', nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
   return url.href
+}
+
+/**
+ * Protects the persisted phone pairing at rest.
+ *
+ * The record carries a credential that grants remote access to this desktop's sessions. The
+ * platform key store seals it when available; otherwise the owner-only file mode is the only
+ * protection, and the next launch after a key-store change starts a fresh pairing.
+ * @returns sealing helpers for the pairing store.
+ */
+function pairingCipher(): { seal(plaintext: string): string; unseal(value: string): string | undefined } {
+  if (safeStorage.isEncryptionAvailable()) {
+    return {
+      seal: plaintext => 'encrypted:' + safeStorage.encryptString(plaintext).toString('base64'),
+      unseal: (value) => {
+        if (!value.startsWith('encrypted:')) return undefined
+        try {
+          return safeStorage.decryptString(Buffer.from(value.slice('encrypted:'.length), 'base64'))
+        } catch {
+          // A rotated or unavailable key-store entry is expected; the phone scans again.
+          return undefined
+        }
+      },
+    }
+  }
+  return {
+    seal: plaintext => 'plain:' + Buffer.from(plaintext, 'utf8').toString('base64'),
+    unseal: value => value.startsWith('plain:')
+      ? Buffer.from(value.slice('plain:'.length), 'base64').toString('utf8')
+      : undefined,
+  }
 }
 
 function createWindow(preload: string, show = false, primary = false): BrowserWindow {
@@ -547,7 +580,7 @@ async function main(): Promise<void> {
   const phoneAccount = new DesktopMobileAccount((account) => {
     const origin = sealedDeployment?.platformOrigin ?? hostEnvironment.QINGCLAW_PLATFORM_ORIGIN
       ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test
-    return new MobilePairingWindow(new RemoteMobileBridge({
+    const bridge = new RemoteMobileBridge({
       platformOrigin: origin,
       desktopTheme: readFileSync(join(app.getAppPath(), 'lib/welcome/design-platform.css'), 'utf8'),
       createRoom: signal => registerMobileRoom(origin, account, signal),
@@ -558,7 +591,19 @@ async function main(): Promise<void> {
       },
       harnessCookie: () => backend.state.phase === 'ready' ? hostCookie : undefined,
       locale: () => locale.id.startsWith('zh') ? 'zh' : 'en',
-    }))
+      pairing: new PairingStore({
+        path: join(app.getPath('userData'), 'desktop', 'mobile-pairing.json'),
+        origin,
+        accountId: account.userId,
+        ...pairingCipher(),
+      }),
+    })
+    const window = new MobilePairingWindow(bridge)
+    return {
+      restore: () => bridge.restore(),
+      open: (parent: BrowserWindow, title: string) => window.open(parent, title),
+      dispose: (options?: { preserveRoom?: boolean }) => window.dispose(options),
+    }
   })
   const backend = new DesktopBackendController((onFailure) => {
     const hostInspectPort = developmentHostInspectPort(development)
@@ -1568,7 +1613,8 @@ async function main(): Promise<void> {
     updateDialog.dispose()
     mandatoryUI?.dispose()
     void Promise.all([
-      phoneAccount.close(),
+      // A restart keeps the room so an already paired phone reconnects without scanning again.
+      phoneAccount.close({ preserveRoom: true }),
       stopOperationReports(),
       Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
       backend.close().then(async () => { await operationJournal?.drain(500) }, async (error: unknown) => {
@@ -1589,7 +1635,7 @@ async function main(): Promise<void> {
       tray?.dispose()
       updateDialog.dispose()
       mandatoryUI?.dispose()
-      void phoneAccount.close().catch(() => undefined)
+      void phoneAccount.close({ preserveRoom: true }).catch(() => undefined)
       // Installation preparation already awaited Platform storage cleanup.
       void platformView.dispose().catch((error: unknown) => { console.error(error) })
       return

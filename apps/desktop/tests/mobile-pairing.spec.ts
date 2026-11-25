@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { RemoteMobileBridge } from '../src/mobile/remote-mobile-bridge.ts'
-import { parseRoom } from '../src/mobile/mobile-relay.ts'
+import { parseRoom, type RemoteRoom } from '../src/mobile/mobile-relay.ts'
+import type { PairingVault } from '../src/mobile/pairing-store.ts'
 
 const cables = vi.hoisted(
   () =>
@@ -49,7 +50,7 @@ function room(id = 'room-1') {
   }
 }
 const origin = 'https://site.example'
-function fixture(createRoom = vi.fn(async () => room())) {
+function fixture(createRoom = vi.fn(async () => room()), pairing?: PairingVault) {
   return new RemoteMobileBridge({
     platformOrigin: origin,
     desktopTheme: 'body { --test-shared-theme: 1; }',
@@ -57,7 +58,24 @@ function fixture(createRoom = vi.fn(async () => room())) {
     locale: 'zh',
     harnessUrl: () => undefined,
     harnessCookie: () => undefined,
+    ...(pairing ? { pairing } : {}),
   })
+}
+function cableState(cable: (typeof cables)[number], state: Record<string, unknown>) {
+  cable.emit('message', JSON.stringify({ type: 'welcome' }))
+  cable.emit('message', JSON.stringify({
+    identifier: JSON.stringify({ channel: 'MobileRelayChannel', room_id: 'room-1' }),
+    message: { type: 'state', ...state },
+  }))
+}
+function vault(initial?: RemoteRoom) {
+  let stored = initial
+  return {
+    load: vi.fn(async () => stored),
+    save: vi.fn(async (value: RemoteRoom) => { stored = value }),
+    clear: vi.fn(async () => { stored = undefined }),
+    get stored() { return stored },
+  }
 }
 async function pairingClient(bridge: RemoteMobileBridge) {
   await bridge.start()
@@ -203,4 +221,104 @@ it('rejects room identifiers and secrets that are not valid local URL components
   expect(() => parseRoom({ ...room(), id: '../another' })).toThrow()
   expect(() => parseRoom({ ...room(), pairing_secret: '123' })).toThrow()
   expect(() => parseRoom({ ...room(), pairing_expires_at: 'invalid' })).toThrow()
+})
+it('keeps the room and its link across a restart and revokes it only on disconnect', async () => {
+  const released: string[] = []
+  const realFetch = globalThis.fetch
+  vi.stubGlobal('fetch', (url: URL, init: RequestInit) => {
+    if (new URL(url).origin !== origin) return realFetch(url, init)
+    released.push(init.method ?? 'GET')
+    return Promise.resolve(new Response(null, { status: 204 }))
+  })
+  const createRoom = vi.fn(async () => room())
+  const storage = vault()
+  const bridge = fixture(createRoom, storage)
+  const client = await pairingClient(bridge)
+  await vi.waitFor(() => {
+    expect(cables).toHaveLength(1)
+  })
+  cableState(cables[0]!, { paired: false })
+  const first = (await (await client('/desktop/status')).json()) as Record<string, unknown>
+  expect(first.link).toBe(origin + '/mobile#room-1.' + 's'.repeat(32))
+  expect(storage.save).toHaveBeenCalledTimes(1)
+  await bridge.stop({ preserveRoom: true })
+  expect(storage.clear).not.toHaveBeenCalled()
+  expect(released).toEqual([])
+
+  const restarted = fixture(createRoom, storage)
+  await restarted.restore()
+  const reopened = await pairingClient(restarted)
+  await vi.waitFor(() => {
+    expect(cables).toHaveLength(2)
+  })
+  cableState(cables[1]!, { paired: false })
+  expect((await (await reopened('/desktop/status')).json())).toMatchObject({ link: first.link })
+  expect(createRoom).toHaveBeenCalledTimes(1)
+  expect(cables[1]!.options.headers.authorization).toBe('Bearer ' + 'd'.repeat(32))
+  expect((await reopened('/desktop/disconnect', 'POST')).status).toBe(204)
+  await vi.waitFor(() => {
+    expect(storage.clear).toHaveBeenCalledTimes(1)
+    expect(released).toEqual(['DELETE'])
+  })
+  await restarted.stop()
+})
+
+it('forgets the stored room when the Platform revokes it', async () => {
+  const storage = vault(parseRoom(room()))
+  const bridge = fixture(undefined, storage)
+  await bridge.start()
+  await vi.waitFor(() => {
+    expect(cables).toHaveLength(1)
+  })
+  const identifier = JSON.stringify({ channel: 'MobileRelayChannel', room_id: 'room-1' })
+  cables[0]!.emit('message', JSON.stringify({ identifier, message: { type: 'revoked' } }))
+  await vi.waitFor(() => {
+    expect(storage.clear).toHaveBeenCalledTimes(1)
+  })
+  expect(bridge.snapshot()).toMatchObject({ paired: false, denied: false })
+  await bridge.stop({ preserveRoom: true })
+})
+
+it('drops an expired stored room before pairing again', async () => {
+  const expired: RemoteRoom = { ...parseRoom(room()), expiresAt: Date.now() - 1000 }
+  const storage = vault(expired)
+  const createRoom = vi.fn(async () => room())
+  const bridge = fixture(createRoom, storage)
+  await bridge.start()
+  await vi.waitFor(() => {
+    expect(createRoom).toHaveBeenCalledTimes(1)
+  })
+  expect(storage.clear).toHaveBeenCalledTimes(1)
+  await bridge.stop({ preserveRoom: true })
+})
+it('follows a room the Platform renews while the desktop stays in use', async () => {
+  const storage = vault()
+  const bridge = fixture(vi.fn(async () => room()), storage)
+  try {
+    const client = await pairingClient(bridge)
+    await vi.waitFor(() => {
+      expect(cables).toHaveLength(1)
+    })
+    const socket = cables[0]!
+    const identifier = JSON.stringify({ channel: 'MobileRelayChannel', room_id: 'room-1' })
+    cableState(socket, { paired: true, status: 'approved' })
+    const extended = new Date(Date.now() + 20 * 86_400_000).toISOString()
+    socket.emit('message', JSON.stringify({
+      identifier,
+      message: { type: 'state', paired: true, status: 'approved', expires_at: extended },
+    }))
+    await vi.waitFor(() => {
+      expect(storage.stored?.expiresAt).toBe(Date.parse(extended))
+    })
+    // A stale frame with an earlier expiry never shortens the stored room.
+    socket.emit('message', JSON.stringify({
+      identifier,
+      message: { type: 'state', paired: true, status: 'approved', expires_at: new Date(Date.now() + 60_000).toISOString() },
+    }))
+    await Promise.resolve()
+    expect(storage.stored?.expiresAt).toBe(Date.parse(extended))
+    expect(await (await client('/desktop/status')).json()).toMatchObject({ paired: true })
+  } finally {
+    await bridge.stop({ preserveRoom: true })
+  }
 })

@@ -36,6 +36,8 @@ export function parseRoom(value: unknown): RemoteRoom {
 interface RelayOptions extends MobileHostOptions {
   platformOrigin: string
   onRevoked(): void
+  /** The Platform moved the room's expiry forward while this desktop stayed in use. */
+  onExtended?(expiresAt: number): void
 }
 
 /** The relay transports only the mobile chat protocol, never an HTTP URL or a Host RPC endpoint. */
@@ -171,6 +173,12 @@ export class MobileRelay {
     if (message.type === 'state') {
       this.ready = true
       this.backoff = 500
+      // A room follows this desktop's use, so its stored credential and local
+      // expiry must follow the Platform instead of aging out.
+      if (typeof message.expires_at === 'string') {
+        const expiresAt = Date.parse(message.expires_at)
+        if (Number.isFinite(expiresAt)) this.options.onExtended?.(expiresAt)
+      }
       // Each room has a single, irreversible approval decision. Late pub/sub
       // notifications must not expose the consumed invitation again.
       if (!this.decision) {

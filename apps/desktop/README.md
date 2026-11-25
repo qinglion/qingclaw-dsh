@@ -59,7 +59,7 @@ Desktop microphone access is restricted to audio requests from the primary `dsh-
 
 Press F12 (Fn+F12 on media-key keyboards), Command+Option+I on macOS, or Ctrl+Shift+I on Windows to toggle DevTools for the focused application page, including in packaged builds. The application menu shows a localized “Developer tools” command in a separate group before Hide and Quit (before Exit on Windows). Windows exposes it in the titlebar application popup; its hidden native application menu registers the shortcuts. macOS and Linux keep a hidden F12 shortcut alias in their application menus. Update overlays and packaged embedded browser guests disable DevTools.
 
-Open **Connect phone** in the sidebar footer after signing in. Scan the QingClaw website QR code, sign in with the same WeChat account on the phone and approve its connection request on the computer. Keep the desktop app online while using the mobile browser. Reopen **Connect phone** and select **Disconnect** to revoke access. Signing out or quitting the app also ends the connection.
+Open **Connect phone** in the sidebar footer after signing in. Scan the QingClaw website QR code, sign in with the same WeChat account on the phone and approve its connection request on the computer. Keep the desktop app online while using the mobile browser. The paired room is stored for the signed-in account, so the same link keeps working after a restart, and the website slides it forward while this computer keeps being used; only **Disconnect**, signing out, or a month without desktop activity ends it. On the phone, opening the mobile site directly lists the computers this account linked and re-enters one. Reopen **Connect phone** and select **Disconnect** to revoke access.
 
 <a id="terminal-command"></a>
 

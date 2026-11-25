@@ -29,27 +29,54 @@ it.each([[404, 'Service unavailable'], [401, 'Sign in required'], [500, 'Connect
       .rejects.toThrow(message)
   })
 
-it('disconnects the previous account or Host before opening another device pairing', async () => {
-  let finish!: () => void
-  const first = { open: vi.fn(async () => {}), dispose: vi.fn(() => new Promise<void>((resolve) => { finish = resolve })) }
-  const second = { open: vi.fn(async () => {}), dispose: vi.fn(async () => {}) }
+it('keeps the stored room when the Host session is replaced', async () => {
+  const first = { restore: vi.fn(async () => {}), open: vi.fn(async () => {}), dispose: vi.fn(async () => {}) }
+  const second = { restore: vi.fn(async () => {}), open: vi.fn(async () => {}), dispose: vi.fn(async () => {}) }
   const create = vi.fn().mockReturnValueOnce(first).mockReturnValue(second)
   const phone = new DesktopMobileAccount(create)
   await expect(phone.open(parent, 'Pair')).rejects.toThrow('Sign in')
   phone.setSession(account)
   await phone.open(parent, 'Pair')
+  expect(first.restore).toHaveBeenCalledTimes(1)
   phone.setSession({ ...account })
   expect(first.dispose).not.toHaveBeenCalled()
   phone.setSession({ ...account, token: 'next-fixture' })
-  expect(first.dispose).toHaveBeenCalledTimes(1)
+  await phone.open(parent, 'Pair')
+  expect(first.dispose).toHaveBeenCalledWith({ preserveRoom: true })
+  expect(second.restore).toHaveBeenCalledTimes(1)
+  expect(second.open).toHaveBeenCalledTimes(1)
+  await phone.close({ preserveRoom: true })
+  expect(second.dispose).toHaveBeenCalledWith({ preserveRoom: true })
+})
+
+it('revokes the room when the account signs out', async () => {
+  const pairing = { restore: vi.fn(async () => {}), open: vi.fn(async () => {}), dispose: vi.fn(async () => {}) }
+  const phone = new DesktopMobileAccount(() => pairing)
+  phone.setSession(account)
+  await phone.open(parent, 'Pair')
+  phone.setSession(null)
+  await phone.close()
+  expect(pairing.dispose).toHaveBeenCalledWith({ preserveRoom: false })
+})
+
+it('rejects an open that outlived its session', async () => {
+  let release!: () => void
+  const blocked = new Promise<void>((resolve) => { release = resolve })
+  const pairing = {
+    restore: vi.fn(async () => {}),
+    open: vi.fn(async () => {}),
+    dispose: vi.fn(() => blocked),
+  }
+  const phone = new DesktopMobileAccount(() => pairing)
+  phone.setSession(account)
+  await phone.open(parent, 'Pair')
+  phone.setSession({ ...account, token: 'next-fixture' })
+  await vi.waitFor(() => {
+    expect(pairing.dispose).toHaveBeenCalledTimes(1)
+  })
   const staleOpen = phone.open(parent, 'Pair')
   phone.setSession(null)
-  finish()
+  release()
   await expect(staleOpen).rejects.toThrow('Sign in')
-  expect(create).toHaveBeenCalledTimes(1)
-  phone.setSession({ ...account, token: 'next-fixture' })
-  await phone.open(parent, 'Pair')
-  expect(second.open).toHaveBeenCalledTimes(1)
-  await phone.close()
-  expect(second.dispose).toHaveBeenCalledTimes(1)
+  expect(pairing.open).toHaveBeenCalledTimes(1)
 })

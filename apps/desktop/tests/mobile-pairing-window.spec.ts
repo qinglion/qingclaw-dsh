@@ -79,29 +79,25 @@ it('fits short connection states and the QR page without changing the window wid
   await pairing.dispose()
 })
 
-it('lets a paired phone continue after the window closes and disconnects it when the app exits', async () => {
+it('keeps the relay after the management window closes and stops it only when the app exits', async () => {
   const { bridge, pairing, parent } = kit()
   await pairing.open(parent, '连接手机')
   bridge.snapshot.mockReturnValue({ ...bridge.snapshot(), paired: true } as RemoteMobileBridgeSnapshot)
   windows[0]!.destroy()
   expect(bridge.stop).not.toHaveBeenCalled()
-  await pairing.dispose()
-  expect(bridge.stop).toHaveBeenCalledTimes(1)
+  await pairing.dispose({ preserveRoom: true })
+  expect(bridge.stop).toHaveBeenCalledWith({ preserveRoom: true })
   await expect(pairing.open(parent, '连接手机')).rejects.toThrow()
 })
 
-it('waits for an abandoned listener to finish stopping before opening the next QR', async () => {
+it('reopens the management page over the same bridge after the window closes', async () => {
   const { bridge, pairing, parent } = kit()
   await pairing.open(parent, '连接手机')
-  let finish!: () => void
-  bridge.stop.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
   windows[0]!.destroy()
-  const reopening = pairing.open(parent, '连接手机')
-  expect(bridge.start).toHaveBeenCalledTimes(1)
-  finish()
-  await reopening
-  expect(bridge.start).toHaveBeenCalledTimes(2)
+  await pairing.open(parent, '连接手机')
   expect(windows).toHaveLength(2)
+  expect(bridge.start).toHaveBeenCalledTimes(2)
+  expect(bridge.stop).not.toHaveBeenCalled()
   await pairing.dispose()
 })
 

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-25-phone-pairing-persistence.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-25-phone-pairing-persistence.md
+/agent-note-phone-pairing-survives-desktop-restarts:
+  en: b56d58d1128ce2f1
+  zh: f7c9837340b0a1be
+/agent-note-phone-pairing-survives-desktop-restarts/problem:
+  en: bdf9a33baa7cd26b
+  zh: 43c9ebdbe9365a06
+/agent-note-phone-pairing-survives-desktop-restarts/decision:
+  en: 280d7a7c8b365923
+  zh: 1260945ada658a58
+/agent-note-phone-pairing-survives-desktop-restarts/alternatives-considered:
+  en: 5055a93d2d6b8e38
+  zh: 670f638a8be61121
+/agent-note-phone-pairing-survives-desktop-restarts/consequences:
+  en: 203e99b6e50cb125
+  zh: f24972a3ad24014f
