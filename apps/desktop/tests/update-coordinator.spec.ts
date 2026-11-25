@@ -45,7 +45,10 @@ describe('desktop release metadata', () => {
 })
 
 const coordinators: InstanceType<typeof DesktopUpdateCoordinator>[] = []
-afterEach(() => { for (const item of coordinators.splice(0)) item.dispose() })
+afterEach(() => {
+  for (const item of coordinators.splice(0)) item.dispose()
+  vi.restoreAllMocks()
+})
 
 function fixture(channel: 'nightly' | 'stable' = 'nightly', version = '1.1.0-alpha.1', discard?: (updater: AppUpdater) => Promise<void>) {
   const events = new EventEmitter()
@@ -73,6 +76,11 @@ function fixture(channel: 'nightly' | 'stable' = 'nightly', version = '1.1.0-alp
 }
 
 describe('desktop update coordinator', () => {
+  it.each(['darwin', 'win32'] as const)('transfers the complete application package on %s', (platform) => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+    expect(fixture().updater.disableDifferentialDownload).toBe(platform === 'darwin')
+  })
+
   it.each(['stop-failed', 'fullscreen-timeout'] as const)('keeps safe %s diagnostics separate and clears them on an explicit retry', async (kind) => {
     const f = fixture()
     await f.coordinator.check()

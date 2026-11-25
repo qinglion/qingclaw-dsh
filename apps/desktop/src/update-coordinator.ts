@@ -78,6 +78,9 @@ export class DesktopUpdateCoordinator {
     }
     this.updater.autoDownload = false
     this.updater.autoInstallOnAppQuit = false
+    // macOS installs the complete application zip, so its blockmap diff re-fetches nearly the whole archive
+    // as sequential range requests instead of one stream; Windows keeps the installer's smaller diff.
+    this.updater.disableDifferentialDownload = process.platform === 'darwin'
     selectUpdateChannel(this.updater, channel)
     this.updater.on('download-progress', this.onProgress)
     this.updater.on('update-downloaded', this.onDownloaded)
