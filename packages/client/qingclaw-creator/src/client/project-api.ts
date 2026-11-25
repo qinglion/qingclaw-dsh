@@ -15,24 +15,28 @@ async function projectAt(query: Record<string, string>, signal: AbortSignal): Pr
 /**
  * Read the plugin the Session's own directory declares.
  * @param sessionId - the Session whose directory is inspected.
+ * @param cwd - the Session directory the client holds, when the Host cannot resolve the Session.
  * @param signal - aborts the request.
  * @returns the detected project, when the manifest declares one.
  */
-export async function getSessionPlugin(sessionId: string, signal: AbortSignal): Promise<PluginProject | undefined> {
-  return projectAt({ session: sessionId }, signal)
+export async function getSessionPlugin(
+  sessionId: string, cwd: string | undefined, signal: AbortSignal,
+): Promise<PluginProject | undefined> {
+  return projectAt({ session: sessionId, ...(cwd ? { cwd } : {}) }, signal)
 }
 
 /**
  * Read the plugin a directory inside the Session's directory declares.
  * @param sessionId - the Session whose directory the path is relative to.
  * @param directory - relative directory, `.` for the Session directory itself.
+ * @param cwd - the Session directory the client holds, when the Host cannot resolve the Session.
  * @param signal - aborts the request.
  * @returns the detected project, when the manifest declares one.
  */
 export async function getSessionProjectAt(
-  sessionId: string, directory: string, signal: AbortSignal,
+  sessionId: string, directory: string, cwd: string | undefined, signal: AbortSignal,
 ): Promise<PluginProject | undefined> {
-  return projectAt({ session: sessionId, directory }, signal)
+  return projectAt({ session: sessionId, directory, ...(cwd ? { cwd } : {}) }, signal)
 }
 
 /**

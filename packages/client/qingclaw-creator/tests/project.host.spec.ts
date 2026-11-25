@@ -68,6 +68,17 @@ it('answers for a session directory and for one named directory inside it', asyn
   expect(unknown.status).toBe(404)
 })
 
+it('accepts a client-supplied session directory when the Host cannot resolve the session', async () => {
+  await manifest(root, plugin)
+  const fetch = route({ session: () => undefined })
+  const resolved = await fetch(new Request(sessionUrl + '&cwd=' + encodeURIComponent(root)))
+  expect(await resolved.json()).toMatchObject({ project: { name: '@qinglion/desk' } })
+  const relative = await fetch(new Request(sessionUrl + '&cwd=relative/path'))
+  expect(relative.status).toBe(404)
+  const missing = await fetch(new Request(sessionUrl + '&cwd=' + encodeURIComponent(join(root, 'absent'))))
+  expect(missing.status).toBe(404)
+})
+
 it('refuses unknown callers and workspaces and reports an unreadable one', async () => {
   await manifest(root, plugin)
   expect((await route({ canReadProjects: async () => false })(new Request(url))).status).toBe(403)

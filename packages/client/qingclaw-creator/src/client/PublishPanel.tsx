@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { submitListing } from './api.ts'
+import { CreatorNotice } from './Notice.tsx'
 import { getSessionPlugin, getSessionProjectAt } from './project-api.ts'
 import type { PluginProject, PublishCandidate } from '../project-types.ts'
-import { CreatorNotice } from './Notice.tsx'
 import type { NS } from './locales.ts'
-import css from './CreatorCenter.module.css'
+import css from './PublishPanel.module.css'
 
-/** What the publish page calls into: it writes the request into the Session that owns the page. */
+/** What the publish page calls into: the Session's directory and the publish action. */
 export interface PublishInputs {
+  /** The directory the Session works in, when the client knows it. */
+  directoryOf(sessionId: SessionId): string | undefined
+  /** Write the publish request into the Session that owns the page. */
   publish(sessionId: SessionId, candidate: PublishCandidate): void
 }
 
@@ -40,8 +43,7 @@ const BINDING_PREFIX = 'qingclaw.creator.publish.v1.'
  */
 function readBinding(sessionId: string): string | undefined {
   try {
-    const value = window.localStorage.getItem(BINDING_PREFIX + sessionId)
-    return value ?? undefined
+    return window.localStorage.getItem(BINDING_PREFIX + sessionId) ?? undefined
   } catch {
     return undefined
   }
@@ -69,7 +71,8 @@ type Props = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<typeof NS> & I
  * plugin at its root, so the page asks once for the one directory to publish
  * and remembers it for this Session.
  */
-export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' | 'publish' | 't'>) {
+export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props, 'sessionId' | 'directoryOf' | 'publish' | 't'>) {
+  const cwd = directoryOf(sessionId)
   const [view, setView] = useState<View>({ kind: 'loading' })
   const [entry, setEntry] = useState('')
   const [missing, setMissing] = useState(false)
@@ -84,7 +87,7 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
       try {
         const bound = readBinding(key)
         if (bound !== undefined) {
-          const associated = await getSessionProjectAt(sessionId, bound, controller.signal)
+          const associated = await getSessionProjectAt(sessionId, bound, cwd, controller.signal)
           if (controller.signal.aborted) return
           if (associated !== undefined) {
             setView({ kind: 'project', directory: bound, project: associated })
@@ -93,7 +96,7 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
           // The associated directory no longer holds a package; ask again.
           writeBinding(key, undefined)
         }
-        const root = await getSessionPlugin(sessionId, controller.signal)
+        const root = await getSessionPlugin(sessionId, cwd, controller.signal)
         if (controller.signal.aborted) return
         setView(root === undefined ? { kind: 'choose' } : { kind: 'project', directory: '.', project: root })
       } catch {
@@ -101,13 +104,13 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
       }
     })()
     return () => { controller.abort() }
-  }, [key, sessionId, revision])
+  }, [key, sessionId, cwd, revision])
   const associate = async (): Promise<void> => {
     const relative = entry.trim()
     if (!relative) return
     setMissing(false)
     try {
-      const found = await getSessionProjectAt(sessionId, relative, new AbortController().signal)
+      const found = await getSessionProjectAt(sessionId, relative, cwd, new AbortController().signal)
       if (found === undefined) { setMissing(true); return }
       writeBinding(key, relative)
       setEntry('')
@@ -116,8 +119,6 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
       setView({ kind: 'failed' })
     }
   }
-  const candidate: PublishCandidate | undefined = view.kind === 'project'
-    ? { directory: view.directory, project: view.project } : undefined
   const requestListing = async (chosen: PublishCandidate): Promise<void> => {
     setListing({ kind: 'pending' })
     try {
@@ -128,33 +129,39 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
       setListing({ kind: 'failed', message: error instanceof Error && error.message ? error.message : t('loadFailure') })
     }
   }
-  return <section className={css.body}>
-    <div className={css.sectionHead}><h2>{t('publish')}</h2>
+  const candidate: PublishCandidate | undefined = view.kind === 'project'
+    ? { directory: view.directory, project: view.project } : undefined
+  return <section className={css.page}>
+    <div className={css.head}><h2 className={css.title}>{t('publishTitle')}</h2>
       <Button variant="ghost" disabled={view.kind === 'loading'} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button></div>
-    {view.kind === 'loading' && <p>{t('loading')}</p>}
-    {view.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeReadFailed')}>{t('scanFailed')}</CreatorNotice>}
-    {view.kind === 'project' && candidate !== undefined && <ul className={css.list}><li className={css.row}>
-      <div>
-        <p className={css.package}>{candidate.project.title}</p>
-        <p className={css.muted}>{candidate.project.name} · {candidate.directory}</p>
+    {cwd !== undefined && <p className={css.source} title={cwd}>{t('publishSource')} {cwd}</p>}
+    {view.kind === 'loading' && <p className={css.hint}>{t('loading')}</p>}
+    {view.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeReadFailed')}>{t('publishReadFailed')}</CreatorNotice>}
+    {view.kind === 'project' && candidate !== undefined && <div className={css.card}>
+      <div className={css.cardHead}>
+        <p className={css.name}>{candidate.project.title}</p>
+        <code className={css.version}>{candidate.project.version}</code>
       </div>
-      <div className={css.actions}><code>{candidate.project.version}</code>
-        {candidate.directory === '.' ? null : <Button variant="ghost" onClick={() => { writeBinding(key, undefined); refresh(n => n + 1) }}>
-          {t('publishChange')}</Button>}
+      <p className={css.meta}>{candidate.project.name} · {candidate.directory === '.' ? './' : candidate.directory}</p>
+      <div className={css.actions}>
         <Button variant="outline" onClick={() => { publish(sessionId, candidate) }}>{t('publish')}</Button>
         <Button variant="ghost" disabled={listing.kind === 'pending'} onClick={() => { void requestListing(candidate) }}>
-          {t('publishList')}</Button></div>
-    </li></ul>}
-    {listing.kind === 'done' && <CreatorNotice tone="success" title={t('submitted')} />}
-    {listing.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeListingRefused')}>{listing.message}</CreatorNotice>}
-    {view.kind === 'choose' && <>
-      <p className={css.muted}>{t('unrecognizedRoot')}</p>
-      <div className={css.sectionHead}>
-        <input className={css.package} value={entry} placeholder={t('publishDirectory')}
+          {t('publishList')}</Button>
+        {candidate.directory === '.' ? null : <Button variant="ghost" onClick={() => { writeBinding(key, undefined); refresh(n => n + 1) }}>
+          {t('publishChange')}</Button>}
+      </div>
+    </div>}
+    {view.kind === 'choose' && <div className={css.card}>
+      <p className={css.name}>{t('unrecognizedRoot')}</p>
+      <p className={css.hint}>{t('publishDirectoryHint')}</p>
+      <div className={css.chooseRow}>
+        <Input value={entry} placeholder={t('publishDirectory')} aria-label={t('publishDirectory')}
           onChange={(event) => { setEntry(event.target.value); setMissing(false) }} />
         <Button variant="outline" disabled={!entry.trim()} onClick={() => { void associate() }}>{t('publishUse')}</Button>
       </div>
       {missing && <CreatorNotice tone="error" title={t('publishMissing')} />}
-    </>}
+    </div>}
+    {listing.kind === 'done' && <CreatorNotice tone="success" title={t('submitted')} />}
+    {listing.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeListingRefused')}>{listing.message}</CreatorNotice>}
   </section>
 }

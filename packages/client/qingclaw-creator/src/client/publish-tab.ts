@@ -30,11 +30,11 @@ export function publishDefinition(t: TranslateNS<'qingclaw.creator'>): SidebarRi
     id: PUBLISH_ID,
     kind: PUBLISH_KIND,
     priority: 'extension',
-    title: () => t('publish'),
+    title: () => t('publishTitle'),
     guide: [{
       id: 'publish',
       order: 40,
-      title: () => t('publish'),
+      title: () => t('publishTitle'),
       description: () => t('publishDescription'),
       icon: artwork,
     }],

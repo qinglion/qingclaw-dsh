@@ -53,6 +53,9 @@ export function apply(ctx: Context): void {
             },
           }
           const publish: PublishInputs = {
+            directoryOf(sessionId) {
+              return scope.sessions.list.getSnapshot().byId[sessionId]?.cwd
+            },
             publish(sessionId, candidate) {
               if (!active()) return
               const session = scope.sessions.binding(sessionId)?.session

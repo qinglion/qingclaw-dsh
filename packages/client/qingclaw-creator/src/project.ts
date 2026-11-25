@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { lstat, open, readdir, realpath } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -212,6 +212,21 @@ export interface ProjectRouteInputs {
 }
 
 /**
+ * Resolve an absolute directory a client already knows, refusing anything that
+ * is not an existing directory so a request cannot probe arbitrary paths.
+ * @param value - the request's `cwd` parameter.
+ * @returns the real path, when it names an existing directory.
+ */
+async function clientDirectory(value: string | null): Promise<string | undefined> {
+  if (value === null || !isAbsolute(value)) return
+  try {
+    return await realpath(value)
+  } catch {
+    return
+  }
+}
+
+/**
  * Answer one discovery request: the plugin the requested directory's manifest
  * declares, when any. The publish page asks with `session` for the Session's
  * own directory and names a `directory` inside it only when the root holds no
@@ -226,8 +241,11 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
     }
     const params = new URL(request.url).searchParams
     const headers = { 'cache-control': 'no-store' }
-    const sessionRoot = inputs.session(params.get('session'))
-    const root = sessionRoot ?? inputs.workspace(params.get('workspace'))?.path
+    // A Session the Host has not materialized still has a directory the client
+    // holds, so the client may supply it; the Session stays authoritative.
+    const root = inputs.session(params.get('session'))
+      ?? inputs.workspace(params.get('workspace'))?.path
+      ?? await clientDirectory(params.get('cwd'))
     if (root === undefined) return Response.json({ error: 'target_not_found' }, { status: 404 })
     const directory = params.get('directory')
     try {

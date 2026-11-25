@@ -15,10 +15,14 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); window.localStorage.clear() })
 
 const desk: PluginProject = { name: '@qinglion/desk', title: 'Desk', version: '1.0.0', kind: 'plugin' }
 const sessionId = 'session-1' as SessionId
+const cwd = '/Users/me/collection'
 const BINDING = 'qingclaw.creator.publish.v1.session-1'
 
-function mount() {
-  const props = { sessionId, publish: vi.fn(), t: (key: keyof typeof zh) => zh[key] }
+function mount(directory: string | undefined = cwd) {
+  const props = {
+    sessionId, directoryOf: () => directory, publish: vi.fn(),
+    t: (key: keyof typeof zh) => zh[key],
+  }
   render(<PublishPanel {...props as ComponentProps<typeof PublishPanel>} />)
   return props
 }
@@ -26,8 +30,11 @@ function mount() {
 it('publishes the plugin of the session directory by writing the request into that conversation', async () => {
   vi.mocked(getSessionPlugin).mockResolvedValue(desk)
   const props = mount()
-  expect(await screen.findByText(desk.name + ' · .')).toBeTruthy()
+  expect(screen.getByRole('heading', { name: zh.publishTitle })).toBeTruthy()
+  expect(await screen.findByText(desk.name + ' · ./')).toBeTruthy()
   expect(screen.getByText(desk.version)).toBeTruthy()
+  expect(screen.getByTitle(cwd)).toBeTruthy()
+  expect(getSessionPlugin).toHaveBeenCalledWith(sessionId, cwd, expect.any(AbortSignal))
   fireEvent.click(screen.getByRole('button', { name: zh.publish }))
   expect(props.publish).toHaveBeenCalledWith(sessionId, { directory: '.', project: desk })
   const prompt = publishPrompt({ directory: '.', project: desk })
@@ -43,7 +50,7 @@ it('associates one subdirectory with the session and publishes it on the next vi
   fireEvent.change(screen.getByPlaceholderText(zh.publishDirectory), { target: { value: 'dsh-codex' } })
   fireEvent.click(screen.getByRole('button', { name: zh.publishUse }))
   expect(await screen.findByText('@qinglion/dsh-codex · dsh-codex')).toBeTruthy()
-  expect(getSessionProjectAt).toHaveBeenCalledWith(sessionId, 'dsh-codex', expect.any(AbortSignal))
+  expect(getSessionProjectAt).toHaveBeenCalledWith(sessionId, 'dsh-codex', cwd, expect.any(AbortSignal))
   expect(window.localStorage.getItem(BINDING)).toBe('dsh-codex')
   fireEvent.click(screen.getByRole('button', { name: zh.publish }))
   expect(props.publish).toHaveBeenCalledWith(sessionId, { directory: 'dsh-codex', project: codex })
@@ -65,6 +72,14 @@ it('drops an association whose directory no longer holds a package', async () =>
   mount()
   expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
   expect(window.localStorage.getItem(BINDING)).toBeNull()
+})
+
+it('says the session directory could not be read instead of blaming a workspace', async () => {
+  vi.mocked(getSessionPlugin).mockRejectedValue(new Error('directory_unavailable'))
+  mount()
+  const notice = await screen.findByRole('alert')
+  expect(notice.textContent).toContain(zh.noticeReadFailed)
+  expect(notice.textContent).toContain(zh.publishReadFailed)
 })
 
 it('requests the listing for the same package version from the page', async () => {
