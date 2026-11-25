@@ -77,6 +77,16 @@ it('publishes the captured archive with a scoped bearer, verifies it and leaves 
   } finally { await f.remove() }
 })
 
+it('asks a free creator to upgrade when the platform withholds the publishing grant', async () => {
+  const f = await fixture()
+  try {
+    f.fetch.mockImplementationOnce(async () => Response.json(
+      { error: 'pro_required', message: '发布插件需要专业版' }, { status: 402 }))
+    await expect(publishPackage(f.ctx, () => f.directory, f.target, signal())).rejects.toThrow('专业版')
+    expect(upload).not.toHaveBeenCalled()
+  } finally { await f.remove() }
+})
+
 it('names the size limit when the registry refuses an oversized archive', async () => {
   const f = await fixture()
   try {

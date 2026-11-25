@@ -49,6 +49,7 @@ Registry inventory and application state appear only in the UI. The publishing p
 - The Session's package choice lives in the Host process. A restarted client asks again the first time a Session publishes.
 - The Publish page resolves one directory at a time: the Session directory or the subdirectory the user names. It never enumerates the packages underneath.
 - The association lives in this client's local storage per Session; another machine does not carry it.
+- Publishing requires an active professional plan: the platform withholds the publishing grant from a free account and the tool asks the creator to upgrade.
 - Releases and listing requests accept only `@qinglion/` package names whose exact version exists in the QingClaw registry.
 - A listing request is refused until the release declares `qingclaw.name` and `qingclaw.description`, and, for a workbench, `qingclaw.workbench.icon` and at least two `previews`.
 - A package published under a shared legacy account has no verified owner, so it appears in the Creator center only after an administrator assigns it.

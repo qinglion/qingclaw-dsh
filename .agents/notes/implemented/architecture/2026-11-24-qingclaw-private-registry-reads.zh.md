@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-- 平台只为持有有效专业版授权（未过期的 `pro` 权益）的账号签发读取授权；免费账号的请求返回 402 `pro_required`，因此拿不到任何私服凭据。授权端点为：在账号源上 `POST /auth-api/v0/dsh/registry/read-grant`，用与发布流程相同的平台会话请求头认证（`X-DSH-Auth-Token` 加上会话自带的请求头），返回与发布授权同形的 `{ username, password, registry, expires_at }`。该端点位于青狮官网应用内，客户端在使用前会校验它返回的每个字段。
+- 平台只为持有有效专业版授权（未过期的 `pro` 权益）的账号签发读取与发布授权；免费账号的请求返回 402 `pro_required`，拿不到任何私服凭据，免费创作者会被要求先升级再发布。授权端点为：在账号源上 `POST /auth-api/v0/dsh/registry/read-grant`，用与发布流程相同的平台会话请求头认证（`X-DSH-Auth-Token` 加上会话自带的请求头），返回与发布授权同形的 `{ username, password, registry, expires_at }`。该端点位于青狮官网应用内，客户端在使用前会校验它返回的每个字段。
 - [`@qinglion/dsh-qingclaw-workbench`](../../../../packages/client/qingclaw-workbench/README.zh.md) 完成交换。`WorkbenchRegistryAccess` 用 `PUT -/user/org.couchdb.user:<username>` 把授权换成 npm 读取令牌，并缓存到 `expires_at` 前 60 秒；缓存键包含注册表、账号源和会话令牌，因此更换登录账号不会复用上一个账号的令牌。读取 README 压缩包时带上 `Authorization: Bearer`。部署用工作台的 `registry` 配置指定这个私服，目录条目必须与它一致，默认是官方地址。产品内的其他 Host 插件通过同一服务上的 `registryAuthorization(registry)` 读取，该接口不新增 Remote 接口：创作者中心的版本历史与发布前的版本核对都使用它，而发布流程内部的核对则由发布登录本身得到的令牌覆盖。
 - [`@deepseek-ai/dsh-plugin-manager`](../../../../packages/boot/plugin-manager/README.zh.md) 的 `installBundle` 接受 `authToken`，以 `npm_config_//<主机>/:_authToken` 放进这次运行的 pnpm 环境，因此安装前的注册表查询、包元数据请求与压缩包下载都会认证。令牌不进入命令行、安装日志或 profile。
 - 私服只对已登录用户开放 `@qinglion/*` 读取，因此官网用自身的只读 npm 身份（官网侧 `PLUGIN_REGISTRY_SERVICE_USERNAME`/`PLUGIN_REGISTRY_SERVICE_PASSWORD`，私服侧 `QINGCLAW_REGISTRY_SERVICE_*`）读取包清单、上架核对与发布校验；该身份可读不可发布。

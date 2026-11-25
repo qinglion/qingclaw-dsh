@@ -65,7 +65,11 @@ export async function publishPackage(
   const response = await fetch(new URL('/auth-api/v0/dsh/registry/publish-grant', session.origin), {
     method: 'POST', headers, redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
   })
-  if (!response.ok) throw new Error(response.status === 403 ? '当前青狮账号没有发布权限。' : '无法获取青狮发布授权，请检查登录状态后重试。')
+  if (!response.ok) {
+    throw new Error(response.status === 402 ? '发布插件需要专业版，请先开通专业版后再试。'
+      : response.status === 403 ? '当前青狮账号没有发布权限。'
+        : '无法获取青狮发布授权，请检查登录状态后重试。')
+  }
   const grant = await response.json() as { username?: string; password?: string; registry?: string; expires_at?: string }
   if (grant.username !== target.account || !/^qc-[1-9]\d*$/.test(target.account)) throw new Error(accountChanged)
   if (!grant.password || !/^qcn_[a-zA-Z0-9_-]{43}$/.test(grant.password)
