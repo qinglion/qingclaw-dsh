@@ -4,8 +4,12 @@ const IMAGE = /^(?:\.\/)?[a-zA-Z0-9_][a-zA-Z0-9._/-]*\.(?:webp|png|jpe?g)$/
 const SITE_IMAGE = /^\/workbenches\/[a-zA-Z0-9_-][a-zA-Z0-9._-]*\.(?:webp|png|jpe?g)$/
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 function record(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+  return isRecord(value) ? value : {}
 }
 
 function text(value: unknown): string | undefined {
@@ -39,7 +43,7 @@ export function listingMetadataIssues(manifest: Record<string, unknown>, files: 
     const links = Array.isArray(qingclaw.links) ? qingclaw.links : []
     const shape = (link: unknown): boolean => {
       if (typeof link === 'string') return httpsLink(link)
-      if (!record(link) || !httpsLink(link.url)) return false
+      if (!isRecord(link) || !httpsLink(link.url)) return false
       if (link.title !== undefined && (typeof link.title !== 'string' || !link.title.trim() || link.title.length > 200)) return false
       if (link.image === undefined) return true
       return typeof link.image === 'string' && (httpsLink(link.image) || IMAGE.test(link.image))
@@ -47,7 +51,7 @@ export function listingMetadataIssues(manifest: Record<string, unknown>, files: 
     const valid = links.length >= 1 && links.length <= 8 && links.every(shape)
     if (!valid) issues.push('qingclaw.links 必须是 1 至 8 个 https 链接，或 { url, title, image } 对象')
     for (const [index, link] of links.entries()) {
-      if (!record(link) || typeof link.image !== 'string' || httpsLink(link.image)) continue
+      if (!isRecord(link) || typeof link.image !== 'string' || httpsLink(link.image)) continue
       checkLinkImage(link.image.replace(/^\.\//, ''), index, files, issues)
     }
   }
