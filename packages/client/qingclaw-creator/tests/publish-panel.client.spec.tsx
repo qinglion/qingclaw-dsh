@@ -9,10 +9,11 @@ import { zh } from '../src/client/locales.ts'
 import type { PluginProject } from '../src/project-types.ts'
 
 vi.mock('../src/client/project-api.ts', () => ({ getSessionPlugin: vi.fn(), getSessionProjectAt: vi.fn() }))
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+afterEach(() => { cleanup(); vi.resetAllMocks(); window.localStorage.clear() })
 
 const desk: PluginProject = { name: '@qinglion/desk', title: 'Desk', version: '1.0.0', kind: 'plugin' }
 const sessionId = 'session-1' as SessionId
+const BINDING = 'qingclaw.creator.publish.v1.session-1'
 
 function mount() {
   const props = { sessionId, publish: vi.fn(), t: (key: keyof typeof zh) => zh[key] }
@@ -31,7 +32,7 @@ it('publishes the plugin of the session directory by writing the request into th
   for (const field of ['qingclaw-plugin-publish', desk.name, desk.version]) expect(prompt).toContain(field)
 })
 
-it('asks for one subdirectory when the session directory root holds no plugin', async () => {
+it('associates one subdirectory with the session and publishes it on the next visit', async () => {
   const codex: PluginProject = { ...desk, name: '@qinglion/dsh-codex' }
   vi.mocked(getSessionPlugin).mockResolvedValue(undefined)
   vi.mocked(getSessionProjectAt).mockResolvedValue(codex)
@@ -41,8 +42,27 @@ it('asks for one subdirectory when the session directory root holds no plugin', 
   fireEvent.click(screen.getByRole('button', { name: zh.publishUse }))
   expect(await screen.findByText('@qinglion/dsh-codex · dsh-codex')).toBeTruthy()
   expect(getSessionProjectAt).toHaveBeenCalledWith(sessionId, 'dsh-codex', expect.any(AbortSignal))
+  expect(window.localStorage.getItem(BINDING)).toBe('dsh-codex')
   fireEvent.click(screen.getByRole('button', { name: zh.publish }))
   expect(props.publish).toHaveBeenCalledWith(sessionId, { directory: 'dsh-codex', project: codex })
+})
+
+it('reopens on the associated directory without asking again', async () => {
+  const codex: PluginProject = { ...desk, name: '@qinglion/dsh-codex' }
+  window.localStorage.setItem(BINDING, 'dsh-codex')
+  vi.mocked(getSessionProjectAt).mockResolvedValue(codex)
+  mount()
+  expect(await screen.findByText('@qinglion/dsh-codex · dsh-codex')).toBeTruthy()
+  expect(getSessionPlugin).not.toHaveBeenCalled()
+})
+
+it('drops an association whose directory no longer holds a package', async () => {
+  window.localStorage.setItem(BINDING, 'gone')
+  vi.mocked(getSessionPlugin).mockResolvedValue(undefined)
+  vi.mocked(getSessionProjectAt).mockResolvedValue(undefined)
+  mount()
+  expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
+  expect(window.localStorage.getItem(BINDING)).toBeNull()
 })
 
 it('says so when the chosen directory holds no plugin', async () => {
