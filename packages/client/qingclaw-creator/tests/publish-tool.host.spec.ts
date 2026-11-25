@@ -16,7 +16,7 @@ afterEach(() => { vi.unstubAllGlobals(); upload.mockReset() })
 
 async function fixture() {
   const directory = await realpath(await mkdtemp(join(tmpdir(), 'qingclaw-publish-')))
-  const manifest = { name: '@qinglion/editor', version: '1.0.0', qingclaw: { resourceType: 'plugin' }, publishConfig: { tag: 'beta' } }
+  const manifest = { name: '@qinglion/editor', version: '1.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } }, publishConfig: { tag: 'beta' } }
   await writeFile(join(directory, 'package.json'), JSON.stringify(manifest))
   const archive = 'qinglion-editor-1.0.0.tgz'
   const stage = join(directory, 'packed')
@@ -126,8 +126,8 @@ it('validates a package nested in a collection workspace and refuses directories
   try {
     const nested = join(f.directory, 'packages', 'desk')
     await mkdir(join(nested, 'packed', 'package'), { recursive: true })
-    await writeFile(join(nested, 'package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin' } }))
-    await writeFile(join(nested, 'packed/package/package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0' }))
+    await writeFile(join(nested, 'package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }))
+    await writeFile(join(nested, 'packed/package/package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }))
     const archive = 'qinglion-desk-2.0.0.tgz'
     await create({ cwd: join(nested, 'packed'), file: join(nested, archive), gzip: true }, ['package/package.json'])
     const bytes = await readFile(join(nested, archive))
@@ -148,8 +148,8 @@ it('resolves the package directory from its name and version when the request na
 
     const nested = join(f.directory, 'packages', 'desk')
     await mkdir(join(nested, 'packed', 'package'), { recursive: true })
-    await writeFile(join(nested, 'package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin' } }))
-    await writeFile(join(nested, 'packed/package/package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0' }))
+    await writeFile(join(nested, 'package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }))
+    await writeFile(join(nested, 'packed/package/package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }))
     const archive = 'qinglion-desk-2.0.0.tgz'
     await create({ cwd: join(nested, 'packed'), file: join(nested, archive), gzip: true }, ['package/package.json'])
     const bytes = await readFile(join(nested, archive))
@@ -160,7 +160,7 @@ it('resolves the package directory from its name and version when the request na
     // A dependency tree copy never becomes the publishing target.
     const shadow = join(f.directory, 'node_modules', 'desk')
     await mkdir(shadow, { recursive: true })
-    await writeFile(join(shadow, 'package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin' } }))
+    await writeFile(join(shadow, 'package.json'), JSON.stringify({ name: '@qinglion/desk', version: '2.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }))
     expect(await inspectArchive(f.directory, { packageName: '@qinglion/desk', version: '2.0.0', archive, integrity }))
       .toMatchObject({ integrity })
 
@@ -175,7 +175,7 @@ it('asks for the directory when two workspace directories declare the same packa
     const copies = ['a', 'b']
     for (const copy of copies) {
       await mkdir(join(f.directory, copy), { recursive: true })
-      await writeFile(join(f.directory, copy, 'package.json'), JSON.stringify({ name: '@qinglion/twin', version: '1.0.0', qingclaw: { resourceType: 'plugin' } }))
+      await writeFile(join(f.directory, copy, 'package.json'), JSON.stringify({ name: '@qinglion/twin', version: '1.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }))
     }
     await expect(inspectArchive(f.directory, { packageName: '@qinglion/twin', version: '1.0.0', archive: 'twin-1.0.0.tgz', integrity: 'sha512-x' }))
       .rejects.toThrow('多个目录')
@@ -202,7 +202,7 @@ it('offers the tool to a signed-in creator in every session, whatever the worksp
 it('publishes from a branch worktree the session was created in', async () => {
   const f = await fixture()
   try {
-    const manifest = { name: '@qinglion/editor', version: '1.0.0', qingclaw: { resourceType: 'plugin' } }
+    const manifest = { name: '@qinglion/editor', version: '1.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }
     const worktree = join(f.directory, 'worktrees', 'feature')
     await mkdir(join(worktree), { recursive: true })
     await writeFile(join(worktree, 'package.json'), JSON.stringify(manifest))
@@ -216,7 +216,7 @@ it('publishes from a branch worktree the session was created in', async () => {
 it('binds the package the user chose to the session so a later request needs no directory', async () => {
   const f = await fixture()
   try {
-    const manifest = { name: '@qinglion/twin', version: '1.0.0', qingclaw: { resourceType: 'plugin' } }
+    const manifest = { name: '@qinglion/twin', version: '1.0.0', qingclaw: { resourceType: 'plugin', name: { zh: '示例插件' }, description: { zh: '示例描述' } } }
     for (const copy of ['a', 'b']) {
       await mkdir(join(f.directory, copy, 'packed', 'package'), { recursive: true })
       await writeFile(join(f.directory, copy, 'package.json'), JSON.stringify(manifest))
