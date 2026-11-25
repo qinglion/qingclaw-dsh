@@ -15,3 +15,28 @@
 .package { background: none; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; padding: 4px 0; overflow-wrap: anywhere; }
 .package:hover { text-decoration: underline; }
 .body code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.noticeError {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 9%, var(--dsw-alias-bg-base));
+}
+.noticeSuccess {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, var(--dsw-alias-bg-base));
+}
+.noticeIcon { flex: none; margin-top: 1px; color: var(--dsw-alias-state-error-primary); }
+.noticeSuccess .noticeIcon { color: var(--dsw-alias-state-success-primary); }
+.noticeBody { display: grid; gap: 2px; min-width: 0; }
+.noticeTitle { font-weight: 500; color: var(--dsw-alias-label-primary); }
+.noticeText { color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }

@@ -6,6 +6,7 @@ import { getMyPackages, submitListing } from './api.ts'
 import type { CreatorPackage } from '../types.ts'
 import type { WorkspaceId, WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { LocalProjects } from './LocalProjects.tsx'
+import { CreatorNotice } from './Notice.tsx'
 import type { CreatorKey, NS } from './locales.ts'
 import css from './CreatorCenter.module.css'
 
@@ -19,6 +20,13 @@ type Props = PropsRuntime<'main'> & PropsLocale<typeof NS> & InjectFace<CenterIn
 
 const labels: Record<string, CreatorKey> = { pending: 'pending', publishing: 'publishing', published: 'published', failed: 'failed', rejected: 'rejected', delisted: 'delisted', superseded: 'superseded' }
 
+/** One result the panel shows above the list. */
+interface Notice {
+  readonly tone: 'error' | 'success'
+  readonly title: string
+  readonly text?: string
+}
+
 function errorMessage(error: unknown, t: Translate): string {
   return error instanceof Error && error.message ? error.message : t('loadFailure')
 }
@@ -27,7 +35,7 @@ function PackageList({ t }: { t: Translate }) {
   const [packages, setPackages] = useState<CreatorPackage[]>([])
   const [active, select] = useState<string>()
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState<Notice>()
   const [pending, setPending] = useState(false)
   const [revision, reload] = useState(0)
   const lifecycle = useRef<AbortController>()
@@ -37,20 +45,22 @@ function PackageList({ t }: { t: Translate }) {
     setStatus('loading')
     void getMyPackages(controller.signal).then((rows) => {
       if (!controller.signal.aborted) { setPackages(rows); setStatus('ready') }
-    }).catch((error) => { if (!controller.signal.aborted) { setStatus('error'); setNotice(errorMessage(error, t)) } })
+    }).catch((error) => { if (!controller.signal.aborted) {
+      setStatus('error'); setNotice({ tone: 'error', title: t('noticeReadFailed'), text: errorMessage(error, t) })
+    } })
     return () => controller.abort()
   }, [revision, t])
   const selected = packages.find(row => row.name === active)
   const apply = async (pkg: string, version: string) => {
     const signal = lifecycle.current?.signal
     if (!signal || signal.aborted || pending) return
-    setPending(true); setNotice('')
+    setPending(true); setNotice(undefined)
     try {
       await submitListing(pkg, version, signal)
-      if (!signal.aborted) { setNotice(t('submitted')); reload(n => n + 1) }
+      if (!signal.aborted) { setNotice({ tone: 'success', title: t('submitted') }); reload(n => n + 1) }
     } catch (error) {
       if (!signal.aborted) {
-        setNotice(errorMessage(error, t))
+        setNotice({ tone: 'error', title: t('noticeListingRefused'), text: errorMessage(error, t) })
         if (error instanceof Error && error.cause === 409) reload(n => n + 1)
       }
     }
@@ -59,11 +69,11 @@ function PackageList({ t }: { t: Translate }) {
   return <section className={css.body}>
     <div className={css.sectionHead}>
       <h2>{selected?.title ?? t('packages')}</h2>
-      <div className={css.actions}>{selected && <Button variant="ghost" onClick={() => { select(undefined); setNotice('') }}>{t('back')}</Button>}
+      <div className={css.actions}>{selected && <Button variant="ghost" onClick={() => { select(undefined); setNotice(undefined) }}>{t('back')}</Button>}
         <Button variant="ghost" icon={<IconRefreshOutlineRegular size={16} />} disabled={pending || status === 'loading'}
-          onClick={() => { setNotice(''); reload(n => n + 1) }}>{t('reload')}</Button></div>
+          onClick={() => { setNotice(undefined); reload(n => n + 1) }}>{t('reload')}</Button></div>
     </div>
-    {notice && <p role={status === 'error' ? 'alert' : 'status'}>{notice}</p>}
+    {notice && <CreatorNotice tone={notice.tone} title={notice.title}>{notice.text}</CreatorNotice>}
     {status === 'loading' ? <p>{t('loading')}</p> : status === 'ready' && (selected ? <>
       {selected.title !== selected.name && <p className={css.muted}><code>{selected.name}</code></p>}
       {selected.description && <p className={css.muted}>{selected.description}</p>}
@@ -80,7 +90,7 @@ function PackageList({ t }: { t: Translate }) {
         {item.review_note && <p className={css.muted}>{item.review_note}</p>}
       </li>)}</ul>
     </> : packages.length ? <ul className={css.list}>{packages.map(row => <li key={row.name} className={css.row}>
-      <div><button className={css.package} onClick={() => { select(row.name); setNotice('') }}>{row.title}</button>
+      <div><button className={css.package} onClick={() => { select(row.name); setNotice(undefined) }}>{row.title}</button>
         {row.title !== row.name && <p className={css.muted}><code>{row.name}</code></p>}
         {row.description && <p className={css.muted}>{row.description}</p>}</div><code>{row.latest_version}</code>
     </li>)}</ul> : <p className={css.muted}>{t('packageListEmpty')}</p>)}

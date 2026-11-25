@@ -4,6 +4,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { getWorkspacePluginState } from './project-api.ts'
 import type { PluginProject } from '../project-types.ts'
+import { CreatorNotice } from './Notice.tsx'
 import type { NS } from './locales.ts'
 import css from './CreatorCenter.module.css'
 
@@ -48,7 +49,7 @@ export function LocalProjects({ workspaces, resume, t }: {
   return <section className={css.body}>
     <div className={css.sectionHead}><h2>{t('local')}</h2>
       <Button variant="ghost" disabled={loading} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button></div>
-    {failed && <p role="alert">{t('scanFailed')}</p>}
+    {failed && <CreatorNotice tone="error" title={t('noticeReadFailed')}>{t('scanFailed')}</CreatorNotice>}
     {loading ? <p>{t('loading')}</p> : rows.length ? <ul className={css.list}>
       {rows.map(row => <li className={css.row} key={row.workspace.workspaceId}>
         <div>

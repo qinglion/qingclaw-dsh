@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { submitListing } from './api.ts'
 import { getSessionPlugin, getSessionProjectAt } from './project-api.ts'
 import type { PluginProject, PublishCandidate } from '../project-types.ts'
+import { CreatorNotice } from './Notice.tsx'
 import type { NS } from './locales.ts'
 import css from './CreatorCenter.module.css'
 
@@ -131,7 +132,7 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
     <div className={css.sectionHead}><h2>{t('publish')}</h2>
       <Button variant="ghost" disabled={view.kind === 'loading'} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button></div>
     {view.kind === 'loading' && <p>{t('loading')}</p>}
-    {view.kind === 'failed' && <p role="alert">{t('scanFailed')}</p>}
+    {view.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeReadFailed')}>{t('scanFailed')}</CreatorNotice>}
     {view.kind === 'project' && candidate !== undefined && <ul className={css.list}><li className={css.row}>
       <div>
         <p className={css.package}>{candidate.project.title}</p>
@@ -144,7 +145,8 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
         <Button variant="ghost" disabled={listing.kind === 'pending'} onClick={() => { void requestListing(candidate) }}>
           {t('publishList')}</Button></div>
     </li></ul>}
-    {listing.message !== undefined && <p role={listing.kind === 'failed' ? 'alert' : 'status'}>{listing.message}</p>}
+    {listing.kind === 'done' && <CreatorNotice tone="success" title={t('submitted')} />}
+    {listing.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeListingRefused')}>{listing.message}</CreatorNotice>}
     {view.kind === 'choose' && <>
       <p className={css.muted}>{t('unrecognizedRoot')}</p>
       <div className={css.sectionHead}>
@@ -152,7 +154,7 @@ export function PublishPanel({ sessionId, publish, t }: Pick<Props, 'sessionId' 
           onChange={(event) => { setEntry(event.target.value); setMissing(false) }} />
         <Button variant="outline" disabled={!entry.trim()} onClick={() => { void associate() }}>{t('publishUse')}</Button>
       </div>
-      {missing && <p role="alert">{t('publishMissing')}</p>}
+      {missing && <CreatorNotice tone="error" title={t('publishMissing')} />}
     </>}
   </section>
 }

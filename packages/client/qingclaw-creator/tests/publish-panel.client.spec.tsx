@@ -82,7 +82,9 @@ it('shows the website refusal verbatim when a listing is declined', async () => 
   vi.mocked(submitListing).mockRejectedValue(new Error(message))
   mount()
   fireEvent.click(await screen.findByRole('button', { name: zh.publishList }))
-  expect((await screen.findByRole('alert')).textContent).toBe(message)
+  const alert = await screen.findByRole('alert')
+  expect(alert.textContent).toContain(zh.noticeListingRefused)
+  expect(alert.textContent).toContain(message)
 })
 
 it('says so when the chosen directory holds no plugin', async () => {

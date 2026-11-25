@@ -62,6 +62,7 @@ it('shows the listing rejection that names the manifest fields still missing', a
   fireEvent.click(await screen.findByRole('button', { name: title }))
   fireEvent.click(screen.getByRole('button', { name: zh.request }))
   expect(await screen.findByText(message)).toBeTruthy()
+  expect(screen.getByRole('alert').textContent).toContain(zh.noticeListingRefused)
 })
 
 it('lists a package by its market title and keeps its package name visible', async () => {
