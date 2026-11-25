@@ -10,7 +10,7 @@ import { detectPluginProject, findPluginPackages, packageDirectory } from './pro
 
 export const registry = 'https://npm.qingclaw.com/'
 const unzip = promisify(gunzip)
-const maxPackage = 25 * 1024 * 1024
+const maxPackage = 100 * 1024 * 1024
 
 export interface PublishTarget {
   /** Workspace-relative package directory; omitted resolves it from the package name and version. */
@@ -22,7 +22,7 @@ export interface PublishTarget {
 }
 
 async function readArchive(bytes: Buffer): Promise<{ manifest: Record<string, unknown>; files: Map<string, number> }> {
-  const plain = await unzip(bytes, { maxOutputLength: 128 * 1024 * 1024 })
+  const plain = await unzip(bytes, { maxOutputLength: 512 * 1024 * 1024 })
   if (plain.subarray(257, 262).toString('ascii') !== 'ustar') throw new Error('Expected an npm tar archive')
   const chunks: Buffer[] = []
   const paths = new Set<string>()
@@ -89,7 +89,7 @@ export async function inspectArchive(workspace: string, target: PublishTarget) {
   let bytes: Buffer
   try {
     const info = await file.stat()
-    if (!info.isFile() || info.dev !== before.dev || info.ino !== before.ino || info.size <= 0 || info.size > maxPackage) throw new Error('包归档应为 25 MB 以内的普通文件。')
+    if (!info.isFile() || info.dev !== before.dev || info.ino !== before.ino || info.size <= 0 || info.size > maxPackage) throw new Error('包归档应为 100 MB 以内的普通文件。')
     bytes = Buffer.alloc(info.size)
     let offset = 0
     while (offset < bytes.length) {

@@ -39,7 +39,7 @@ it('reads the exact package README or localized detail under native plugin rules
     expect(provider).toHaveBeenCalledWith(new URL('https://npm.qingclaw.com/@qinglion/desk/-/desk-1.0.0.tgz'),
       expect.objectContaining({ credentials: 'omit', redirect: 'error', headers: { authorization: 'Bearer registry-token' } }))
     await expect(readRegistryReadme({ ...entry, version: '2.0.0' }, 'en', signal, 'registry-token')).rejects.toThrow('identity mismatch')
-    provider.mockResolvedValueOnce(new Response(null, { headers: { 'Content-Length': String(26 * 1024 * 1024) } }))
+    provider.mockResolvedValueOnce(new Response(null, { headers: { 'Content-Length': String(101 * 1024 * 1024) } }))
     await expect(readRegistryReadme(entry, 'en', signal, 'registry-token')).rejects.toThrow('byte limit')
     // A slower npm archive can still supply the version's README after the catalog timeout.
     const ctx = new Context()

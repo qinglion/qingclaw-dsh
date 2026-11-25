@@ -90,7 +90,7 @@ export async function readRegistryReadme(
     signal, redirect: 'error', credentials: 'omit', headers: { authorization: 'Bearer ' + token },
   })
   if (!response.ok) throw new Error('Workbench archive HTTP ' + response.status)
-  const source = await documentationFiles(await readBoundedBody(response, 25 * 1024 * 1024), entry)
+  const source = await documentationFiles(await readBoundedBody(response, 100 * 1024 * 1024), entry)
   signal.throwIfAborted()
   return selectDocument(source, language)
 }

@@ -81,7 +81,7 @@ it('names the size limit when the registry refuses an oversized archive', async 
   const f = await fixture()
   try {
     upload.mockImplementation(async () => { throw Object.assign(new Error('too large'), { code: 'E413', statusCode: 413 }) })
-    await expect(publishPackage(f.ctx, () => f.directory, f.target, signal())).rejects.toThrow('25 MB')
+    await expect(publishPackage(f.ctx, () => f.directory, f.target, signal())).rejects.toThrow('100 MB')
   } finally { await f.remove() }
 })
 
