@@ -41,7 +41,7 @@ Mount this plugin instead of `@deepseek-ai/dsh-llm-deepseek-account` while keepi
 
 The signed-in platform issues a catalog JWT at `/auth-api/v0/dsh/model_token` and a per-user gateway key at `/auth-api/v0/dsh/model_key`. Each exchange is shared across concurrent requests for the same session.
 
-The desktop bundle sets `catalogURL` to the website’s `/auth-api/v0/dsh/models`. A failed refresh retains the cached catalog, and no models are advertised before the first successful listing. Each model is named by its catalog id: the provider keeps no display names of its own. A listed `rate` states the model's cost relative to the deployment's default model, which is recomputed by the website on every sync and when the default changes; the provider forwards it as display metadata.
+The desktop bundle sets `catalogURL` to the website’s `/auth-api/v0/dsh/models`. A failed refresh retains the cached catalog, and no models are advertised before the first successful listing. Each model is named by its catalog id: the provider keeps no display names of its own. A listed `rate` is the model's uncached input price divided by the deployment default's standard input price, which the website recomputes on every sync and when the default changes; the provider forwards it as display metadata.
 
 | Field | Default | Meaning |
 |---|---|---|
