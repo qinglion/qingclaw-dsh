@@ -132,9 +132,13 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
   const candidate: PublishCandidate | undefined = view.kind === 'project'
     ? { directory: view.directory, project: view.project } : undefined
   return <section className={css.page}>
-    <div className={css.head}><h2 className={css.title}>{t('publishTitle')}</h2>
-      <Button variant="ghost" disabled={view.kind === 'loading'} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button></div>
-    {cwd !== undefined && <p className={css.source} title={cwd}>{t('publishSource')} {cwd}</p>}
+    <div className={css.head}>
+      <div className={css.headings}>
+        <h2 className={css.title}>{t('publishTitle')}</h2>
+        {cwd !== undefined && <p className={css.source} title={cwd}>{t('publishSource')} {cwd}</p>}
+      </div>
+      <Button variant="ghost" disabled={view.kind === 'loading'} onClick={() => { refresh(n => n + 1) }}>{t('reload')}</Button>
+    </div>
     {view.kind === 'loading' && <p className={css.hint}>{t('loading')}</p>}
     {view.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeReadFailed')}>{t('publishReadFailed')}</CreatorNotice>}
     {view.kind === 'project' && candidate !== undefined && <div className={css.card}>
