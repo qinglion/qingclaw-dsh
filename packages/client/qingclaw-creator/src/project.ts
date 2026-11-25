@@ -210,13 +210,14 @@ export interface ProjectRouteInputs {
 }
 
 /**
- * Resolve an absolute directory a client already knows, refusing anything that
- * is not an existing directory so a request cannot probe arbitrary paths.
- * @param value - the request's `cwd` parameter.
+ * Resolve one absolute directory that must already exist. A Session keeps the
+ * directory it started in after that directory moves or disappears, so every
+ * candidate is checked before it becomes the root of a read.
+ * @param value - a candidate directory from a Session, a Workspace, or the client.
  * @returns the real path, when it names an existing directory.
  */
-async function clientDirectory(value: string | null): Promise<string | undefined> {
-  if (value === null || !isAbsolute(value)) return
+async function existingDirectory(value: string | null | undefined): Promise<string | undefined> {
+  if (value === null || value === undefined || !isAbsolute(value)) return
   try {
     return await realpath(value)
   } catch {
@@ -240,20 +241,24 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
     const params = new URL(request.url).searchParams
     const headers = { 'cache-control': 'no-store' }
     // A Session the Host has not materialized still has a directory the client
-    // holds, so the client may supply it; the Session stays authoritative.
-    const root = inputs.session(params.get('session'))
-      ?? inputs.workspace(params.get('workspace'))?.path
-      ?? await clientDirectory(params.get('cwd'))
-    if (root === undefined) return Response.json({ error: 'target_not_found' }, { status: 404 })
+    // holds, so the client may supply it; the Session stays authoritative. Each
+    // candidate must exist, because a Session keeps the directory it started in.
+    const root = await existingDirectory(inputs.session(params.get('session')))
+      ?? await existingDirectory(inputs.workspace(params.get('workspace'))?.path)
+      ?? await existingDirectory(params.get('cwd'))
+    if (root === undefined) {
+      return Response.json({ error: 'target_not_found', detail: 'no_candidate' }, { status: 404 })
+    }
     const directory = params.get('directory')
     try {
       const project = await detectPluginProject(
-        directory === null ? root : await packageDirectory(await realpath(root), directory),
+        directory === null ? root : await packageDirectory(root, directory),
       )
       const state: WorkspacePluginState = { ...(project && { project }) }
       return Response.json(state, { headers })
-    } catch {
-      return Response.json({ error: 'directory_unavailable' }, { status: 404 })
+    } catch (error) {
+      const code = error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : 'unreadable'
+      return Response.json({ error: 'directory_unavailable', detail: code }, { status: 404 })
     }
   }
 }

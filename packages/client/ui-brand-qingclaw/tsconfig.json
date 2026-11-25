@@ -31,6 +31,9 @@
     },
     {
       "path": "../../host/webserver"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

@@ -39,10 +39,12 @@ describe('QingClaw browser-brand plugin', () => {
   it('publishes the brand splash rows from the host half and declares its two browser services', () => {
     const ctx = new Context()
     onTestFinished(() => ctx.fiber.dispose())
-    hostApply(ctx)
+    hostApply(ctx, { minVisibleMs: 1500, timeoutMs: 30_000 })
     const table: IndexInjection[] = []
     ctx.emit('webserver/index-inject', table, PAGE_PEER)
     expect(table.map(row => row.kind)).toEqual(['style', 'script'])
+    expect(JSON.stringify(table[1])).toContain('var MIN_MS = 1500')
+    expect(JSON.stringify(table[1])).toContain('var TIMEOUT_MS = 30000')
     expect(inject).toEqual(['slots', 'locale'])
   })
 

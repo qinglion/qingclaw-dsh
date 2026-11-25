@@ -44,11 +44,17 @@ function selectors(css: string): string[] {
     .map(line => line.slice(0, -1).trim())
 }
 
+/**
+ * Evaluate the injected script text against the page globals.
+ * @param script - Classic script text, exactly as the Host row carries it.
+ */
+function runSplash(script: string): void {
+  runInNewContext(script, { document, Date, setInterval, setTimeout, clearInterval })
+}
+
 /** Mount the splash the way the injected body script does. */
 function mountSplash(): void {
-  // The row is classic script text, so the spec evaluates that text against the
-  // page globals instead of importing an equivalent function.
-  runInNewContext(bootSplashScript(), { document, Date, setInterval, setTimeout, clearInterval })
+  runSplash(bootSplashScript())
 }
 
 /** Draw the shell boot page inside the application root. */
@@ -93,6 +99,12 @@ describe('boot splash injections', () => {
     expect(BOOT_SPLASH_STYLE).not.toContain('</style')
     expect(bootSplashScript()).not.toContain('</script')
   })
+
+  it('bakes configured timing into the script', () => {
+    const script = bootSplashScript({ minVisibleMs: 1200, timeoutMs: 9000 })
+    expect(script).toContain('var MIN_MS = 1200')
+    expect(script).toContain('var TIMEOUT_MS = 9000')
+  })
 })
 
 describe('boot splash lifecycle', () => {
@@ -105,6 +117,7 @@ describe('boot splash lifecycle', () => {
     expect(splash?.textContent).toContain('正在唤醒青狮…')
     expect(splash?.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
     expect(splash?.querySelector('.qcb-name')?.getAttribute('aria-label')).toBe('青狮龙虾')
+    expect(splash?.querySelector('.qcb-progress')).not.toBeNull()
   })
 
   it('mounts once even when the script runs twice', () => {
@@ -122,18 +135,44 @@ describe('boot splash lifecycle', () => {
     expect(splash?.classList.contains('qcb-out')).toBe(false)
   })
 
-  it('fades out and leaves when the application replaces the boot page', () => {
+  it('holds the entrance for the minimum window even when the application is ready early', () => {
     vi.useFakeTimers()
     mountSplash()
     const root = drawShellBoot()
     vi.advanceTimersByTime(240)
     root.replaceChildren(document.createElement('main'))
-    vi.advanceTimersByTime(240)
+    vi.advanceTimersByTime(1000)
     const splash = document.getElementById(BOOT_SPLASH_ID)
+    expect(splash?.classList.contains('qcb-out')).toBe(false)
+    vi.advanceTimersByTime(1200)
     expect(splash?.classList.contains('qcb-out')).toBe(true)
     expect(splash?.getAttribute('aria-busy')).toBe('false')
     vi.advanceTimersByTime(BOOT_SPLASH_FADE_MS)
     expect(document.getElementById(BOOT_SPLASH_ID)).toBeNull()
+  })
+
+  it('follows the shell roster once the wait needs a bar', () => {
+    vi.useFakeTimers()
+    mountSplash()
+    const root = drawShellBoot()
+    const spinner = root.querySelector<HTMLElement>('[data-dsh-boot-spinner]')
+    spinner?.style.setProperty('--dsh-boot-arc', '180deg')
+    vi.advanceTimersByTime(1700)
+    const progress = document.querySelector('.qcb-progress')
+    expect(progress?.classList.contains('is-live')).toBe(true)
+    expect(progress?.classList.contains('is-indeterminate')).toBe(false)
+    expect(document.querySelector<HTMLElement>('.qcb-progress-fill')?.style.width).toBe('50%')
+    expect(document.querySelector('.qcb-percent')?.textContent).toBe('50%')
+  })
+
+  it('shows an indeterminate bar when the roster is unreadable', () => {
+    vi.useFakeTimers()
+    mountSplash()
+    drawShellBoot()
+    vi.advanceTimersByTime(2700)
+    const progress = document.querySelector('.qcb-progress')
+    expect(progress?.classList.contains('is-live')).toBe(true)
+    expect(progress?.classList.contains('is-indeterminate')).toBe(true)
   })
 
   it('yields to the shell failure report', () => {
@@ -141,7 +180,7 @@ describe('boot splash lifecycle', () => {
     mountSplash()
     const root = drawShellBoot()
     root.querySelector('[data-dsh-boot]')?.replaceChildren(document.createElement('div'))
-    vi.advanceTimersByTime(240)
+    vi.advanceTimersByTime(2600)
     expect(document.getElementById(BOOT_SPLASH_ID)?.classList.contains('qcb-out')).toBe(true)
   })
 
@@ -150,6 +189,15 @@ describe('boot splash lifecycle', () => {
     mountSplash()
     vi.advanceTimersByTime(BOOT_SPLASH_TIMEOUT_MS - 240)
     expect(document.getElementById(BOOT_SPLASH_ID)?.classList.contains('qcb-out')).toBe(false)
+    vi.advanceTimersByTime(2000)
+    expect(document.getElementById(BOOT_SPLASH_ID)).toBeNull()
+  })
+
+  it('retires immediately when configured with no minimum window', () => {
+    vi.useFakeTimers()
+    runSplash(bootSplashScript({ minVisibleMs: 0 }))
+    const root = drawShellBoot()
+    root.replaceChildren(document.createElement('main'))
     vi.advanceTimersByTime(360)
     expect(document.getElementById(BOOT_SPLASH_ID)?.classList.contains('qcb-out')).toBe(true)
   })

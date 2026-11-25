@@ -8,8 +8,9 @@ async function projectAt(query: Record<string, string>, signal: AbortSignal): Pr
   const response = await creatorFetch(url, { method: 'GET', signal })
   if (!response.ok) {
     // Name the refusal so the page can show why it could not read the directory.
-    const detail = await response.json().catch(() => null) as { error?: string } | null
-    throw new Error(detail?.error ?? 'http_' + response.status)
+    const detail = await response.json().catch(() => null) as { error?: string; detail?: string } | null
+    const code = detail?.error ?? 'http_' + response.status
+    throw new Error(detail?.detail === undefined ? code : code + ' · ' + detail.detail)
   }
   const body = await response.json() as WorkspacePluginState
   return body.project

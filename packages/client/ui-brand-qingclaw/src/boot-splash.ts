@@ -119,9 +119,13 @@ const MARKUP = [
   '<div class="qcb-latin">' + BRAND_LATIN + '</div>',
   '</div>',
   '</div>',
+  '<div class="qcb-foot">',
+  '<div class="qcb-progress" aria-hidden="true"><i class="qcb-progress-fill"></i></div>',
   '<div class="qcb-status" role="status">',
   '<span class="qcb-dot"></span>',
   '<span>' + STATUS + '</span>',
+  '<span class="qcb-percent" aria-hidden="true"></span>',
+  '</div>',
   '</div>',
 ].join('')
 
@@ -137,6 +141,7 @@ export const BOOT_SPLASH_STYLE = `#qingclaw-boot {
   --qcb-ink-faint: #647c80;
   --qcb-slate: #48707a;
   --qcb-teal: #4bb6b0;
+  --qcb-track: rgb(9 13 20 / 10%);
   --qcb-aura: rgb(75 182 176 / 17%);
   --qcb-aura-mid: rgb(75 182 176 / 6%);
   --qcb-aura-fade: rgb(75 182 176 / 0%);
@@ -159,6 +164,7 @@ body[data-ds-dark-theme] #qingclaw-boot {
   --qcb-ink: #f2f8f8;
   --qcb-ink-faint: #6e8c90;
   --qcb-slate: #7f9ea2;
+  --qcb-track: rgb(255 255 255 / 12%);
   --qcb-aura: rgb(75 182 176 / 26%);
   --qcb-aura-mid: rgb(75 182 176 / 9%);
   --qcb-glow: rgb(75 182 176 / 55%);
@@ -282,11 +288,50 @@ body[data-ds-dark-theme] #qingclaw-boot {
   animation: qcb-latin-settle 700ms cubic-bezier(0.2, 0.7, 0.25, 1) 760ms forwards;
 }
 
-#qingclaw-boot .qcb-status {
+#qingclaw-boot .qcb-foot {
   position: absolute;
-  bottom: 46px;
+  bottom: 40px;
   left: 0;
   right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Activated share of the loader roster; it appears only once the wait is long
+   enough to need it, so a quick boot never flashes a bar. */
+#qingclaw-boot .qcb-progress {
+  width: 220px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--qcb-track);
+  opacity: 0;
+  transition: opacity 260ms ease-out;
+}
+
+#qingclaw-boot .qcb-progress.is-live {
+  opacity: 1;
+}
+
+#qingclaw-boot .qcb-progress-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  corner-shape: round;
+  background: var(--qcb-teal);
+  transition: width 360ms cubic-bezier(0.2, 0.7, 0.25, 1);
+}
+
+#qingclaw-boot .qcb-progress.is-indeterminate .qcb-progress-fill {
+  width: 38%;
+  animation: qcb-sweep 1.5s ease-in-out infinite;
+}
+
+#qingclaw-boot .qcb-status {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -297,6 +342,12 @@ body[data-ds-dark-theme] #qingclaw-boot {
   color: var(--qcb-ink-faint);
   opacity: 0;
   animation: qcb-fade-in 600ms ease-out 900ms forwards;
+}
+
+#qingclaw-boot .qcb-percent {
+  min-width: 3.2em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 #qingclaw-boot .qcb-dot {
@@ -360,13 +411,18 @@ body[data-ds-dark-theme] #qingclaw-boot {
   100% { opacity: 0; transform: translateX(140px); }
 }
 
+@keyframes qcb-sweep {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(290%); }
+}
+
 @keyframes qcb-dot-pulse {
   0%, 100% { opacity: 0.4; transform: scale(0.8); }
   50% { opacity: 1; transform: scale(1); }
 }
 
 @media (max-height: 520px) {
-  #qingclaw-boot .qcb-status {
+  #qingclaw-boot .qcb-foot {
     position: static;
     margin-top: 26px;
   }
@@ -407,6 +463,11 @@ body[data-ds-dark-theme] #qingclaw-boot {
     opacity: 0;
   }
 
+  #qingclaw-boot .qcb-progress.is-indeterminate .qcb-progress-fill {
+    width: 100%;
+    animation: none;
+  }
+
   #qingclaw-boot {
     transition: none;
   }
@@ -414,33 +475,87 @@ body[data-ds-dark-theme] #qingclaw-boot {
 
 /** Milliseconds the splash spends fading out before it leaves the document. */
 export const BOOT_SPLASH_FADE_MS = 320
-/** Absolute cap: a shell that never draws its boot page still gets the screen back. */
-export const BOOT_SPLASH_TIMEOUT_MS = 12_000
+/** Minimum time the splash stays on screen, so a fast boot still shows the entrance. */
+export const BOOT_SPLASH_MIN_MS = 2_400
+/** Absolute cap before the splash retires even when the shell never settles. */
+export const BOOT_SPLASH_TIMEOUT_MS = 60_000
+
+/** Deployment-varying timing for the splash; every field has a documented default. */
+export interface BootSplashOptions {
+  /** Minimum time the splash stays on screen, in milliseconds. */
+  readonly minVisibleMs?: number
+  /** Absolute cap before the splash retires, in milliseconds. */
+  readonly timeoutMs?: number
+}
 
 /**
- * Build the body script that mounts the splash and retires it.
+ * Build the body script that mounts the splash, follows the loader roster, and
+ * retires it.
+ * @param options - Timing overrides; omitted fields keep their defaults.
  * @returns the inline script text.
  */
-export function bootSplashScript(): string {
+export function bootSplashScript(options: BootSplashOptions = {}): string {
+  const minVisibleMs = options.minVisibleMs ?? BOOT_SPLASH_MIN_MS
+  const timeoutMs = options.timeoutMs ?? BOOT_SPLASH_TIMEOUT_MS
   return `(function () {
   var ID = ${JSON.stringify(BOOT_SPLASH_ID)}
   if (document.getElementById(ID) !== null) return
+  var MIN_MS = ${String(minVisibleMs)}
+  var TIMEOUT_MS = ${String(timeoutMs)}
+  var FADE_MS = ${String(BOOT_SPLASH_FADE_MS)}
   var started = Date.now()
+  var finishing = false
+  var seenBoot = false
   var element = document.createElement('div')
   element.id = ID
   element.setAttribute('aria-busy', 'true')
   element.innerHTML = ${JSON.stringify(MARKUP)}
   document.body.appendChild(element)
 
-  var seenBoot = false
+  var progress = element.querySelector('.qcb-progress')
+  var fill = element.querySelector('.qcb-progress-fill')
+  var percent = element.querySelector('.qcb-percent')
+
+  // The shell's boot page keeps the activated share of the loader roster on its
+  // spinner; reading it here keeps the splash honest without a second channel.
+  function readRatio() {
+    var spinner = document.querySelector('[data-dsh-boot] [data-dsh-boot-spinner]')
+    if (spinner === null) return null
+    var arc = parseFloat(spinner.style.getPropertyValue('--dsh-boot-arc'))
+    if (isNaN(arc)) return null
+    return Math.min(1, Math.max(0, (arc - 72) / 216))
+  }
+
+  function paintProgress(elapsed) {
+    if (progress === null) return
+    if (elapsed > 1600) progress.classList.add('is-live')
+    var ratio = readRatio()
+    if (ratio === null) {
+      // Without a readable roster the bar still shows that work continues.
+      if (elapsed > 2500) progress.classList.add('is-indeterminate')
+      return
+    }
+    progress.classList.remove('is-indeterminate')
+    var pct = Math.round(ratio * 100)
+    if (fill !== null) fill.style.width = pct + '%'
+    if (percent !== null) percent.textContent = pct + '%'
+  }
+
   function finish() {
-    if (element.classList.contains('qcb-out')) return
-    element.setAttribute('aria-busy', 'false')
-    element.className = 'qcb-out'
-    setTimeout(function () { element.remove() }, ${String(BOOT_SPLASH_FADE_MS)})
+    if (finishing) return
+    finishing = true
+    var wait = MIN_MS - (Date.now() - started)
+    if (wait < 0) wait = 0
+    setTimeout(function () {
+      element.setAttribute('aria-busy', 'false')
+      element.className = 'qcb-out'
+      setTimeout(function () { element.remove() }, FADE_MS)
+    }, wait)
   }
 
   var timer = setInterval(function () {
+    var elapsed = Date.now() - started
+    paintProgress(elapsed)
     var boot = document.querySelector('[data-dsh-boot]')
     var root = document.getElementById('root')
     if (boot !== null) seenBoot = true
@@ -450,8 +565,7 @@ export function bootSplashScript(): string {
     // The shell drops the spinner when it switches to its own failure report;
     // that report has to stay readable, so the splash yields to it.
     var failed = boot !== null && boot.querySelector('[data-dsh-boot-spinner]') === null
-    var expired = Date.now() - started > ${String(BOOT_SPLASH_TIMEOUT_MS)}
-    if (failed || application || (seenBoot && boot === null) || expired) {
+    if (failed || application || (seenBoot && boot === null) || elapsed > TIMEOUT_MS) {
       clearInterval(timer)
       finish()
     }
@@ -461,11 +575,12 @@ export function bootSplashScript(): string {
 
 /**
  * Index-injection rows that paint the splash before the shell boots.
+ * @param options - Timing overrides for the injected script; omitted fields keep their defaults.
  * @returns the head style row followed by the body script row.
  */
-export function bootSplashInjections(): IndexInjection[] {
+export function bootSplashInjections(options: BootSplashOptions = {}): IndexInjection[] {
   return [
     { kind: 'style', text: BOOT_SPLASH_STYLE },
-    { kind: 'script', placement: 'body', text: bootSplashScript() },
+    { kind: 'script', placement: 'body', text: bootSplashScript(options) },
   ]
 }
