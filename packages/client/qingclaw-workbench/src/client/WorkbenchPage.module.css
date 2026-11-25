@@ -205,7 +205,15 @@
 .detailHeader { flex-wrap: wrap; gap: 14px; }
 .detailIcon { display: flex; flex: none; }
 .detailLogo { width: 42px; height: 42px; border-radius: var(--dsw-radius-sm); object-fit: contain; }
-.detailActions { display: flex; justify-content: flex-end; margin-top: -4px; }
+.danger {
+  color: var(--dsw-alias-state-error-primary);
+  --dsh-button-outline-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);
+  --dsw-alias-interactive-bg-hover: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+}
+.dangerButton {
+  --dsw-alias-button-primary-fill: var(--dsw-alias-state-error-primary);
+  --dsw-alias-button-primary-hover: var(--dsw-alias-state-error-primary);
+}
 .previewCarousel {
   display: flex;
   gap: 12px;

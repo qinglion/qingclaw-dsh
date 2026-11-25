@@ -1,8 +1,8 @@
 /** The built-in QingClaw workbench directory. */
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Button, IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconDownloadOutlineRegular, PluginArtworkDefault, Tag,
-  IconRefreshOutlineRegular, IconSearchOutlineRegular, Input, SegmentedControl,
+  Button, IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconDownloadOutlineRegular, IconTrashOutlineRegular,
+  Modal, PluginArtworkDefault, Tag, IconRefreshOutlineRegular, IconSearchOutlineRegular, Input, SegmentedControl,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -28,6 +28,8 @@ interface ItemActions {
   t: TranslateNS<typeof NS>
   installing: boolean
   busy: boolean
+  /** The product page hides the installed label; its actions already say what the state is. */
+  detail?: boolean
   onInstall(): void
   onUpdate(): void
   onUninstall(): void
@@ -35,7 +37,7 @@ interface ItemActions {
   onFavorite(): void
 }
 
-function WorkbenchActions({ item, t, installing, busy, onInstall, onUpdate, onOpen, onFavorite }: ItemActions): ReactNode {
+function WorkbenchActions({ item, t, installing, busy, detail, onInstall, onUpdate, onOpen, onFavorite }: ItemActions): ReactNode {
   const favoriteLabel = t(item.favorite ? 'unfavorite' : 'favorite')
   return <div className={css.actions}>
     <button type="button" className={css.favorite} aria-label={favoriteLabel}
@@ -51,7 +53,10 @@ function WorkbenchActions({ item, t, installing, busy, onInstall, onUpdate, onOp
         </Button>}
         {item.openable
           ? <Button variant="outline" size="sm" onClick={onOpen}>{t('open')}</Button>
-          : <span className={css.installed}><IconCheckOutlineRegular size={14} />{t(item.restartRequired ? 'restartRequired' : 'installed')}</span>}
+          // The product page states its actions instead of a status, and an update replaces the label.
+          : !detail && !item.updateAvailable && <span className={css.installed}>
+            <IconCheckOutlineRegular size={14} />{t(item.restartRequired ? 'restartRequired' : 'installed')}
+          </span>}
       </>
       : <Button variant="primary" size="sm" disabled={busy || !item.installable} onClick={onInstall}
         title={busy && !installing ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
@@ -146,17 +151,24 @@ function WorkbenchDetail({ item, t, actions, onBack, error }: {
         <div className={css.titleLine}><h1 id={titleId} ref={heading} tabIndex={-1}>{item.title}</h1><Tag tone="neutral">{item.version}</Tag></div>
         <span className={css.packageName}>{item.packageName}</span>
       </div>
-      <WorkbenchActions {...actions} />
+      <WorkbenchActions {...actions} detail />
+      {item.installed && <Button variant="outline" size="sm" className={css.danger}
+        icon={<IconTrashOutlineRegular size={13} />} disabled={actions.busy}
+        aria-label={t('uninstallLabel', { name: item.title })} onClick={() => setConfirming(true)}>
+        {t('uninstall')}
+      </Button>}
     </header>
     {item.description && <p className={css.summary}>{item.description}</p>}
     {error && <p className={css.error} role="alert">{t(error)}</p>}
-    {item.installed && <div className={css.detailActions}>
-      <Button variant="ghost" size="sm" disabled={actions.busy}
-        onClick={() => { if (confirming) actions.onUninstall(); else setConfirming(true) }}>
-        {t(confirming ? 'confirmUninstall' : 'uninstall')}
-      </Button>
-    </div>}
     <WorkbenchPreviews item={item} t={t} />
+    {confirming && <Modal open onClose={() => setConfirming(false)}
+      title={t('confirmUninstallTitle', { name: item.title })} closeLabel={t('close')}
+      description={t('confirmUninstallDescription')}
+      footer={<>
+        <Button variant="outline" onClick={() => setConfirming(false)}>{t('cancel')}</Button>
+        <Button variant="primary" className={css.dangerButton} disabled={actions.busy}
+          onClick={() => { setConfirming(false); actions.onUninstall() }}>{t('uninstall')}</Button>
+      </>} />}
   </section>
 }
 

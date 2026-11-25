@@ -207,10 +207,32 @@ it('uninstalls an installed workbench from its detail page after a confirmation'
   fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
     .getByRole('button', { name: '查看自媒体工作台详情' }))
   const detail = within(await screen.findByRole('region', { name: media.title }))
-  fireEvent.click(detail.getByRole('button', { name: zh.uninstall }))
+  fireEvent.click(detail.getByRole('button', { name: '卸载自媒体工作台' }))
   expect(store.uninstall).not.toHaveBeenCalled()
-  fireEvent.click(detail.getByRole('button', { name: zh.confirmUninstall }))
+
+  const dialog = within(await screen.findByRole('dialog'))
+  expect(dialog.getByText('卸载后它提供的功能会消失。')).toBeTruthy()
+  fireEvent.click(dialog.getByRole('button', { name: zh.uninstall }))
   await waitFor(() => expect(store.uninstall).toHaveBeenCalledWith(media.id))
+})
+
+it('replaces the installed label with the update action', async () => {
+  const { page } = setup([{ ...media, installed: true, installable: false, openable: false,
+    installedVersion: '0.9.0', updateAvailable: true }])
+  page()
+  const card = within(await screen.findByRole('article', { name: media.title }))
+  expect(card.getByRole('button', { name: '更新到 1.0.0' })).toBeTruthy()
+  expect(card.queryByText(zh.installed)).toBeNull()
+})
+
+it('does not repeat the installed label on the product page', async () => {
+  const { page } = setup([{ ...media, installed: true, installable: false, openable: false }])
+  page()
+  fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
+    .getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  expect(detail.queryByText(zh.installed)).toBeNull()
+  expect(detail.getByRole('button', { name: '卸载自媒体工作台' })).toBeTruthy()
 })
 
 it('preserves the tab, search, and category when returning from a workbench detail', async () => {
