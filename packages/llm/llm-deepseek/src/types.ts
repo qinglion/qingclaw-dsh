@@ -20,6 +20,11 @@ export interface DeepSeekCatalogModel {
   /** Accepted request modalities; omission is text-only. */
   inputModalities?: ModelModality[]
   /**
+   * Relative request cost the catalog owner advertises for this model, with
+   * its baseline at one; omission means no advertised multiple.
+   */
+  rate?: number
+  /**
    * Total-pixel budget replacing the published token-grid projection for one
    * deterministic request preview, or the 512-by-512 `low` preset; omission
    * projects onto the token grid.

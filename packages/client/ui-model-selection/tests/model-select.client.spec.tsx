@@ -207,6 +207,38 @@ describe('ModelSelect catalog badges', () => {
   })
 })
 
+describe('ModelSelect cost multiple', () => {
+  const priced = () => state({
+    current: { provider: 'deepseek-account', model: 'deepseek-v4.1-flash' },
+    groups: [{
+      id: 'deepseek-account',
+      name: 'QingClaw Account',
+      models: [
+        { id: 'deepseek-v4.1-flash', name: 'DeepSeek-V4.1-Flash', rate: 1 },
+        { id: 'qwen4-max', name: 'Qwen4-Max', rate: 4.0909 },
+        { id: 'auto', name: 'Auto' },
+      ],
+    }],
+  })
+
+  it('shows each advertised multiple beside its name and leaves unpriced models blank', () => {
+    render(<ModelSelect renderSlot={renderLabel} locked={false} available directory={createSnapshotStore(priced())}
+      load={vi.fn()} resolveText={resolveText} select={vi.fn()} t={t} />)
+    const trigger = screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4.1-Flash' })
+    // The trigger keeps its name-and-effort caption; the multiple belongs to the rows.
+    expect(trigger.textContent).toBe('DeepSeek-V4.1-Flash')
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
+
+    const rows = screen.getAllByRole('menuitemradio')
+    expect(rows.map(row => row.textContent)).toEqual(['DeepSeek-V4.1-Flash1.00x', 'Qwen4-Max4.09x', 'Auto'])
+    // The multiple explains itself on hover; the baseline row reads 1.00x.
+    expect(rows[0]?.querySelector('span[title]')?.getAttribute('title')).toBe('成本倍率 1.00x')
+    expect(rows[1]?.querySelector('span[title]')?.getAttribute('title')).toBe('成本倍率 4.09x')
+    expect(rows[2]?.querySelector('span[title]')).toBeNull()
+  })
+})
+
 describe('ModelSelect reasoning effort', () => {
   it('renders effort names without descriptions and submits the effort as part of the session selection', async () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())

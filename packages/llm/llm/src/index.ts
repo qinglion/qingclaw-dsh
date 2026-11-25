@@ -743,6 +743,7 @@ export class LlmRuntime extends TypertRemoteService {
         || typeof model.name !== 'string'
         || model.name.length === 0
         || (model.description !== undefined && typeof model.description !== 'string')
+        || (model.rate !== undefined && (typeof model.rate !== 'number' || !Number.isFinite(model.rate) || model.rate < 0))
         || seen.has(model.id)
       ) {
         throw new LlmError(`adapter returned invalid or duplicate model metadata for provider "${provider}"`, 'INVALID_CATALOG')
@@ -759,6 +760,7 @@ export class LlmRuntime extends TypertRemoteService {
         ...badge === undefined ? {} : {
           badge: { text: typeof badge.text === 'string' ? badge.text : { ...badge.text }, tone: badge.tone },
         },
+        ...model.rate === undefined ? {} : { rate: model.rate },
       }
     })
   }

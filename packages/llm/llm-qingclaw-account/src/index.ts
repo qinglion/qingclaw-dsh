@@ -4,7 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { APP_IDENTITY, attributionHeaders, LlmError } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-deepseek-account'
 import {
-  catalogModelInfo, createModelListingCache, refuseListedModel,
+  catalogModelInfo, createModelListingCache, listedRate, refuseListedModel,
   resolveAdapterOptions, resolveListedCatalog,
 } from '@deepseek-ai/dsh-llm-deepseek'
 import type {
@@ -73,9 +73,13 @@ async function requestQingclawListing(url: string, token: string, signal: AbortS
     const inputModalities = Array.isArray(rawModalities)
       ? rawModalities.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
       : []
+    // The website prices each model against the deployed default, so the
+    // listing carries the multiple the selector shows beside the name.
+    const rate = listedRate(Reflect.get(item, 'rate'))
     entries.push({
       id,
       ...(isDefault ? { default: true } : {}),
+      ...(rate === undefined ? {} : { rate }),
       requirement: { kind: 'none' },
       capabilities: {
         usable: true,

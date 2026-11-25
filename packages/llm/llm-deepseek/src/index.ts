@@ -41,7 +41,7 @@ export type { RequestDefaults } from './types.ts'
 
 export { catalogModelInfo } from './model-info.ts'
 export { createModelListingCache, registerDeepSeekProvider } from './host.ts'
-export { LISTING_TIMEOUT, modelListingURL, parseModelListing, requestModelListing } from './listing.ts'
+export { LISTING_TIMEOUT, listedRate, modelListingURL, parseModelListing, requestModelListing } from './listing.ts'
 export type { ClientRequirement, ListedBadge, ListedCapabilities, ListedFacts, ListingEntry, ModelListing } from './listing.ts'
 export { DEFAULT_MODELS_MAX_AGE_MS, DEFAULT_MODELS_TIMEOUT_MS, modelListingConfigFields, resolveListingTiming } from './listing-config.ts'
 export type { ListingSettings, ListingTiming, ModelListingConfig, ModelListingOptions } from './listing-config.ts'

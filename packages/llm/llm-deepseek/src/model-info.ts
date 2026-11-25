@@ -52,6 +52,7 @@ export function catalogModelInfo(provider: string, model: DeepSeekCatalogModel, 
     ...model.description === undefined ? {} : { description: model.description },
     inputModalities: model.inputModalities ?? ['text'],
     ...badge === undefined ? {} : { badge },
+    ...model.rate === undefined ? {} : { rate: model.rate },
   }
 }
 

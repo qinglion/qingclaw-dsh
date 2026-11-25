@@ -328,6 +328,17 @@
   flex: none;
 }
 
+/* Advertised cost multiple: a right-aligned caption column shared by every
+   row, so the numbers line up independently of name length. */
+.rate {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .check {
   display: grid;
   place-items: center;

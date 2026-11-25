@@ -202,8 +202,8 @@ describe('QingClaw account provider', () => {
       if (path === '/auth-api/v0/dsh/models') {
         return Response.json({
           data: [
-            { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', input_modalities: ['text'] },
-            { id: 'new-upstream-model', name: 'New Upstream Model', default: true },
+            { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', input_modalities: ['text'], rate: 1 },
+            { id: 'new-upstream-model', name: 'New Upstream Model', default: true, rate: 0.4 },
           ],
         })
       }
@@ -221,6 +221,7 @@ describe('QingClaw account provider', () => {
     expect(models.map(model => model.id)).toEqual(['deepseek-v4.1-flash', 'new-upstream-model'])
     expect(models.map(model => model.name)).toEqual(['deepseek-v4.1-flash', 'new-upstream-model'])
     expect(models[0]?.inputModalities).toEqual(['text'])
+    expect(models.map(model => model.rate)).toEqual([1, 0.4])
   })
 
   it('assembles streamed function arguments and delivers the image returned by the tool in the next request', async () => {

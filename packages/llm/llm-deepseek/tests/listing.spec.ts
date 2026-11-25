@@ -186,6 +186,17 @@ describe('parseModelListing', () => {
     expect(entry?.capabilities.usable).toBe(true)
   })
 
+  it.each([0, 1, 4.0909])('decodes a declared cost multiple %j', (rate) => {
+    expect(only({ ...MESSAGES, rate })?.rate).toBe(rate)
+  })
+
+  it.each([undefined, null, '1', -1, Number.NaN, Number.POSITIVE_INFINITY, {}, true])(
+    'keeps an unreadable cost multiple %j out of the entry',
+    (rate) => {
+      expect(only({ ...MESSAGES, rate })).not.toHaveProperty('rate')
+    },
+  )
+
   it('rejects an own "__proto__" translation key', () => {
     const body: unknown = JSON.parse(
       `{"data":[{"id":"m","client_metadata":{"${APP_IDENTITY.product}":{"badge":{"text":{"en":"New","__proto__":"x"}}}}}]}`,
