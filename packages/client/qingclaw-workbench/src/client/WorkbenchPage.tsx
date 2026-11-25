@@ -155,13 +155,13 @@ function WorkbenchDetail({ item, t, actions, onBack, error }: {
         <span className={css.packageName}>{item.packageName}</span>
       </div>
       <WorkbenchActions {...actions} detail />
-      {item.installed && <Switch checked={item.enabled} label={t('enableToggle', { name: item.title })}
-        disabled={actions.busy} onChange={(next) => { actions.onSetEnabled(next) }} />}
       {item.installed && <Button variant="outline" size="sm" className={css.danger}
         icon={<IconTrashOutlineRegular size={13} />} disabled={actions.busy}
         aria-label={t('uninstallLabel', { name: item.title })} onClick={() => setConfirming(true)}>
         {t('uninstall')}
       </Button>}
+      {item.installed && <Switch checked={item.enabled} label={t('enableToggle', { name: item.title })}
+        disabled={actions.busy} onChange={(next) => { actions.onSetEnabled(next) }} />}
     </header>
     {item.description && <p className={css.summary}>{item.description}</p>}
     {error && <p className={css.error} role="alert">{t(error)}</p>}
