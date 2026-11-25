@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { PublishPanel, publishPrompt } from '../src/client/PublishPanel.tsx'
+import { PublishPanel, nextRelease, publishPrompt } from '../src/client/PublishPanel.tsx'
 import { submitListing } from '../src/client/api.ts'
 import { getSessionPlugin, getSessionProjectAt } from '../src/client/project-api.ts'
 import { zh } from '../src/client/locales.ts'
@@ -35,10 +35,20 @@ it('publishes the plugin of the session directory by writing the request into th
   expect(screen.getByText(desk.version)).toBeTruthy()
   expect(screen.getByTitle(cwd)).toBeTruthy()
   expect(getSessionPlugin).toHaveBeenCalledWith(sessionId, cwd, expect.any(AbortSignal))
+  expect(screen.getByText(zh.publishNext + ' 1.0.1')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: zh.publish }))
   expect(props.publish).toHaveBeenCalledWith(sessionId, { directory: '.', project: desk })
   const prompt = publishPrompt({ directory: '.', project: desk })
-  for (const field of ['qingclaw-plugin-publish', desk.name, desk.version]) expect(prompt).toContain(field)
+  for (const field of ['qingclaw-plugin-publish', desk.name, '1.0.1', '提交并推送']) expect(prompt).toContain(field)
+  // The published version is the bumped one, never the version already on the registry.
+  expect(prompt).not.toContain('"version"')
+})
+
+it('names the next patch release and drops a prerelease suffix', () => {
+  expect(nextRelease('2.7.7')).toBe('2.7.8')
+  expect(nextRelease('2.7.9-beta.1')).toBe('2.7.10')
+  expect(nextRelease('1.0')).toBeUndefined()
+  expect(nextRelease('latest')).toBeUndefined()
 })
 
 it('associates one subdirectory with the session and publishes it on the next visit', async () => {

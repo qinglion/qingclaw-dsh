@@ -18,12 +18,27 @@ export interface PublishInputs {
   publish(sessionId: SessionId, candidate: PublishCandidate): void
 }
 
+/**
+ * The next patch release of a version, dropping any prerelease suffix.
+ * @param version - the package's current version.
+ * @returns the version a publish would produce, or undefined when it is not three numeric parts.
+ */
+export function nextRelease(version: string): string | undefined {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version)
+  if (match === null) return
+  const [, major = '', minor = '', patch = ''] = match
+  return major + '.' + minor + '.' + String(Number(patch) + 1)
+}
+
 /** The request one publish action writes into the conversation. */
 export function publishPrompt(candidate: PublishCandidate): string {
-  const target = JSON.stringify({
-    directory: candidate.directory, packageName: candidate.project.name, version: candidate.project.version,
-  })
-  return '请使用 qingclaw-plugin-publish 技能，将当前工作区中指定目录的包版本发布到青狮 npm 私服。目标包信息：' + target
+  const target = JSON.stringify({ directory: candidate.directory, packageName: candidate.project.name })
+  const next = nextRelease(candidate.project.version)
+  const bump = next === undefined
+    ? '先把版本号递增（用户指定了版本号时按用户说的）'
+    : '先把版本号按 patch 递增到 ' + next + '（用户指定了版本号或要求 minor / major 时按用户说的）'
+  return '请使用 qingclaw-plugin-publish 技能发布这个包：' + bump
+    + '，构建并测试，打包后用 qingclaw_publish_package 发布新版本，发布成功后提交并推送版本改动。目标包信息：' + target
 }
 
 /** Where the page stands for one Session. */
@@ -133,6 +148,7 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
   }
   const candidate: PublishCandidate | undefined = view.kind === 'project'
     ? { directory: view.directory, project: view.project } : undefined
+  const next = candidate === undefined ? undefined : nextRelease(candidate.project.version)
   return <section className={css.page}>
     <div className={css.head}>
       <div className={css.headings}>
@@ -151,6 +167,7 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
         <code className={css.version}>{candidate.project.version}</code>
       </div>
       <p className={css.meta}>{candidate.project.name} · {candidate.directory === '.' ? './' : candidate.directory}</p>
+      {next !== undefined && <p className={css.hint}>{t('publishNext')} {next}</p>}
       <div className={css.actions}>
         <Button variant="outline" onClick={() => { publish(sessionId, candidate) }}>{t('publish')}</Button>
         <Button variant="ghost" disabled={listing.kind === 'pending'} onClick={() => { void requestListing(candidate) }}>
