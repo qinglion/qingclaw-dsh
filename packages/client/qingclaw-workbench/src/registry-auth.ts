@@ -22,8 +22,15 @@ const EXCHANGE_TIMEOUT_MS = 15_000
 /** The failure code a signed-out registry read reports, so the browser can ask for a sign-in. */
 const SIGN_IN_REQUIRED_CODE = 'qingclaw-workbench/sign-in-required'
 
+/** The failure code a free account gets when it asks for the workbench credential. */
+const PRO_REQUIRED_CODE = 'qingclaw-workbench/pro-required'
+
 function signInRequired(): RemoteError {
   return new RemoteError(SIGN_IN_REQUIRED_CODE, 'Sign in to QingClaw to read the private workbench registry.', {})
+}
+
+function proRequired(): RemoteError {
+  return new RemoteError(PRO_REQUIRED_CODE, 'Reading or installing a workbench requires the professional licence.', {})
 }
 
 /** Minimal account reader: the Host-only platform grant that identifies the signed-in account. */
@@ -93,10 +100,16 @@ export class WorkbenchRegistryAccess {
     })
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) throw signInRequired()
+      // The platform withholds the credential from a free account, so the browser
+      // asks for the professional plan instead of retrying.
+      if (response.status === 402) throw proRequired()
       throw new Error('无法获取青狮 npm 读取授权，请稍后重试。')
     }
     const grant = await response.json() as {
-      username?: unknown; password?: unknown; registry?: unknown; expires_at?: unknown
+      username?: unknown
+      password?: unknown
+      registry?: unknown
+      expires_at?: unknown
     }
     const expiresAt = typeof grant.expires_at === 'string' ? Date.parse(grant.expires_at) : Number.NaN
     if (typeof grant.username !== 'string' || !/^qc-[1-9]\d*$/.test(grant.username)

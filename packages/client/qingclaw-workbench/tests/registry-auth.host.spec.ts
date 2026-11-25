@@ -46,7 +46,7 @@ it('exchanges again when the token is about to expire, when the account session 
   const ctx = new Context()
   ctx.provide('deepseekAccount', { getPlatformSession: async () => session })
   const access = new WorkbenchRegistryAccess(ctx, new AbortController().signal)
-  const fetchMock = vi.fn<typeof fetch>(async (url) => String(url).includes('read-grant')
+  const fetchMock = vi.fn<typeof fetch>(async url => String(url).includes('read-grant')
     ? answered(grant(30_000)) : answered({ token: 'registry-bearer' }))
   vi.stubGlobal('fetch', fetchMock)
   try {
@@ -78,6 +78,8 @@ it('refuses to read the registry without a signed-in account or an accepted gran
   try {
     fetchMock.mockResolvedValueOnce(answered({ error: 'unauthorized' }, 401))
     await expect(access.authorization(registry)).rejects.toMatchObject({ code: 'qingclaw-workbench/sign-in-required' })
+    fetchMock.mockResolvedValueOnce(answered({ error: 'pro_required' }, 402))
+    await expect(access.authorization(registry)).rejects.toMatchObject({ code: 'qingclaw-workbench/pro-required' })
     fetchMock.mockResolvedValueOnce(answered({ error: 'unavailable' }, 500))
     await expect(access.authorization(registry)).rejects.toThrow('无法获取青狮 npm 读取授权')
     for (const invalid of [
