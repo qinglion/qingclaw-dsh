@@ -77,6 +77,14 @@ it('publishes the captured archive with a scoped bearer, verifies it and leaves 
   } finally { await f.remove() }
 })
 
+it('names the size limit when the registry refuses an oversized archive', async () => {
+  const f = await fixture()
+  try {
+    upload.mockImplementation(async () => { throw Object.assign(new Error('too large'), { code: 'E413', statusCode: 413 }) })
+    await expect(publishPackage(f.ctx, () => f.directory, f.target, signal())).rejects.toThrow('25 MB')
+  } finally { await f.remove() }
+})
+
 it('rejects expired grants, account changes and mismatched workspace membership before writing', async () => {
   const f = await fixture()
   try {

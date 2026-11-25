@@ -118,7 +118,10 @@ export async function publishPackage(
   } catch (error) {
     // npm errors may carry request options. Keep all such objects inside this host call.
     const code: unknown = error && typeof error === 'object' && 'code' in error ? error.code : undefined
-    failureCode = code === 'E403' || code === 'E401' ? '私服拒绝发布，请检查当前账号的创作者权限和包归属。' : '无法确认私服写入结果，请稍后重试。'
+    const status: unknown = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined
+    failureCode = status === 413 || code === 'E413'
+      ? '包归档超过私服允许的 25 MB，请精简包内容（例如预览图）后重新发版。'
+      : code === 'E403' || code === 'E401' ? '私服拒绝发布，请检查当前账号的创作者权限和包归属。' : '无法确认私服写入结果，请稍后重试。'
   } finally {
     signal.removeEventListener('abort', abortUpload)
     transport.destroy()
