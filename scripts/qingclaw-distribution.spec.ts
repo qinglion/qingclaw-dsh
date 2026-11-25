@@ -22,7 +22,7 @@ describe('QingClaw distribution identity', () => {
         },
       },
       web: {
-        manifest: { name: '青狮龙虾', shortName: 'QingClaw', themeColor: '#10B981' },
+        manifest: { name: '青狮龙虾', shortName: '青狮龙虾', themeColor: '#10B981' },
       },
     })
   })

@@ -48,7 +48,7 @@ export const QINGCLAW_DISTRIBUTION = deepFreeze({
     appleMobileWebAppTitle: '青狮龙虾',
     manifest: {
       name: '青狮龙虾',
-      shortName: 'QingClaw',
+      shortName: '青狮龙虾',
       themeColor: '#10B981',
       backgroundColor: '#ffffff',
     },
