@@ -12,6 +12,17 @@ function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
+/** Whether a value is one absolute https URL without credentials. */
+function httpsLink(value: unknown): boolean {
+  if (typeof value !== 'string' || value.length > 2048) return false
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:' && parsed.hostname !== '' && parsed.username === '' && parsed.password === ''
+  } catch {
+    return false
+  }
+}
+
 /**
  * Check the fields the QingClaw directory needs before it can list this release.
  * @param manifest - the packed `package.json`.
@@ -26,14 +37,19 @@ export function listingMetadataIssues(manifest: Record<string, unknown>, files: 
 
   if (qingclaw.links !== undefined) {
     const links = Array.isArray(qingclaw.links) ? qingclaw.links : []
-    const valid = links.length >= 1 && links.length <= 8 && links.every((link) => {
-      if (typeof link !== 'string' || link.length > 2048) return false
-      try {
-        const parsed = new URL(link)
-        return parsed.protocol === 'https:' && parsed.hostname !== '' && parsed.username === '' && parsed.password === ''
-      } catch { return false }
-    })
-    if (!valid) issues.push('qingclaw.links 必须是 1 至 8 个 https 链接')
+    const shape = (link: unknown): boolean => {
+      if (typeof link === 'string') return httpsLink(link)
+      if (!record(link) || !httpsLink(link.url)) return false
+      if (link.title !== undefined && (typeof link.title !== 'string' || !link.title.trim() || link.title.length > 200)) return false
+      if (link.image === undefined) return true
+      return typeof link.image === 'string' && (httpsLink(link.image) || IMAGE.test(link.image))
+    }
+    const valid = links.length >= 1 && links.length <= 8 && links.every(shape)
+    if (!valid) issues.push('qingclaw.links 必须是 1 至 8 个 https 链接，或 { url, title, image } 对象')
+    for (const [index, link] of links.entries()) {
+      if (!record(link) || typeof link.image !== 'string' || httpsLink(link.image)) continue
+      checkLinkImage(link.image.replace(/^\.\//, ''), index, files, issues)
+    }
   }
 
   const workbench = record(qingclaw.workbench)
@@ -60,4 +76,16 @@ export function listingMetadataIssues(manifest: Record<string, unknown>, files: 
   if (previews.length < 2) issues.push('qingclaw.workbench.previews 至少需要 2 张图片')
   for (const reference of previews.slice(0, 8)) checkImage(reference, 'qingclaw.workbench.previews')
   return issues
+}
+
+/** A packaged link cover must exist in the archive and stay under the image cap. */
+function checkLinkImage(path: string, index: number, files: ReadonlyMap<string, number>, issues: string[]): void {
+  const field = `qingclaw.links 第 ${index + 1} 条的封面`
+  if (!IMAGE.test(path) || path.split('/').includes('..')) {
+    issues.push(`${field} 不是包内图片路径：${path}`)
+    return
+  }
+  const size = files.get(path)
+  if (size === undefined) issues.push(`${field} 的图片不在包里：${path}`)
+  else if (size > MAX_IMAGE_BYTES) issues.push(`${field} 的图片超过 2 MB：${path}`)
 }

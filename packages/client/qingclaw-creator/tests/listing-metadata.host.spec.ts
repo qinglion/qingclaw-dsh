@@ -52,12 +52,22 @@ it('rejects images the published archive cannot serve', () => {
 
 it('checks the related links a release declares', () => {
   const base = { name: { zh: '插件' }, description: { zh: '描述' } }
+  const shape = 'qingclaw.links 必须是 1 至 8 个 https 链接，或 { url, title, image } 对象'
   expect(listingMetadataIssues({ qingclaw: { ...base, links: ['https://weixin.qq.com/sph/AHfxwU7MP7'] } }, files))
     .toEqual([])
+  // 视频号页面抓不到 og 数据，作者在包里给出标题和封面。
+  expect(listingMetadataIssues({ qingclaw: { ...base, links: [{
+    url: 'https://weixin.qq.com/sph/AHfxwU7MP7', title: '视频号内容', image: 'assets/workbench/one.webp',
+  }] } }, files)).toEqual([])
   expect(listingMetadataIssues({ qingclaw: { ...base, links: ['http://insecure.example.com'] } }, files))
-    .toEqual(['qingclaw.links 必须是 1 至 8 个 https 链接'])
+    .toEqual([shape])
+  expect(listingMetadataIssues({ qingclaw: { ...base, links: [{ url: 'https://x.example.com', title: '   ' }] } }, files))
+    .toEqual([shape])
   expect(listingMetadataIssues({ qingclaw: { ...base, links: Array(9).fill('https://a.example.com') } }, files))
-    .toEqual(['qingclaw.links 必须是 1 至 8 个 https 链接'])
+    .toEqual([shape])
+  expect(listingMetadataIssues({ qingclaw: { ...base, links: [{
+    url: 'https://x.example.com', image: 'assets/workbench/missing.webp',
+  }] } }, files)).toEqual(['qingclaw.links 第 1 条的封面 的图片不在包里：assets/workbench/missing.webp'])
 })
 
 it('refuses to inspect an archive whose manifest cannot be listed', async () => {
