@@ -203,8 +203,6 @@ export interface ProjectWorkspace {
 
 /** What the project route reads; the creator center owns it. */
 export interface ProjectRouteInputs {
-  /** Whether the caller holds creator access. */
-  canReadProjects(): Promise<boolean>
   /** Resolve the registered workspace named by the request's `workspace` parameter. */
   workspace(id: string | null): ProjectWorkspace | undefined
   /** Resolve the directory of the Session named by the request's `session` parameter. */
@@ -231,14 +229,14 @@ async function clientDirectory(value: string | null): Promise<string | undefined
  * declares, when any. The publish page asks with `session` for the Session's
  * own directory and names a `directory` inside it only when the root holds no
  * plugin; the creator center asks with `workspace` for its inventory.
- * @param inputs - resolved access, workspace, and session lookups.
+ * @param inputs - workspace and session lookups.
  * @returns the Fetch handler for {@link registerProjectRoutes}.
  */
 export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => Promise<Response> {
   return async (request) => {
-    if (!await inputs.canReadProjects()) {
-      return Response.json({ error: 'creator_required' }, { status: 403 })
-    }
+    // A local manifest read: the owner peer already reads these directories, and
+    // the creator surfaces are mounted for creators only. The account gate stays
+    // on the operations that publish, where the website authorizes each write.
     const params = new URL(request.url).searchParams
     const headers = { 'cache-control': 'no-store' }
     // A Session the Host has not materialized still has a directory the client
@@ -263,14 +261,12 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
 /**
  * Serve the discovery route over registered workspaces received from the local desktop client.
  * @param ctx - Host context providing the connection and workspace registry.
- * @param canReadProjects - creator access reader; defaults to the account-backed one.
  * @returns the effect disposer removing the route.
  */
-export function registerProjectRoutes(ctx: Context, canReadProjects = createProjectAccess(ctx)): () => Promise<void> {
+export function registerProjectRoutes(ctx: Context): () => Promise<void> {
   return ctx.connection.fetch.register({
     path: PROJECT_PATH, methods: ['GET'], requestBody: 'buffered',
     fetch: projectRoute({
-      canReadProjects,
       workspace: id => ctx.workspaceRegistry.list().find(item => item.id === id),
       session: (id) => {
         const session = id === null ? undefined : ctx.sessions.get(id as SessionId)

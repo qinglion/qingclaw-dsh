@@ -24,7 +24,7 @@ export function apply(ctx: Context): void {
   const canReadProjects = createProjectAccess(ctx)
   registerPublishSkill(ctx)
   registerPublishTool(ctx, canReadProjects)
-  ctx.effect(() => registerProjectRoutes(ctx, canReadProjects), 'qingclaw-creator: workspace projects')
+  ctx.effect(() => registerProjectRoutes(ctx), 'qingclaw-creator: workspace projects')
   ctx.effect(() => ctx.connection.fetch.register({
     path: CREATOR_PATH, methods: ['GET', 'POST'], requestBody: 'buffered',
     async fetch(request) {

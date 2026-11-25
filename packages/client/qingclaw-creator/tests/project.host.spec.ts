@@ -36,7 +36,6 @@ const sessionUrl = 'https://local.test/api/qingclaw-creator/project?session=s1'
 
 function route(overrides: Partial<ProjectRouteInputs> = {}) {
   const inputs: ProjectRouteInputs = {
-    canReadProjects: async () => true,
     workspace: id => id === 'w1' ? { path: root } : undefined,
     session: id => id === 's1' ? root : undefined,
     ...overrides,
@@ -79,9 +78,8 @@ it('accepts a client-supplied session directory when the Host cannot resolve the
   expect(missing.status).toBe(404)
 })
 
-it('refuses unknown callers and workspaces and reports an unreadable one', async () => {
+it('refuses unknown workspaces and reports an unreadable one', async () => {
   await manifest(root, plugin)
-  expect((await route({ canReadProjects: async () => false })(new Request(url))).status).toBe(403)
   expect((await route({ workspace: () => undefined })(new Request(url))).status).toBe(404)
   const fetch = route()
   await rm(root, { recursive: true, force: true })
