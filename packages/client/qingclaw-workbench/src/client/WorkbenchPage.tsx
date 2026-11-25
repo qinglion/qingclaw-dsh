@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Button, IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconDownloadOutlineRegular, IconTrashOutlineRegular,
-  Modal, PluginArtworkDefault, Tag, IconRefreshOutlineRegular, IconSearchOutlineRegular, Input, SegmentedControl,
+  Modal, PluginArtworkDefault, Switch, Tag, IconRefreshOutlineRegular, IconSearchOutlineRegular, Input, SegmentedControl,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -33,6 +33,7 @@ interface ItemActions {
   onInstall(): void
   onUpdate(): void
   onUninstall(): void
+  onSetEnabled(enabled: boolean): void
   onOpen(): void
   onFavorite(): void
 }
@@ -51,12 +52,14 @@ function WorkbenchActions({ item, t, installing, busy, detail, onInstall, onUpda
           icon={<IconDownloadOutlineRegular size={14} />}>
           {t(installing ? 'updating' : 'update', { version: item.version })}
         </Button>}
-        {item.openable
-          ? <Button variant="outline" size="sm" onClick={onOpen}>{t('open')}</Button>
-          // The product page states its actions instead of a status, and an update replaces the label.
-          : !detail && !item.updateAvailable && <span className={css.installed}>
-            <IconCheckOutlineRegular size={14} />{t(item.restartRequired ? 'restartRequired' : 'installed')}
-          </span>}
+        {item.enabled
+          ? item.openable
+            ? <Button variant="outline" size="sm" onClick={onOpen}>{t('open')}</Button>
+            // The product page states its actions instead of a status, and an update replaces the label.
+            : !detail && !item.updateAvailable && <span className={css.installed}>
+              <IconCheckOutlineRegular size={14} />{t(item.restartRequired ? 'restartRequired' : 'installed')}
+            </span>
+          : <Tag tone="neutral">{t('disabled')}</Tag>}
       </>
       : <Button variant="primary" size="sm" disabled={busy || !item.installable} onClick={onInstall}
         title={busy && !installing ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
@@ -152,6 +155,8 @@ function WorkbenchDetail({ item, t, actions, onBack, error }: {
         <span className={css.packageName}>{item.packageName}</span>
       </div>
       <WorkbenchActions {...actions} detail />
+      {item.installed && <Switch checked={item.enabled} label={t('enableToggle', { name: item.title })}
+        disabled={actions.busy} onChange={(next) => { actions.onSetEnabled(next) }} />}
       {item.installed && <Button variant="outline" size="sm" className={css.danger}
         icon={<IconTrashOutlineRegular size={13} />} disabled={actions.busy}
         aria-label={t('uninstallLabel', { name: item.title })} onClick={() => setConfirming(true)}>
@@ -242,6 +247,7 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
       onInstall: () => { void act(() => pluginStore.install(item.id), 'installError', item.id) },
       onUpdate: () => { void act(() => pluginStore.update(item.id), 'updateError', item.id) },
       onUninstall: () => { void act(() => pluginStore.uninstall(item.id), 'uninstallError', item.id) },
+      onSetEnabled: (enabled) => { void act(() => pluginStore.setEnabled(item.id, enabled), 'toggleError', item.id) },
       onOpen: () => { void act(() => pluginStore.open(item.id), 'openError') },
       onFavorite: () => { void act(() => pluginStore.setFavorite(item.id, !item.favorite), 'preferenceError') },
     }

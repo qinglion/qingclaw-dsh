@@ -8,11 +8,12 @@ const name = '@qinglion/dsh-desk'
 const entry = { packageName: name, version: '2.0.0', panelId: 'desk', title: '工作台',
   description: '制作图文内容', author: '作者', category: '工具', registry: 'https://npm.qingclaw.com/' }
 
-async function mount(installedVersion: () => string | undefined) {
+async function mount(installedVersion: () => string | undefined, enabled = () => true) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry)
   const updateWorkbench = vi.fn(async () => ({ ok: true, value: { application: 'applied' } }))
   const removeBundle = vi.fn(async () => ({ ok: true, value: { application: 'applied' } }))
+  const setBundleEnabled = vi.fn(async (_name: string, _enabled: boolean) => ({ ok: true, value: { application: 'applied' } }))
   ctx.provide('remote', {
     $on: () => () => {},
     qingclawWorkbench: {
@@ -23,16 +24,18 @@ async function mount(installedVersion: () => string | undefined) {
     pluginManager: {
       listBundles: async () => {
         const version = installedVersion()
-        return { ok: true, value: version === undefined ? [] : [{ name, version, installed: true, availability: 'profile' }] }
+        return { ok: true, value: version === undefined ? []
+          : [{ name, version, installed: true, enabled: enabled(), availability: 'profile' }] }
       },
       removeBundle,
+      setBundleEnabled,
     },
   } as never)
   ctx.provide('layout', { selectPanel: vi.fn() } as never)
   const root = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' },
     'sidebar.panellist': { kind: 'list', scope: 'root' } } } as never, () => null)
   const store = createWorkbenchPluginStore(ctx)
-  return { ctx, store, root, updateWorkbench, removeBundle }
+  return { ctx, store, root, updateWorkbench, removeBundle, setBundleEnabled }
 }
 
 it('offers an update when the catalog is newer and installs it through the Host', async () => {
@@ -65,6 +68,23 @@ it('keeps a removed workbench uninstalled while the inventory still lists it', a
     expect((await store.load())[0]).toMatchObject({
       installed: false, installable: true, updateAvailable: false,
     })
+  } finally { store.dispose(); root(); await ctx.fiber.dispose() }
+})
+
+it('reports a disabled workbench and toggles it through the plugin manager', async () => {
+  let enabled = false
+  const { ctx, store, root, setBundleEnabled } = await mount(() => '2.0.0', () => enabled)
+  try {
+    expect((await store.load())[0]).toMatchObject({ installed: true, enabled: false })
+
+    setBundleEnabled.mockImplementation(async (_name: string, next: boolean) => {
+      enabled = next
+      return { ok: true, value: { application: 'applied' } }
+    })
+    await store.setEnabled(name, true)
+
+    expect(setBundleEnabled).toHaveBeenCalledWith(name, true)
+    expect((await store.load())[0]).toMatchObject({ installed: true, enabled: true })
   } finally { store.dispose(); root(); await ctx.fiber.dispose() }
 })
 

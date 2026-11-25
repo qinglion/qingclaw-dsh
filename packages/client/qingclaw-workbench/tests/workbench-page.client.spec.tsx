@@ -17,7 +17,7 @@ const media: WorkbenchPluginItem = {
   id: 'media', title: '自媒体工作台', description: '制作图文内容', author: '内容团队',
   category: '创作', version: '1.0.0', packageName: '@example/media',
   panelId: 'media', registry: 'https://npm.qingclaw.com/',
-  installed: false, installable: true, openable: false, favorite: false, updateAvailable: false,
+  installed: false, installable: true, openable: false, favorite: false, updateAvailable: false, enabled: true,
   previewUrl: 'https://example.com/media-preview.png',
 }
 const notes: WorkbenchPluginItem = {
@@ -37,6 +37,7 @@ function setup(initial = [media, notes]) {
     install: vi.fn(async (id: string) => update(id, { installed: true, openable: true })),
     update: vi.fn(async (id: string) => update(id, { installedVersion: '1.0.0', updateAvailable: false })),
     uninstall: vi.fn(async (id: string) => update(id, { installed: false, openable: false })),
+    setEnabled: vi.fn(async (id: string, enabled: boolean) => update(id, { enabled })),
     open: vi.fn(),
     readReadme: vi.fn(async (_id: string, _version: string, _language: string) => ({ markdown: '## 使用指南\n\n在灵感页新建素材。' })),
     dispose: vi.fn(),
@@ -214,6 +215,21 @@ it('uninstalls an installed workbench from its detail page after a confirmation'
   expect(dialog.getByText('卸载后它提供的功能会消失。')).toBeTruthy()
   fireEvent.click(dialog.getByRole('button', { name: zh.uninstall }))
   await waitFor(() => expect(store.uninstall).toHaveBeenCalledWith(media.id))
+})
+
+it('marks a disabled workbench and toggles it from its page', async () => {
+  const { store, page } = setup([{ ...media, installed: true, installable: false, openable: true, enabled: false }])
+  page()
+  const card = within(await screen.findByRole('article', { name: media.title }))
+  expect(card.getByText(zh.disabled)).toBeTruthy()
+  expect(card.queryByRole('button', { name: zh.open })).toBeNull()
+
+  fireEvent.click(card.getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  const toggle = detail.getByRole('switch', { name: '启用自媒体工作台' })
+  expect(toggle.getAttribute('aria-checked')).toBe('false')
+  fireEvent.click(toggle)
+  await waitFor(() => expect(store.setEnabled).toHaveBeenCalledWith(media.id, true))
 })
 
 it('replaces the installed label with the update action', async () => {

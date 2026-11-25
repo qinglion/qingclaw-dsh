@@ -15,6 +15,8 @@ export interface WorkbenchPluginItem extends WorkbenchCatalogEntry {
   readonly installedVersion?: string
   /** A newer catalog version replaces the installed one. */
   readonly updateAvailable: boolean
+  /** Selected in the profile; a disabled workbench stays installed but cannot open. */
+  readonly enabled: boolean
   readonly installable: boolean
   readonly openable: boolean
   readonly favorite: boolean
@@ -32,6 +34,7 @@ export interface WorkbenchPluginStore {
   install(id: string): Promise<void>
   update(id: string): Promise<void>
   uninstall(id: string): Promise<void>
+  setEnabled(id: string, enabled: boolean): Promise<void>
   open(id: string): void
   setFavorite(id: string, favorite: boolean): void
   subscribe(listener: () => void): () => void
@@ -125,6 +128,8 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   let installed = new Map<string, string | undefined>()
   /** Bundles the profile owns, which a new catalog version can replace; shipped copies cannot be updated. */
   let managed = new Set<string>()
+  /** Installed bundles the profile has selected; a disabled one stays installed but inert. */
+  let enabledBundles = new Set<string>()
   let reading: Promise<void> | undefined
   let disposed = false
   const notify = (): void => { if (!disposed) for (const listener of listeners) listener() }
@@ -168,6 +173,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     installed = new Map(bundles.value.filter(bundle => bundle.availability !== 'missing'
       && (bundle.installed || bundle.availability === 'installation')).map(bundle => [bundle.name, bundle.version]))
     managed = new Set(bundles.value.filter(bundle => bundle.installed).map(bundle => bundle.name))
+    enabledBundles = new Set(bundles.value.filter(bundle => bundle.enabled).map(bundle => bundle.name))
     for (const name of removed) {
       if (!installed.has(name)) removed.delete(name)
     }
@@ -188,6 +194,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       const installedVersion = has ? installed.get(entry.packageName) : undefined
       const openable = has && hasMain(entry.panelId)
       return { ...entry, id: entry.packageName, installed: has, installable: !has && !offline, openable,
+        enabled: !has || enabledBundles.has(entry.packageName),
         favorite: favorites.has(entry.packageName),
         updateAvailable: has && managed.has(entry.packageName) && installedVersion !== undefined
           && compareVersions(installedVersion, entry.version) < 0,
@@ -260,6 +267,26 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     try { await pending } finally { installs.delete(id) }
   }
 
+  async function setEnabled(id: string, enabled: boolean): Promise<void> {
+    if (installs.has(id)) return installs.get(id)
+    const pending = (async () => {
+      await load(true)
+      const entry = find(id)
+      if (!present(id)) return
+      const result = await ctx.remote.pluginManager.setBundleEnabled(entry.packageName, enabled)
+      if (!result.ok) throw remoteFailure(result.error)
+      const { application, error } = result.value
+      if (application === 'failed' || application === 'cancelled') {
+        throw new Error(error?.diagnostic ?? error?.code ?? application)
+      }
+      if (application === 'restart-required') restartRequired.add(id)
+      await load(true)
+      notify()
+    })()
+    installs.set(id, pending)
+    try { await pending } finally { installs.delete(id) }
+  }
+
   const changed = (): void => { void load().then(notify, notify) }
   function clearSidebars(): void {
     for (const remove of sidebars.values()) remove()
@@ -277,7 +304,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   // Restore already-installed launchers before the user opens the directory.
   void load().catch(() => undefined)
   return {
-    load, install, update, uninstall,
+    load, install, update, uninstall, setEnabled,
     async readReadme(id, version, language) {
       const entry = find(id)
       if (entry.version !== version) throw new Error('工作台版本已变更')
