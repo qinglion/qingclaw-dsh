@@ -8,7 +8,7 @@ import { authorizeUrlWithTheme } from './authorize-url.ts'
 import css from './SignInDialog.module.css'
 
 /** @param props - safe account state, localized copy, and user actions. @returns login dialog. */
-export function SignInDialog({ account, colorScheme, start, cancel, close, useApiKey, allowApiKey, t }: {
+export function SignInDialog({ account, colorScheme, start, cancel, close, useApiKey, allowApiKey = true, t }: {
   account: AccountSnapshot
   /** Resolved scheme of the active application theme; the copied link carries it. */
   colorScheme: 'light' | 'dark'
@@ -16,8 +16,8 @@ export function SignInDialog({ account, colorScheme, start, cancel, close, useAp
   cancel: (id: SignInAttemptId) => Promise<void>
   close: () => void
   useApiKey: () => void
-  /** Whether the official API-key route is available in this distribution. */
-  allowApiKey: boolean
+  /** Whether the official API-key route is available in this distribution; omission keeps the upstream route. */
+  allowApiKey?: boolean | undefined
   t: (key: AccountKey) => string
 }) {
   const [busy, setBusy] = useState(false)

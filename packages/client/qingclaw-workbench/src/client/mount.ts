@@ -33,7 +33,15 @@ export function registerWorkbenchUi(ctx: Context): void {
   const injected = (): WorkbenchPageInjected => ({
     pluginStore,
     hooks: { locale: ctx.locale },
-    openSubscriptionPage: (onReturned) => { ctx.accountUi.openTopUp(onReturned) },
+    openSubscriptionPage: (onReturned) => {
+      const url = ctx.accountUi.getSnapshot().view?.links.topUpUrl
+      if (url === undefined || url === '') return
+      window.open(url, '_blank', 'noopener,noreferrer')
+      if (onReturned === undefined) return
+      // A browser tab cannot report its own return, so the next window focus is the viewer coming back.
+      const focus = (): void => { window.removeEventListener('focus', focus); onReturned() }
+      window.addEventListener('focus', focus)
+    },
   })
   // Failures outlive the market panel, so the shell overlay owns their toast.
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({

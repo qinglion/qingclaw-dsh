@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type {} from '@deepseek-ai/dsh-client-ui-settings-account/client'
 import css from './MobilePairingAction.module.css'
 
-type Props = PropsRuntime<'settings.launcher.tools'> & PropsLocale<'qingclaw.admin'> & InjectFace<{ openPairing(): Promise<void> }>
+type Props = PropsRuntime<'sidebar.footer.action'> & PropsLocale<'qingclaw.admin'> & InjectFace<{ openPairing(): Promise<void> }>
 
 /** Owner-only Desktop bridge; browsers without a native pairing window have no entry. */
 export function MobilePairingAction({ openPairing, t }: Props) {

@@ -33,17 +33,15 @@ it('registers the admin section only for an administrator and removes it on sign
   })
   const entry = c.ctx.slots.entries('main').find(candidate => candidate.options.key === 'qingclaw-admin')!
   expect(entry.inject?.()).toEqual({ role: 'admin', userId: 'admin-user' })
-  const action = c.ctx.slots.entries('settings.launcher.actions').find(row => row.options.id === 'qingclaw-admin')
-  const menu = action?.inject?.() as { role: string; openPanel: () => void }
-  expect(menu.role).toBe('admin')
-  menu.openPanel()
-  expect(c.ctx.layout.panelInfo.getSnapshot().activePanelId).toBe('qingclaw-admin')
+  const panellist = c.ctx.slots.entries('sidebar.panellist').find(row => row.options.id === 'qingclaw-admin')
+  expect(panellist?.options.order).toBe(-18)
+  expect(panellist?.locale).toBe('qingclaw.admin')
   expect(c.ctx.slots.entries('settings.section').some(row => row.options.id === 'qingclaw-admin')).toBe(false)
 
   c.mock.streams.push('account/watch', { type: 'credentials-changed', state: signedOut })
   await vi.waitFor(() => {
     expect(c.ctx.slots.entries('main').some(candidate => candidate.options.key === 'qingclaw-admin')).toBe(false)
-    expect(c.ctx.slots.entries('settings.launcher.actions').some(row => row.options.id === 'qingclaw-admin')).toBe(false)
+    expect(c.ctx.slots.entries('sidebar.panellist').some(row => row.options.id === 'qingclaw-admin')).toBe(false)
   })
 }, 120_000)
 
@@ -57,12 +55,12 @@ it('keeps native phone pairing available to ordinary users alongside their accou
   }))
   c.mock.streams.push('account/watch', { type: 'snapshot', state: signedIn })
   await vi.waitFor(() => { expect(c.mock.remote.account.getProfile).toHaveBeenCalled() })
-  const entry = c.ctx.slots.entries('settings.launcher.tools').find(row => row.options.id === 'qingclaw-connect-phone')
+  const entry = c.ctx.slots.entries('sidebar.footer.action').find(row => row.options.id === 'qingclaw-connect-phone')
   expect(entry?.options.order).toBe(20)
   await (entry?.inject?.() as { openPairing(): Promise<void> }).openPairing()
   expect(open).toHaveBeenCalledOnce()
   expect(c.ctx.slots.entries('main').some(entry => entry.options.key === 'qingclaw-admin')).toBe(false)
-  expect(c.ctx.slots.entries('settings.launcher.actions').some(entry => entry.options.id === 'qingclaw-admin')).toBe(false)
+  expect(c.ctx.slots.entries('sidebar.panellist').some(entry => entry.options.id === 'qingclaw-admin')).toBe(false)
 }, 120_000)
 
 it('keeps the administration panel out of a creator account', async ({ start }) => {

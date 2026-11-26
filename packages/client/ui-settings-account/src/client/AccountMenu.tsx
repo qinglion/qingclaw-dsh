@@ -1,21 +1,19 @@
 /** Sidebar account launcher and locally authoritative sign-out action. */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  Toast, Menu, MenuItemButton, IconEllipsisOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
+  Toast, Menu, IconEllipsisOutlineMedium, IconPaperPlaneOutlineRegular, IconSettingsOutlineRegular, IconUserOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSectionInjected } from './AccountSection.tsx'
 import { SignOutDialog } from './SignOutDialog.tsx'
 import { SignInDialog } from './SignInDialog.tsx'
 import { LogoutIcon } from './LogoutIcon.tsx'
 import { AccountAvatar } from './AccountAvatar.tsx'
-import { AccountPlanBadge } from './AccountPlanBadge.tsx'
-import { accountPlanLabelKey, accountPlanTier } from './account-plan.ts'
 import type {} from './account-ui.ts'
 import css from './AccountMenu.module.css'
 
 /** Account launcher composed by the settings shell. */
-export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSlots<'settings.launcher.notifications' | 'settings.launcher.actions' | 'settings.launcher.tools' | 'settings.launcher.feedback'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
+export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 
 /** The signed-in label stays empty while the profile loads.
  * @param props - sidebar geometry, settings navigation and account operations.
@@ -23,9 +21,8 @@ export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSl
  */
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
-  useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, renderSlot,
-  showLogin, start, cancel, avatarFailed, t,
-  allowApiKey,
+  useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount,
+  contactUs, showLogin, start, cancel, avatarFailed, t,
 }: AccountMenuProps) {
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
   // re-renders, section switches and tab switches inside one open must not read again.
@@ -42,12 +39,8 @@ export function AccountMenu({
   const [expiryNotice, setExpiryNotice] = useState(false)
   useEffect(() => subscribeSessionExpired?.(() => { setExpiryNotice(true) }), [subscribeSessionExpired])
   const profile = account.details?.profile
-  const profileValue = profile?.status === 'ready' ? profile.value : undefined
-  const plan = accountPlanTier(profileValue)
-  const signedInFallback = t(allowApiKey ? 'signedIn' : 'signedInGeneric')
-  const label = profile === undefined ? null
-    : profileValue === undefined ? signedInFallback
-      : profileValue.name || profileValue.contact || signedInFallback
+  const label = profile === undefined ? null : profile.status === 'ready'
+    ? profile.value.name ?? profile.value.contact ?? t('signedIn') : t('signedIn')
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
@@ -60,13 +53,9 @@ export function AccountMenu({
   }
   // The plugin's start publishes `loginFailed` before it rejects, so the dialog owns the report.
   const beginSignIn = (): void => { setOpen(false); void start().catch(() => undefined) }
-  const openAccount = useCallback(() => { openSettings('account') }, [openSettings])
-  return <div className={css.root} data-inset={signedIn && wide} data-wide={wide}>
+  return <div className={css.root} data-inset={signedIn && wide}>
     {signInNotice > 0 && <Toast key={signInNotice} text={t('modelSignInRequired')} onDone={() => { setSignInNotice(0) }} />}
     {expiryNotice && <Toast text={t('sessionExpired')} onDone={() => { setExpiryNotice(false) }} />}
-    <div className={css.notifications} hidden={!wide}>{renderSlot('settings.launcher.notifications', {
-      active: signedIn && !account.desktopOnboardingVisible && !account.onboarding, openAccount,
-    })}</div>
     <Menu open={open} side="top" portal autoFocus className={css.anchor} listClassName={signedIn ? undefined : css.signedOutMenu}
       anchor={<button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} data-signed-out={!signedIn} aria-label={t('menu')}
         aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(value => !value) }}>
@@ -76,34 +65,23 @@ export function AccountMenu({
           </span>
           : <IconEllipsisOutlineMedium size={14} />}
         {wide && <span className={css.label}>{signedIn ? label : t('more')}</span>}
-        {wide && signedIn && plan !== undefined
-          && <span className={css.plan}><AccountPlanBadge tier={plan} label={t(accountPlanLabelKey(plan))} /></span>}
       </button>}
       items={[
-        { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
+        { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineRegular size={14} />,
           ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
+        { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineRegular size={14} /> },
+        ...(signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
+          : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineRegular size={14} /> }]),
       ]}
       onClose={() => { setOpen(false) }}
       onSelect={(id) => {
         if (id === 'settings') { setOpen(false); trigger.current?.focus(); openSettings() }
-
-      }}>
-      {open && signedIn && renderSlot('settings.launcher.actions', { onDismiss: () => { setOpen(false) } })}
-      {renderSlot('settings.launcher.feedback', {
-        onDismiss: () => { setOpen(false) },
-        restoreFocus: () => { trigger.current?.focus() },
-      })}
-      {signedIn
-        ? <MenuItemButton icon={<LogoutIcon />} disabled={busy} onSelect={() => { void requestSignOut() }}>
-          {t('signOut')}
-        </MenuItemButton>
-        : <MenuItemButton icon={<IconUserOutlineMedium size={16} />} onSelect={beginSignIn}>
-          {t('signIn')}
-        </MenuItemButton>}
-    </Menu>
-    <div className={css.tools}>{renderSlot('settings.launcher.tools', { wide })}</div>
+        else if (id === 'contact') { setOpen(false); contactUs() }
+        else if (id === 'signin') beginSignIn()
+        else void requestSignOut()
+      }} />
     {account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
-      start={start} cancel={cancel} t={t} allowApiKey={allowApiKey}
+      start={start} cancel={cancel} t={t}
       close={() => { showLogin(false) }} useApiKey={() => { showLogin(false); openOnboarding('deepseek-official') }} />}
     {signedIn && signOutImpact !== undefined && <SignOutDialog running={signOutImpact} signOut={signOut}
       close={() => { setSignOutImpact(undefined) }} t={t} />}

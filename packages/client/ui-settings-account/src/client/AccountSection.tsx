@@ -38,8 +38,8 @@ export interface AccountSnapshot {
 
 /** Host operations injected into the Cordis-free account component. */
 export interface AccountSectionInjected {
-  /** Whether this distribution exposes the official API-key credential path. */
-  allowApiKey: boolean
+  /** Whether this distribution exposes the official API-key credential path; omission keeps the upstream copy. */
+  allowApiKey?: boolean | undefined
   /** @param snapshot - picture attempt whose rendered image failed; superseded attempts are ignored. */
   avatarFailed: (snapshot: AccountAvatarSnapshot) => void
   /** Subscribe to live credential-expiry notifications.
@@ -87,7 +87,7 @@ export type AccountSectionProps =
   PropsRuntime<'settings.section'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 /** @param props - localized actions, account subscription, and the shared Platform page channel. @returns account settings UI. */
 export function AccountSection({
-  t, useAccount, useTheme, start, cancel, openPlatformPage, avatarFailed, allowApiKey,
+  t, useAccount, useTheme, start, cancel, openPlatformPage, avatarFailed, allowApiKey = true,
 }: AccountSectionProps) {
   const { view: state, details, avatar, failed: streamFailed } = useAccount(value => value)
   const colorScheme = useTheme(snapshot => snapshot.active.colorScheme)

@@ -18,17 +18,15 @@ import { contactUrl } from './contact-url.ts'
 import { authorizeUrlWithTheme } from './authorize-url.ts'
 import { BrowserLogin } from './browser-login.ts'
 import { AccountOnboarding } from './AccountOnboarding.tsx'
-import { AccountPlatformHost, type AccountPlatformHostInjected } from './AccountPlatformHost.tsx'
-import { AccountQuotaTool } from './AccountQuotaTool.tsx'
-import { AccountMenu } from './AccountMenu.tsx'
-import { FeedbackMenuItem } from './FeedbackMenuItem.tsx'
 import { AccountColdStart } from './AccountColdStart.tsx'
+import { AccountPlatformHost, type AccountPlatformHostInjected } from './AccountPlatformHost.tsx'
+import { AccountMenu } from './AccountMenu.tsx'
+import { AccountNotices } from './AccountNotices.tsx'
 import { createPlatformPages, type PlatformPages } from './platform-pages.ts'
 import { AccountSection, type AccountSnapshot, type AccountSectionInjected } from './AccountSection.tsx'
 import { accountClientMetadata } from './client-metadata.ts'
 import { en, ja, es, fr, de, ru, pt, zh, type AccountKey } from './locales.ts'
 import { AccountQuotaNotice, type AccountQuotaNoticeInjected } from './AccountQuotaNotice.tsx'
-import { AccountQuotaBanner, type AccountQuotaBannerInjected } from './AccountQuotaBanner.tsx'
 import { DESKTOP_ONBOARDING_NAMESPACE, type OnboardingSettings } from '../onboarding-settings.ts'
 import { DesktopOnboardingController } from './onboarding-state.ts'
 import { DesktopOnboardingEntry, type DesktopOnboardingInjected } from './DesktopOnboardingEntry.tsx'
@@ -39,7 +37,7 @@ export type { AccountSectionInjected, AccountSectionProps } from './AccountSecti
 export type { AccountMenuProps } from './AccountMenu.tsx'
 export type { AccountSnapshot } from './AccountSection.tsx'
 export type { AccountKey } from './locales.ts'
-export type { AccountFeedbackOwnerProps, AccountUi, AccountUiState, AccountNotificationsOwnerProps } from './account-ui.ts'
+export type { AccountUi, AccountUiState, AccountNotificationsOwnerProps } from './account-ui.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'settings.account': AccountKey }
@@ -54,11 +52,9 @@ export function apply(ctx: Context): void {
   const t = ctx.locale.bind('settings.account')
   const page = globalThis as Partial<Record<typeof CONTACT_CONFIG_GLOBAL, unknown>>
   const config = ContactConfig(page[CONTACT_CONFIG_GLOBAL] ?? {})
-  const desktopOnboarding = desktop && config.desktopOnboarding
-  const accountOnlyColdStart = desktop && !config.allowApiKey
   let snapshot: AccountSnapshot = {
     view: undefined, details: undefined, avatar: undefined, failed: false, loginVisible: false,
-    desktopOnboardingVisible: desktopOnboarding,
+    desktopOnboardingVisible: desktop && config.desktopOnboarding,
   }
   // Desktop main opens the authorization page natively; a plain browser opens it in a tab it owns.
   const browser = new BrowserLogin(url => authorizeUrlWithTheme(url, ctx.theme.getTheme().active.colorScheme))
@@ -69,6 +65,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { avatar.dispose() }, 'account: profile picture lifetime')
   /** @param locale - requested language. @returns client metadata with the current timezone. */
   const client = (locale: string) => accountClientMetadata(locale, process.env.DSH_CLIENT_VERSION)
+  ctx.provide('accountUi', { getSnapshot: () => snapshot, clientMetadata: client })
   let revision = 0
   let refreshing: Promise<void> | undefined
   const refresh = (): Promise<void> => {
@@ -132,23 +129,14 @@ export function apply(ctx: Context): void {
         const credentialsChanged = frame.value.type === 'credentials-changed'
         const view = frame.value.state
         const generationChanged = frame.generation !== accountGeneration
-        // A routine frame only refreshes the sign-in state and starts a read; keeping what
-        // that read produced until its successor lands stops the composer banner and the
-        // account menu from blinking out on every frame. A new credential, a different
-        // sign-in state, or recovery from a failed stream invalidates it instead.
-        const dropDetails = credentialsChanged || snapshot.view?.status !== view.status || snapshot.failed
-        const reset = dropDetails || generationChanged
+        const reset = credentialsChanged || generationChanged || snapshot.view?.status !== view.status || snapshot.failed
         accountGeneration = frame.generation
         revision++
         refreshing = undefined
-        if (dropDetails) avatar.reset()
+        avatar.reset()
         const initialize = view.status === 'credential-stored' && view.attempt?.phase === 'succeeded'
           && snapshot.view?.attempt?.phase !== 'succeeded'
-        publish({
-          ...snapshot, view, failed: false,
-          details: dropDetails ? undefined : snapshot.details,
-          avatar: dropDetails ? undefined : snapshot.avatar,
-        })
+        publish({ ...snapshot, view, details: undefined, avatar: undefined, failed: false })
         browser.update(view)
         frame.accept()
         ctx.emit('account-ui/change', snapshot, reset)
@@ -192,39 +180,6 @@ export function apply(ctx: Context): void {
       onClose(reason)
       if (reason === 'returned' && page === 'top-up') void refreshAfterReturn(refreshing, reRead)
     })
-  /** The window focus a browser tab's return waits for; a later request replaces the earlier one. */
-  let browserReturn: (() => void) | undefined
-  /**
-   * Show the Platform page that sells the professional plan and credits for a
-   * surface that owns no page container of its own.
-   * @param onReturned - runs when the viewer comes back from that page.
-   * @returns nothing; the account surfaces read the account again on their own terms.
-   */
-  const openTopUp = (onReturned?: () => void): void => {
-    if (nativePlatform !== undefined) {
-      platformPages.open('top-up', (reason) => {
-        if (reason !== 'returned') return
-        void refreshAfterReturn(refreshing, refreshAccount)
-        onReturned?.()
-      })
-      return
-    }
-    const url = snapshot.view?.links.topUpUrl
-    if (url === undefined || url === '') return
-    window.open(url, '_blank', 'noopener,noreferrer')
-    if (onReturned === undefined) return
-    // A browser tab cannot report its own return, so the window's next focus is the viewer coming back.
-    const previous = browserReturn
-    const focus = (): void => {
-      browserReturn = undefined
-      window.removeEventListener('focus', focus)
-      onReturned()
-    }
-    browserReturn = focus
-    window.addEventListener('focus', focus)
-    if (previous !== undefined) window.removeEventListener('focus', previous)
-  }
-  ctx.provide('accountUi', { getSnapshot: () => snapshot, clientMetadata: client, openTopUp })
   const operations: AccountSectionInjected = {
     allowApiKey: config.allowApiKey,
     avatarFailed: (value) => { avatar.failed(value) },
@@ -305,7 +260,8 @@ export function apply(ctx: Context): void {
       throw result.error
     },
   }
-  if (desktopOnboarding) {
+  // A distribution that turns the introduction off owns its own cold start instead.
+  if (desktop && config.desktopOnboarding) {
     const controller = new DesktopOnboardingController(
       ctx.configForms.get<OnboardingSettings>(DESKTOP_ONBOARDING_NAMESPACE),
       ctx.configForms.get<{ transcriptView?: TranscriptViewMode | null; performanceUsage: 'compact' | 'detailed' }>('ui-chat'),
@@ -343,10 +299,13 @@ export function apply(ctx: Context): void {
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.models.sign-in', () => ctx.slots.register({
     name: 'settings.models.sign-in', locale: 'settings.account', inject: () => operations,
   }, AccountOnboarding)))
-  if (accountOnlyColdStart) ctx.remoteAccess.whenAccess('account/watch', () =>
-    ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
+  // QingClaw owns desktop cold start: with the API-key route disabled the upstream
+  // multi-step introduction has no first step, so the account dialog replaces it.
+  if (desktop && !config.allowApiKey) {
+    ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
       name: 'settings.onboarding', id: 'account-sign-in', order: -10, locale: 'settings.account', inject: () => operations,
     }, AccountColdStart)))
+  }
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('shell.quota-notice', () => ctx.slots.register({
     name: 'shell.quota-notice', locale: 'settings.account',
     select: owner => owner.code === 'ACCOUNT_QUOTA' ? owner : null,
@@ -366,32 +325,11 @@ export function apply(ctx: Context): void {
   }
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher', () => ctx.slots.register({
     name: 'settings.launcher', locale: 'settings.account', inject: () => operations,
-    children: {
-      'settings.launcher.notifications': { kind: 'single', scope: 'root' },
-      'settings.launcher.actions': { kind: 'list', scope: 'root' },
-      'settings.launcher.tools': { kind: 'list', scope: 'root' },
-      'settings.launcher.feedback': { kind: 'single', scope: 'root' },
-    },
   }, AccountMenu)))
-  // The built-in questionnaire row occupies the feedback cell at priority 0;
-  // a distribution shadows it with its own feedback surface at a lower priority.
-  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher.feedback', () => ctx.slots.register({
-    name: 'settings.launcher.feedback', locale: 'settings.account', priority: 0,
-    inject: (): Pick<AccountSectionInjected, 'contactUs'> => ({ contactUs: operations.contactUs }),
-  }, FeedbackMenuItem)))
-  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.launcher.tools', () => ctx.slots.register({
-    name: 'settings.launcher.tools', id: 'account-quota', order: 10, locale: 'settings.account',
-    inject: () => ({ hooks: { account: operations.hooks.account }, refreshAccount,
-      ...(nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) }) }),
-  }, AccountQuotaTool)))
-  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
-    name: 'conversation.input.dock', id: 'account-quota-banner', order: 100, locale: 'settings.account',
-    inject: (): AccountQuotaBannerInjected => ({
-      hooks: { account: operations.hooks.account, platformPage: platformPages },
-      ...nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) },
-    }),
-  }, AccountQuotaBanner)))
-
+  ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.notice', () => ctx.slots.register({
+    name: 'settings.notice', inject: () => operations,
+    children: { 'settings.launcher.notifications': { kind: 'single', scope: 'root' } },
+  }, AccountNotices)))
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.section', () => {
     let unregister: (() => void) | undefined
     const update = () => {

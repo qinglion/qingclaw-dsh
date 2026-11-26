@@ -18,29 +18,11 @@ export interface AccountUi {
    * @returns this client's version, language, and timezone.
    */
   clientMetadata(locale: string): AccountClientMetadata
-  /**
-   * Show the Platform page that sells the professional plan and credits, the
-   * destination the account surfaces open for a top-up: the native page on
-   * Desktop, a new tab in a browser when the account supplies its address.
-   * @param onReturned - runs once the viewer comes back, after the native page
-   * closes or on the window's next focus for a browser tab; omitted by surfaces
-   * that hold no post-return work.
-   * @returns nothing; the shared Platform host owns the page while it shows.
-   */
-  openTopUp(onReturned?: () => void): void
 }
 
-/** Account-menu facts supplied to its feedback row. */
-export interface AccountFeedbackOwnerProps {
-  /** Close the account menu before the row's action leaves it. */
-  onDismiss: () => void
-  /** Return focus to the account launcher after the row's surface closes. */
-  restoreFocus: () => void
-}
-
-/** Account-menu presentation facts supplied to its notification extension. */
+/** Account presentation facts supplied to its notification extension. */
 export interface AccountNotificationsOwnerProps {
-  /** Whether the account menu can display notifications outside onboarding. */
+  /** Whether a signed-in account can display notifications outside onboarding. */
   active: boolean
   /** Open the account section in the existing settings shell. */
   openAccount: () => void
@@ -61,17 +43,7 @@ declare module '@deepseek-ai/cordis' {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
-    /** Compact controls beside the account menu, stacked in the collapsed rail. */
-    'settings.launcher.tools': { kind: 'list'; scope: 'root'; owner: { wide: boolean } }
-    /** Additional actions inside the signed-in account menu. */
-    'settings.launcher.actions': { kind: 'list'; scope: 'root'; owner: { onDismiss: () => void } }
-    /** Notifications anchored at the account menu; the contribution owns its markup and lifecycle. */
+    /** Notifications in the row above the account launcher; the contribution owns its markup and lifecycle. */
     'settings.launcher.notifications': { kind: 'single'; scope: 'root'; owner: AccountNotificationsOwnerProps }
-    /**
-     * The account menu's feedback row. One cell, lowest priority renders: the
-     * built-in questionnaire row registers at 0, so a distribution replaces it
-     * with its own feedback surface at a negative priority.
-     */
-    'settings.launcher.feedback': { kind: 'single'; scope: 'root'; owner: AccountFeedbackOwnerProps }
   }
 }

@@ -19,11 +19,9 @@ import type { AccountSectionInjected } from '../src/client/AccountSection.tsx'
 import { CONTACT_CONFIG_GLOBAL } from '../src/contact-config.ts'
 import { AccountPlatformHost } from '../src/client/AccountPlatformHost.tsx'
 import type { AccountPlatformHostInjected } from '../src/client/AccountPlatformHost.tsx'
-import { AccountQuotaTool } from '../src/client/AccountQuotaTool.tsx'
 import { AccountQuotaNotice } from '../src/client/AccountQuotaNotice.tsx'
 import type { AccountQuotaNoticeInjected } from '../src/client/AccountQuotaNotice.tsx'
 import { AccountColdStart } from '../src/client/AccountColdStart.tsx'
-import { FeedbackMenuItem } from '../src/client/FeedbackMenuItem.tsx'
 
 const it = createClientTest({ roster: webApp })
 const withoutAccountAccess = createClientTest({ roster: webApp }, { access: action => action !== 'account/watch' })
@@ -64,13 +62,8 @@ it('registers account sign-in in a plain browser without the Desktop-only surfac
     if (reload) await c.reload(SELF)
     await c.mock.streams.opened('account/watch', reload ? 2 : 1)
     expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1)
-    // The questionnaire row occupies the feedback cell at its default priority.
-    const feedback = c.ctx.slots.entries('settings.launcher.feedback')
-    expect(feedback).toHaveLength(1)
-    expect(feedback[0]!.component).toBe(FeedbackMenuItem)
-    expect(feedback[0]!.options.priority).toBe(0)
-    expect(typeof (feedback[0]!.inject!() as object as { contactUs: unknown }).contactUs).toBe('function')
-    expect(c.ctx.slots.entries('settings.launcher.tools').map(entry => entry.component)).toContain(AccountQuotaTool)
+    // The upstream account menu keeps its own items; QingClaw surfaces live in their plugins.
+    expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1)
     expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(1)
     expect(quotaNoticeEntry(c)).toBeDefined()
     expect(platformHostEntry(c)).toBeUndefined()
@@ -102,7 +95,6 @@ withoutAccountAccess('opens no account stream and registers no account surface w
   const c = await start()
   expect(c.mock.streams.end('account/watch')).toBe(0)
   expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(0)
-  expect(c.ctx.slots.entries('settings.launcher.feedback')).toHaveLength(0)
   expect(quotaNoticeEntry(c)).toBeUndefined()
   expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(0)
   expect(c.ctx.slots.entries('settings.section').some(entry => entry.options.id === 'account')).toBe(false)
@@ -313,28 +305,6 @@ it('keeps successful account refreshes silent and reports only failed reads', as
   expect(JSON.stringify(output.mock.calls)).not.toContain('private-rpc-detail')
 }, 60_000)
 
-it('keeps the account it already read through a routine frame so the composer banner does not blink', async ({ start }) => {
-  const c = await start()
-  const actions = operations(c)
-  c.mock.remote.account.getProfile.mockResolvedValue(ok(profile))
-  c.mock.remote.account.getBalance.mockResolvedValue(ok({ status: 'ready', value: [], bonusWallets: [] }))
-  c.mock.streams.push('account/watch', { type: 'snapshot', state: stored })
-  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().details?.profile).toEqual(profile) })
-  const seen: unknown[] = []
-  const stop = actions.hooks.account.subscribe(() => { seen.push(actions.hooks.account.getSnapshot().details?.profile) })
-  // A reconciliation frame refreshes the sign-in state and starts the one read; until
-  // that read lands, the banner and the account menu keep rendering what they had.
-  const pending = Promise.withResolvers<Awaited<ReturnType<typeof ok<AccountDetails['profile'] | null>>>>()
-  c.mock.remote.account.getProfile.mockReturnValueOnce(pending.promise)
-  c.mock.streams.push('account/watch', { type: 'snapshot', state: stored })
-  await vi.waitFor(() => { expect(c.mock.remote.account.getProfile).toHaveBeenCalledTimes(2) })
-  expect(actions.hooks.account.getSnapshot().details?.profile).toEqual(profile)
-  pending.resolve(ok(profile))
-  await c.flush()
-  stop()
-  expect(seen.length).toBeGreaterThan(0)
-  expect(seen.every(entry => entry !== undefined)).toBe(true)
-}, 60_000)
 
 it('coalesces refreshes, publishes independent failures, and rejects stale responses after sign-out or unload', async ({ start }) => {
   vi.stubGlobal('dshDesktop', {})
@@ -445,58 +415,7 @@ it('uses the Desktop stream origin and exposes the native platform bridge', asyn
 }, 60_000)
 
 
-it('opens the plan page for another surface and reports the viewer returning', async ({ start }) => {
-  vi.stubGlobal('dshDesktop', {})
-  const c = await start()
-  vi.stubGlobal('dshPlatform', { open: vi.fn(), setBounds: vi.fn(), close: vi.fn() })
-  await c.reload(SELF)
-  const host = injectedOf(platformHostEntry(c)!) as AccountPlatformHostInjected
-  const returned = vi.fn()
-  // Desktop shows the one native page; the purchaser's own surface hears about the return.
-  c.ctx.accountUi.openTopUp(returned)
-  expect(host.hooks.page.getSnapshot()).toEqual({ page: 'top-up' })
-  expect(returned).not.toHaveBeenCalled()
-  host.closePage()
-  expect(returned).toHaveBeenCalledExactlyOnceWith()
-  // Superseding the page is not a return, so the earlier surface hears nothing.
-  const superseded = vi.fn()
-  c.ctx.accountUi.openTopUp(superseded)
-  c.ctx.accountUi.openTopUp()
-  expect(superseded).not.toHaveBeenCalled()
-  host.closePage()
-}, 60_000)
 
-it('opens the plan page in a browser tab and reports the return on the next focus', async ({ start }) => {
-  const open = vi.spyOn(window, 'open').mockReturnValue(null)
-  const c = await start()
-  c.mock.streams.push('account/watch', { type: 'snapshot', state: stored })
-  await vi.waitFor(() => { expect(c.ctx.accountUi.getSnapshot().view).toEqual(stored) })
-  const returned = vi.fn()
-  c.ctx.accountUi.openTopUp(returned)
-  expect(open).toHaveBeenCalledWith(stored.links.topUpUrl, '_blank', 'noopener,noreferrer')
-  // A second visit replaces the first return, so one focus reports exactly one comeback.
-  c.ctx.accountUi.openTopUp(returned)
-  window.dispatchEvent(new Event('focus'))
-  expect(returned).toHaveBeenCalledOnce()
-  window.dispatchEvent(new Event('focus'))
-  expect(returned).toHaveBeenCalledOnce()
-  // A deployment that supplies no Platform address opens nothing, and reports no return.
-  open.mockClear()
-  const unaddressed: AccountView = { ...view, links: { usageUrl: '', topUpUrl: '' } }
-  c.mock.streams.push('account/watch', { type: 'snapshot', state: unaddressed })
-  await vi.waitFor(() => { expect(c.ctx.accountUi.getSnapshot().view).toEqual(unaddressed) })
-  c.ctx.accountUi.openTopUp(returned)
-  expect(open).not.toHaveBeenCalled()
-  expect(returned).toHaveBeenCalledOnce()
-  // A surface with no post-return work opens the address without arming a focus listener.
-  const address = { ...view, links: stored.links }
-  c.mock.streams.push('account/watch', { type: 'snapshot', state: address })
-  await vi.waitFor(() => { expect(c.ctx.accountUi.getSnapshot().view).toEqual(address) })
-  c.ctx.accountUi.openTopUp()
-  expect(open).toHaveBeenCalledWith(stored.links.topUpUrl, '_blank', 'noopener,noreferrer')
-  window.dispatchEvent(new Event('focus'))
-  expect(returned).toHaveBeenCalledOnce()
-}, 60_000)
 
 it('re-reads the account when the shared host returns from top-up, and not from usage or an absent page', async ({ start, mock }) => {
   vi.stubGlobal('dshDesktop', {})

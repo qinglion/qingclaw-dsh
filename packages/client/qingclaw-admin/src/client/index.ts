@@ -1,68 +1,69 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import type {} from '@deepseek-ai/dsh-client-ui-settings-account/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings-account/client'
+import { createElement } from 'react'
+import { IconSettingsOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { MobilePairingAction } from './MobilePairingAction.tsx'
 import { AdminSection } from './AdminSection.tsx'
-import { AdminMenuItem } from './AdminMenuItem.tsx'
 import { en, zh } from './locales.ts'
 
 const NS = 'qingclaw.admin'
 const PANEL = 'qingclaw-admin' as MainPanelId
 export const inject = ['slots', 'locale', 'layout', 'remote', 'remote.account', 'accountUi']
 
-/** Register the account action and its dedicated panel while the website grants access. */
+/** Register the phone pairing control and the role-gated management panel. @param ctx - client plugin context. */
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja: en, es: en, fr: en, de: en, ru: en, pt: en }), 'qingclaw-admin: dictionaries')
+  const t = ctx.locale.bind(NS)
   const desktop = (globalThis as typeof globalThis & { dshDesktop?: { mobilePairing?: { open(): Promise<void> } } }).dshDesktop
   const pairing = desktop?.mobilePairing
   if (pairing) {
-    ctx.slots.inject('settings.launcher.tools', () => ctx.slots.register({
-      name: 'settings.launcher.tools', id: 'qingclaw-connect-phone', order: 20, locale: NS,
+    ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+      name: 'sidebar.footer.action', id: 'qingclaw-connect-phone', order: 20, locale: NS,
       inject: () => ({ openPairing: () => pairing.open() }),
     }, MobilePairingAction))
   }
-  ctx.slots.inject('main', () => ctx.slots.inject('settings.launcher.actions', () => {
-    let clearEntry: (() => void) | undefined
-    let identity: string | undefined
+  ctx.effect(() => {
+    let currentId: string | undefined
+    let dispose: (() => void) | undefined
     let generation = 0
-    let disposed = false
-
-    const clear = () => {
-      clearEntry?.()
-      clearEntry = undefined
-      identity = undefined
-    }
-    const refresh = async () => {
-      const current = ++generation
-      if (ctx.accountUi.getSnapshot().view?.status !== 'credential-stored') {
-        clear()
-        return
-      }
-      const result = await Promise.resolve().then(() =>
-        ctx.remote.account.getProfile(ctx.accountUi.clientMetadata(ctx.locale.getSnapshot().active))).catch(() => undefined)
-      if (disposed || current !== generation) return
+    let closed = false
+    const clear = (): void => { currentId = undefined; dispose?.(); dispose = undefined }
+    const refresh = async (): Promise<void> => {
+      const sequence = ++generation
+      if (ctx.accountUi.getSnapshot().view?.status !== 'credential-stored') { clear(); return }
+      const result = await Promise.resolve().then(() => ctx.remote.account.getProfile(
+        ctx.accountUi.clientMetadata(ctx.locale.getSnapshot().active),
+      )).catch(() => undefined)
+      if (closed || sequence !== generation) return
       const profile = result?.ok && result.value?.status === 'ready' ? result.value.value : undefined
-      const role = profile?.role
-      if (!profile || role !== 'admin') { clear(); return }
-      const key = JSON.stringify([profile.id, role])
-      if (identity === key) return
+      if (!profile?.id || profile.role !== 'admin') { clear(); return }
+      if (profile.id === currentId) return
       clear()
-      const removePanel = ctx.slots.register({
-        name: 'main', key: PANEL, locale: NS, inject: () => ({ role, userId: profile.id }),
-      }, AdminSection)
-      const removeMenu = ctx.slots.register({
-        name: 'settings.launcher.actions', id: 'qingclaw-admin', locale: NS,
-        inject: () => ({ role, openPanel: () => ctx.layout.selectPanel(PANEL) }),
-      }, AdminMenuItem)
-      identity = key
-      clearEntry = () => { removeMenu(); removePanel() }
+      const userId = profile.id
+      currentId = userId
+      const attached = ctx.plugin({
+        name: 'qingclaw-admin-account',
+        apply(scope: Context) {
+          const active = (): boolean => !closed && currentId === userId
+          scope.slots.inject('main', () => scope.slots.inject('sidebar.panellist', function* () {
+            yield scope.slots.register({ name: 'main', key: PANEL, locale: NS, inject: () => ({ role: 'admin' as const, userId }) }, AdminSection)
+            yield scope.slots.register({
+              name: 'sidebar.panellist', id: PANEL, order: -18, label: () => t('admin'), locale: NS,
+            }, ({ size }) => createElement(IconSettingsOutlineRegular, { size }))
+          }))
+          scope.effect(() => () => { if (!active()) return }, 'qingclaw-admin: scope lifetime')
+        },
+      })
+      dispose = () => { void attached.dispose() }
     }
-    const offAccount = ctx.on('account-ui/change', (_state, reset) => { if (reset) clear(); void refresh() })
-    const offRefresh = ctx.on('account-ui/refresh', refresh)
+    const changed = ctx.on('account-ui/change', (_view, reset) => { if (reset) clear(); void refresh() })
+    const refreshed = ctx.on('account-ui/refresh', refresh)
     void refresh()
-    return () => { disposed = true; generation++; offAccount(); offRefresh(); clear() }
-  }))
+    return () => { closed = true; ++generation; changed(); refreshed(); clear() }
+  }, 'qingclaw-admin: signed-in surfaces')
 }
