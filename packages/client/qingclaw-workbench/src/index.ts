@@ -52,13 +52,17 @@ interface AccountProfileReader {
 
 /** Host settings for the public feed boundary and optional durable cache. */
 export interface Config {
+  /** Catalog feed the workbench market installs from; empty disables the market. */
   readonly feedUrl: string
   /** Private registry every catalog entry must name; deployment-specific, defaults to the official one. */
   readonly registry: string
   /** Absolute owner-private cache file; omission keeps only the process-local last good value. */
   readonly cacheFile?: string
+  /** How long a durable catalog cache keeps answering before the next read. */
   readonly cacheTtlMs: number
+  /** Deadline of one catalog read. */
   readonly fetchTimeoutMs: number
+  /** Largest catalog response body the cache accepts. */
   readonly maxResponseBytes: number
 }
 

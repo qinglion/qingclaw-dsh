@@ -74,6 +74,8 @@ export interface Config {
   model: Volatile<string>
   /** Adapter-owned reasoning effort; omission follows the provider default. */
   reasoningEffort: Volatile<string | undefined>
+  /** Whether an explicit user choice saved the selection; omission means deployment-owned. */
+  userSelected: Volatile<boolean | undefined>
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-default-model -->
@@ -369,6 +371,8 @@ export interface Config {
 export interface Config {
   /** Override the system Documents directory with a fully qualified path. */
   documentsDirectory?: string
+  /** Directory under Documents that owns the first-use Workspace. */
+  defaultWorkspaceParent?: string
   /** Maximum duration of the operating system's Documents lookup. */
   documentsLookupTimeoutMs?: number
 }
@@ -689,6 +693,24 @@ export interface AccountNotificationsConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-account-notifications -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-ui-brand-qingclaw -->
+<a id="deepseek-aidsh-client-ui-brand-qingclaw"></a>
+
+## `@deepseek-ai/dsh-client-ui-brand-qingclaw`
+
+- `source`: [`packages/client/ui-brand-qingclaw/src/index.ts:13`](../packages/client/ui-brand-qingclaw/src/index.ts)
+
+```ts config-catalog
+/** Splash timing accepted from cordis.yml. */
+export interface Config {
+  /** Minimum time the splash stays on screen, in milliseconds. */
+  minVisibleMs: number
+  /** Absolute cap before the splash retires, in milliseconds. */
+  timeoutMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-brand-qingclaw -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-ui-context-menu -->
 <a id="deepseek-aidsh-client-ui-context-menu"></a>
 
@@ -762,6 +784,10 @@ export interface ContactConfig {
   contactFormUrl: string
   /** Questionnaire source option; empty until Harness is supported by the form. */
   contactSource: string
+  /** Whether Desktop shows the upstream multi-step first-run introduction. */
+  desktopOnboarding: boolean
+  /** Whether sign-in surfaces may hand off to the official API-key editor. */
+  allowApiKey: boolean
 }
 
 /** Persisted steps; a native top-up page leaves the durable step at credit. */
@@ -5586,6 +5612,60 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
 
+<!-- BEGIN GENERATED config-catalog:@qinglion/dsh-llm-qingclaw-account -->
+<a id="qingliondsh-llm-qingclaw-account"></a>
+
+## `@qinglion/dsh-llm-qingclaw-account`
+
+- `inject`: `llm` · `deepseekAccount`
+- `refs`: [`ModelListingConfig`](../packages/llm/llm-deepseek/src/index.ts) · [`ModelOverride`](../packages/llm/llm-deepseek/src/index.ts) · [`ProtocolConfig`](../packages/llm/llm-deepseek/src/index.ts) · `Volatile` (`@deepseek-ai/cordis`)
+- `source`: [`packages/llm/llm-qingclaw-account/src/config.ts:21`](../packages/llm/llm-qingclaw-account/src/config.ts)
+
+```ts config-catalog
+/** QingClaw account route configuration; authentication comes from the account service. */
+export interface Config extends Omit<ProtocolConfig, 'models'>, ModelListingConfig {
+  /** Field overrides by model id, layered over the website catalog entry. */
+  modelOverrides: Volatile<Record<string, ModelOverride>>
+  /** Maximum duration of one device-session-to-model-token exchange. */
+  modelTokenTimeoutMs: Volatile<number>
+  /** Website-managed model catalog URL; empty derives it from the inference origin. */
+  catalogURL: Volatile<string>
+  /** Default image-generation model. */
+  imageModel: Volatile<string>
+  /** Default video-generation model. */
+  videoModel: Volatile<string>
+  /** Default speech-generation model. */
+  audioModel: Volatile<string>
+}
+```
+<!-- END GENERATED config-catalog:@qinglion/dsh-llm-qingclaw-account -->
+
+<!-- BEGIN GENERATED config-catalog:@qinglion/dsh-qingclaw-workbench -->
+<a id="qingliondsh-qingclaw-workbench"></a>
+
+## `@qinglion/dsh-qingclaw-workbench`
+
+- `source`: [`packages/client/qingclaw-workbench/src/index.ts:54`](../packages/client/qingclaw-workbench/src/index.ts)
+
+```ts config-catalog
+/** Host settings for the public feed boundary and optional durable cache. */
+export interface Config {
+  /** Catalog feed the workbench market installs from; empty disables the market. */
+  readonly feedUrl: string
+  /** Private registry every catalog entry must name; deployment-specific, defaults to the official one. */
+  readonly registry: string
+  /** Absolute owner-private cache file; omission keeps only the process-local last good value. */
+  readonly cacheFile?: string
+  /** How long a durable catalog cache keeps answering before the next read. */
+  readonly cacheTtlMs: number
+  /** Deadline of one catalog read. */
+  readonly fetchTimeoutMs: number
+  /** Largest catalog response body the cache accepts. */
+  readonly maxResponseBytes: number
+}
+```
+<!-- END GENERATED config-catalog:@qinglion/dsh-qingclaw-workbench -->
+
 ## 无配置的可加载插件
 
 这些插件通过 `cordis.yml` 中不含 `config:` 块的条目加载；它们未声明任何配置接口。
@@ -5695,6 +5775,7 @@ export interface Config {
 | `@deepseek-ai/dsh-message-quotes` | — | [`packages/session/message-quotes/src/index.ts`](../packages/session/message-quotes/src/index.ts) |
 | `@deepseek-ai/dsh-otel` | — | [`packages/telemetry/otel/src/index.ts`](../packages/telemetry/otel/src/index.ts) |
 | `@deepseek-ai/dsh-plugin-recommendations` | `pluginManager` · `agents` · `skills` · `actionCards` | [`packages/extensions/plugin-recommendations/src/index.ts`](../packages/extensions/plugin-recommendations/src/index.ts) |
+| `@deepseek-ai/dsh-qingclaw-bundle` | `agents` · `tools` | [`packages/bundle/qingclaw/src/index.ts`](../packages/bundle/qingclaw/src/index.ts) |
 | `@deepseek-ai/dsh-sandbox-ssh` | `ssh` | [`packages/ssh/sandbox-ssh/src/index.ts`](../packages/ssh/sandbox-ssh/src/index.ts) |
 | `@deepseek-ai/dsh-session` | — | [`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts) |
 | `@deepseek-ai/dsh-session-checkpoint-policy` | `llm` · `sessionPersistence` · `sessions` · `tools` | [`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts) |
@@ -5717,6 +5798,10 @@ export interface Config {
 | `@deepseek-ai/dsh-user-questions` | — | [`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts) |
 | `@deepseek-ai/dsh-webhook` | `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` | [`packages/experimental/webhook/src/index.ts`](../packages/experimental/webhook/src/index.ts) |
 | `@deepseek-ai/dsh-workspace` | `storageDomain` · `sessionPersistence` | [`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts) |
+| `@qinglion/dsh-client-ui-qingclaw-account` | — | [`packages/client/qingclaw-account/src/index.ts`](../packages/client/qingclaw-account/src/index.ts) |
+| `@qinglion/dsh-client-ui-qingclaw-admin` | `connection` · `deepseekAccount` | [`packages/client/qingclaw-admin/src/index.ts`](../packages/client/qingclaw-admin/src/index.ts) |
+| `@qinglion/dsh-client-ui-qingclaw-feedback` | — | [`packages/client/qingclaw-feedback/src/index.ts`](../packages/client/qingclaw-feedback/src/index.ts) |
+| `@qinglion/dsh-qingclaw-creator` | `workspaceRegistry` · `sessions` · `deepseekAccount` · `connection` · `skills` · `tools` | [`packages/client/qingclaw-creator/src/index.ts`](../packages/client/qingclaw-creator/src/index.ts) |
 <!-- END GENERATED config-catalog:no-config -->
 
 ## Seam 包（不可直接加载）
