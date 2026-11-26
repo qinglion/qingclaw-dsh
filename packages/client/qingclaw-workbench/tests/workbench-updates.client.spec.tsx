@@ -35,6 +35,7 @@ async function mount(installedVersion: () => string | undefined, enabled = () =>
     },
   } as never)
   ctx.provide('layout', { selectPanel: vi.fn() } as never)
+  ctx.provide('accountUi', { getSnapshot: () => ({ view: undefined, failed: false }) } as never)
   const root = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' },
     'sidebar.panellist': { kind: 'list', scope: 'root' } } } as never, () => null)
   const store = createWorkbenchPluginStore(ctx)

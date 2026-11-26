@@ -18,6 +18,16 @@ export interface AccountUi {
    * @returns this client's version, language, and timezone.
    */
   clientMetadata(locale: string): AccountClientMetadata
+  /**
+   * Show the Platform page that sells the professional plan and credits, the
+   * destination the account surfaces open for a top-up: the native page on
+   * Desktop, a new tab in a browser when the account supplies its address.
+   * @param onReturned - runs once the viewer comes back, after the native page
+   * closes or on the window's next focus for a browser tab; omitted by surfaces
+   * that hold no post-return work.
+   * @returns nothing; the shared Platform host owns the page while it shows.
+   */
+  openTopUp(onReturned?: () => void): void
 }
 
 /** Account-menu facts supplied to its feedback row. */

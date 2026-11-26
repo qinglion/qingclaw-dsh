@@ -3948,7 +3948,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.launcher.actions\', () => ctx.slots.register(\n      { name: \'settings.launcher.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:57',
+    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:67',
   },
   {
     key: 'settings.launcher.feedback',
@@ -3983,7 +3983,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.launcher.feedback\', () => ctx.slots.register(\n      { name: \'settings.launcher.feedback\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:65',
+    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:75',
   },
   {
     key: 'settings.launcher.notifications',
@@ -4017,7 +4017,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.launcher.notifications\', () => ctx.slots.register(\n      { name: \'settings.launcher.notifications\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:59',
+    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:69',
   },
   {
     key: 'settings.launcher.tools',
@@ -4069,7 +4069,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.launcher.tools\', () => ctx.slots.register(\n      { name: \'settings.launcher.tools\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:55',
+    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:65',
   },
   {
     key: 'settings.models.footer',

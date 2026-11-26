@@ -20,6 +20,7 @@
     { "path": "../ui-renderer" },
     { "path": "../ui-sidebar" },
     { "path": "../ui-slots" },
+    { "path": "../ui-settings-account" },
     { "path": "../../typert/protocol" },
     { "path": "../../boot/plugin-manager" },
     { "path": "../../util/crypto" }

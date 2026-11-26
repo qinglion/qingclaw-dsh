@@ -69,7 +69,6 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { avatar.dispose() }, 'account: profile picture lifetime')
   /** @param locale - requested language. @returns client metadata with the current timezone. */
   const client = (locale: string) => accountClientMetadata(locale, process.env.DSH_CLIENT_VERSION)
-  ctx.provide('accountUi', { getSnapshot: () => snapshot, clientMetadata: client })
   let revision = 0
   let refreshing: Promise<void> | undefined
   const refresh = (): Promise<void> => {
@@ -193,6 +192,39 @@ export function apply(ctx: Context): void {
       onClose(reason)
       if (reason === 'returned' && page === 'top-up') void refreshAfterReturn(refreshing, reRead)
     })
+  /** The window focus a browser tab's return waits for; a later request replaces the earlier one. */
+  let browserReturn: (() => void) | undefined
+  /**
+   * Show the Platform page that sells the professional plan and credits for a
+   * surface that owns no page container of its own.
+   * @param onReturned - runs when the viewer comes back from that page.
+   * @returns nothing; the account surfaces read the account again on their own terms.
+   */
+  const openTopUp = (onReturned?: () => void): void => {
+    if (nativePlatform !== undefined) {
+      platformPages.open('top-up', (reason) => {
+        if (reason !== 'returned') return
+        void refreshAfterReturn(refreshing, refreshAccount)
+        onReturned?.()
+      })
+      return
+    }
+    const url = snapshot.view?.links.topUpUrl
+    if (url === undefined || url === '') return
+    window.open(url, '_blank', 'noopener,noreferrer')
+    if (onReturned === undefined) return
+    // A browser tab cannot report its own return, so the window's next focus is the viewer coming back.
+    const previous = browserReturn
+    const focus = (): void => {
+      browserReturn = undefined
+      window.removeEventListener('focus', focus)
+      onReturned()
+    }
+    browserReturn = focus
+    window.addEventListener('focus', focus)
+    if (previous !== undefined) window.removeEventListener('focus', previous)
+  }
+  ctx.provide('accountUi', { getSnapshot: () => snapshot, clientMetadata: client, openTopUp })
   const operations: AccountSectionInjected = {
     allowApiKey: config.allowApiKey,
     avatarFailed: (value) => { avatar.failed(value) },

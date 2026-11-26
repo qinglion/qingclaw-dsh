@@ -3,12 +3,17 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings-account/client'
 import type { PluginInstallLogChunk, PluginInstallProgress, PluginInstallRequestId } from '@deepseek-ai/dsh-plugin-manager/types'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type {} from '@qinglion/dsh-qingclaw-workbench/remote'
-import type { WorkbenchActiveInstall, WorkbenchCatalogEntry, WorkbenchInstallResult, WorkbenchPendingOperation } from '../types.ts'
+import type {
+  ProEntitlement, WorkbenchActiveInstall, WorkbenchCatalogEntry, WorkbenchInstallResult, WorkbenchPendingOperation,
+} from '../types.ts'
+import type { WorkbenchLocaleKey } from './locales.ts'
 import { workbenchPanelIcon } from './WorkbenchPanelIcon.tsx'
 
+/** One directory entry projected with this client's inventory, favorites, and operation state. */
 export interface WorkbenchPluginItem extends WorkbenchCatalogEntry {
   readonly id: string
   readonly iconUrl?: string
@@ -22,9 +27,17 @@ export interface WorkbenchPluginItem extends WorkbenchCatalogEntry {
   readonly installable: boolean
   readonly openable: boolean
   readonly favorite: boolean
+  /** A registry installation or update needs the professional licence this signed-in account does not have yet. */
+  readonly upgradeRequired: boolean
   readonly restartRequired?: boolean
   /** The operation this row is running; it survives page switches and reloads while the Host runs it. */
   readonly pending?: WorkbenchPendingOperation
+}
+
+/** One failure the market reports through the shell's transient notice, identified by its sequence. */
+export interface WorkbenchNotice {
+  readonly key: WorkbenchLocaleKey
+  readonly seq: number
 }
 
 export interface WorkbenchReadmeDocument {
@@ -39,6 +52,14 @@ export interface WorkbenchPluginStore {
   snapshot(): readonly WorkbenchPluginItem[]
   install(id: string): Promise<void>
   update(id: string): Promise<void>
+  /** Re-read the professional licence, for a viewer back from the subscription page. */
+  refreshEntitlement(): Promise<void>
+  /** The failure a notice surface must show now, clearing it once that surface dismissed it. */
+  notice(): WorkbenchNotice | undefined
+  /** Report one localized operation failure as a transient notice. */
+  notifyNotice(key: WorkbenchLocaleKey): void
+  /** Clear the notice after its toast finished. */
+  dismissNotice(): void
   uninstall(id: string): Promise<void>
   setEnabled(id: string, enabled: boolean): Promise<void>
   open(id: string): void
@@ -154,6 +175,10 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   let managed = new Set<string>()
   /** Installed bundles the profile has selected; a disabled one stays installed but inert. */
   let enabledBundles = new Set<string>()
+  /** The signed-in account's professional licence; absent while signed out or when the account cannot answer. */
+  let licence: ProEntitlement | undefined
+  let notice: WorkbenchNotice | undefined
+  let noticeSeq = 0
   let reading: Promise<void> | undefined
   let disposed = false
   const notify = (): void => { if (!disposed) for (const listener of listeners) listener() }
@@ -213,13 +238,26 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     notify()
   }
 
+  /** The licence the account currently holds, or undefined when it is signed out or cannot answer. */
+  async function readEntitlement(): Promise<ProEntitlement | undefined> {
+    if (ctx.accountUi.getSnapshot().view?.status !== 'credential-stored') return undefined
+    try {
+      const answer = await ctx.remote.qingclawWorkbench.getEntitlement()
+      return answer.ok ? answer.value : undefined
+    } catch {
+      // An unanswered read leaves the licence unknown, which keeps the plain installation action.
+      return undefined
+    }
+  }
+
   async function read(refresh: boolean): Promise<void> {
-    const [catalog, bundles] = await Promise.all([
-      ctx.remote.qingclawWorkbench.getWorkbenchCatalog(refresh), ctx.remote.pluginManager.listBundles(),
+    const [catalog, bundles, entitlement] = await Promise.all([
+      ctx.remote.qingclawWorkbench.getWorkbenchCatalog(refresh), ctx.remote.pluginManager.listBundles(), readEntitlement(),
     ])
     if (disposed) return
     if (!catalog.ok) throw new Error(catalog.error.message)
     if (!bundles.ok) throw new Error(bundles.error.message)
+    licence = entitlement
     entries = catalog.value.entries
     offline = catalog.value.stale
     installed = new Map(bundles.value.filter(bundle => bundle.availability !== 'missing'
@@ -267,6 +305,7 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       const openable = has && hasMain(entry.panelId)
       const operation = pending.get(entry.packageName)
       return { ...entry, id: entry.packageName, installed: has, installable: !has && !offline, openable,
+        upgradeRequired: !offline && licence?.active === false,
         enabled: !has || enabledBundles.has(entry.packageName),
         favorite: favorites.has(entry.packageName),
         updateAvailable: has && managed.has(entry.packageName) && installedVersion !== undefined
@@ -320,6 +359,14 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     if (existing !== undefined) return existing.promise
     if (!present(id)) return install(id)
     return run(id, 'update')
+  }
+
+  /** Re-read the licence without reloading the directory, for a viewer back from the subscription page. */
+  async function refreshEntitlement(): Promise<void> {
+    const next = await readEntitlement()
+    if (disposed) return
+    licence = next
+    notify()
   }
 
   async function uninstall(id: string): Promise<void> {
@@ -399,6 +446,8 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   }
   const disposers = [
     ctx.remote.$on('plugin-manager/changed', changed),
+    // A licence that starts or lapses elsewhere changes which action the market offers.
+    ctx.on('account-ui/change', changed),
     ctx.remote.$on('plugin-manager/install-state', installState),
     ctx.remote.$on('plugin-manager/install-log', installLog),
     ctx.slots.subscribe('main', () => { syncSidebars(); notify() }),
@@ -411,7 +460,10 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   // Restore already-installed launchers and in-flight installations before the user opens the directory.
   void load().catch(() => undefined)
   return {
-    load, snapshot: project, install, update, uninstall, setEnabled,
+    load, snapshot: project, install, update, uninstall, setEnabled, refreshEntitlement,
+    notice: () => notice,
+    notifyNotice(key) { notice = { key, seq: ++noticeSeq }; notify() },
+    dismissNotice() { notice = undefined; notify() },
     async readReadme(id, version, language) {
       const entry = find(id)
       if (entry.version !== version) throw new Error('工作台版本已变更')

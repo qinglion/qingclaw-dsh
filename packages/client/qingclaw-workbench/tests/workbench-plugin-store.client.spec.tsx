@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { expect, it, vi } from 'vitest'
 import { createWorkbenchPluginStore, needsSignIn } from '../src/client/workbench-plugin-store.ts'
-import type { WorkbenchInstallResult } from '../src/types.ts'
+import type { ProEntitlement, WorkbenchInstallResult } from '../src/types.ts'
 
 /** One Host answer as the Remote boundary delivers it. */
 type Answer<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
@@ -30,6 +30,7 @@ it('installs the exact private package, opens a registered panel, and restores f
   } } as never)
   const selectPanel = vi.fn()
   ctx.provide('layout', { selectPanel } as never)
+  ctx.provide('accountUi', { getSnapshot: () => ({ view: undefined, failed: false }) } as never)
   const root = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' },
     'sidebar.panellist': { kind: 'list', scope: 'root' } } } as never, () => null)
   window.localStorage.clear()
@@ -80,6 +81,84 @@ it('installs the exact private package, opens a registered panel, and restores f
   } finally { store.dispose(); root(); window.localStorage.clear(); await ctx.fiber.dispose() }
 })
 
+it('offers the upgrade while the account holds no licence and installs once it buys one', async () => {
+  let signedIn = false
+  let active = false
+  const { ctx, store, root, setInstalled } = await mountProgress({
+    signedIn: () => signedIn,
+    entitlement: () => ({ ok: true, value: { active, plan: active ? 'pro' : null, endsAt: null } }),
+  })
+  try {
+    // Signed out, the market keeps the installation action, which asks for a sign-in first.
+    expect((await store.load())[0]?.upgradeRequired).toBe(false)
+    signedIn = true
+    active = false
+    await store.load(true)
+    expect(store.snapshot()[0]?.upgradeRequired).toBe(true)
+    // An installed copy is refused an update the same way, so it offers the same action.
+    setInstalled(true)
+    await store.load(true)
+    expect(store.snapshot()[0]?.upgradeRequired).toBe(true)
+    setInstalled(false)
+    // The purchase lands on the account, so the viewer's return re-reads the licence.
+    active = true
+    await store.refreshEntitlement()
+    expect(store.snapshot()[0]?.upgradeRequired).toBe(false)
+  } finally { store.dispose(); root(); await ctx.fiber.dispose() }
+})
+
+it('re-reads the licence when the account changes elsewhere', async () => {
+  let active = false
+  const { ctx, store, root } = await mountProgress({
+    signedIn: () => true,
+    entitlement: () => ({ ok: true, value: { active, plan: active ? 'pro' : null, endsAt: null } }),
+  })
+  try {
+    expect((await store.load())[0]?.upgradeRequired).toBe(true)
+    active = true
+    ctx.emit('account-ui/change', { view: undefined, failed: false }, true)
+    await vi.waitFor(() => expect(store.snapshot()[0]?.upgradeRequired).toBe(false))
+  } finally { store.dispose(); root(); await ctx.fiber.dispose() }
+})
+
+it('keeps the installation action when the licence cannot be read', async () => {
+  const { ctx, store, root, setEntitlement } = await mountProgress({
+    signedIn: () => true,
+    entitlement: () => ({ ok: false, error: { code: 'gateway/internal', message: 'offline' } }),
+  })
+  try {
+    expect((await store.load())[0]?.upgradeRequired).toBe(false)
+    // A transport failure is not a refusal: the account keeps its installation action.
+    const read = vi.fn(async (): Promise<Answer<ProEntitlement>> => { throw new Error('offline') })
+    setEntitlement(read)
+    await store.refreshEntitlement()
+    expect(store.snapshot()[0]?.upgradeRequired).toBe(false)
+    // A disposed store settles a late return read without publishing it.
+    store.dispose()
+    await store.refreshEntitlement()
+    expect(read).toHaveBeenCalledTimes(2)
+  } finally { store.dispose(); root(); await ctx.fiber.dispose() }
+})
+
+it('publishes operation failures for the overlay that shows them', async () => {
+  const { ctx, store, root } = await mountProgress()
+  try {
+    expect(store.notice()).toBeUndefined()
+    let notified = 0
+    const stop = store.subscribe(() => { notified += 1 })
+    store.notifyNotice('installError')
+    // The sequence identifies one showing, so the same message restarts the toast.
+    expect(store.notice()).toEqual({ key: 'installError', seq: 1 })
+    expect(notified).toBe(1)
+    store.notifyNotice('installError')
+    expect(store.notice()).toEqual({ key: 'installError', seq: 2 })
+    store.dismissNotice()
+    expect(store.notice()).toBeUndefined()
+    expect(notified).toBe(3)
+    stop()
+  } finally { store.dispose(); root(); await ctx.fiber.dispose() }
+})
+
 /** A promise whose settlement the test controls. */
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -98,6 +177,10 @@ async function mountProgress(options: {
   catalog?: () => Promise<unknown>
   bundles?: () => Promise<unknown>
   activeDelay?: Promise<unknown>
+  /** Whether the account stream reports a stored credential. */
+  signedIn?: () => boolean
+  /** The licence the account reads back, or the failure the Remote boundary reports. */
+  entitlement?: () => { ok: true; value: ProEntitlement } | { ok: false; error: { code: string; message: string } }
 } = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry)
@@ -122,6 +205,8 @@ async function mountProgress(options: {
   const readBundleDetail = vi.fn(async (): Promise<DetailAnswer> =>
     ({ ok: true, value: { status: 'found', path: 'README.md', markdown: 'doc' } }))
   const getWorkbenchReadme = vi.fn(async (): Promise<{ ok: boolean; value: string | null }> => ({ ok: true, value: 'registry doc' }))
+  let entitlementRead: () => Answer<ProEntitlement> | Promise<Answer<ProEntitlement>> =
+    options.entitlement ?? (() => ({ ok: true, value: { active: false, plan: null, endsAt: null } }))
   ctx.provide('remote', {
     $on: (event: string, handler: (payload: never) => void) => { handlers.set(event, handler); return () => { handlers.delete(event) } },
     qingclawWorkbench: {
@@ -131,6 +216,7 @@ async function mountProgress(options: {
       getWorkbenchReadme,
       installWorkbench,
       updateWorkbench,
+      getEntitlement: async () => entitlementRead(),
     },
     pluginManager: {
       listBundles: options.bundles ?? (async () => ({ ok: true, value: installed
@@ -142,6 +228,9 @@ async function mountProgress(options: {
     },
   } as never)
   ctx.provide('layout', { selectPanel: vi.fn() } as never)
+  ctx.provide('accountUi', {
+    getSnapshot: () => ({ view: options.signedIn?.() === true ? { status: 'credential-stored' } : undefined, failed: false }),
+  } as never)
   const root = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' },
     'sidebar.panellist': { kind: 'list', scope: 'root' } } } as never, () => null)
   const store = createWorkbenchPluginStore(ctx)
@@ -150,7 +239,8 @@ async function mountProgress(options: {
     ({ requestId, jobId: 'job', argv: ['pnpm', 'add'], cwd: '/profile', stream: 'stderr', text })
   return { ctx, store, root, installWorkbench, updateWorkbench, removeBundle, setBundleEnabled,
     readBundleDetail, getWorkbenchReadme, emit, chunk,
-    setInstalled: (value: boolean) => { installed = value } }
+    setInstalled: (value: boolean) => { installed = value },
+    setEntitlement: (read: () => Answer<ProEntitlement> | Promise<Answer<ProEntitlement>>) => { entitlementRead = read } }
 }
 
 it('keeps install progress in the store across page switches and deduplicates clicks', async () => {

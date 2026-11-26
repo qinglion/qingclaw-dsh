@@ -1,7 +1,8 @@
 /** The built-in QingClaw workbench directory. */
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Button, IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconDownloadOutlineRegular, IconTrashOutlineRegular,
+  Button, IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconDownloadOutlineRegular,
+  IconRightUpOutlineRegular, IconTrashOutlineRegular,
   Modal, PluginArtworkDefault, Switch, Tag, IconRefreshOutlineRegular, IconSearchOutlineRegular, Input, SegmentedControl,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
@@ -15,6 +16,8 @@ import css from './WorkbenchPage.module.css'
 export interface WorkbenchPageInjected {
   readonly pluginStore: WorkbenchPluginStore
   readonly hooks: { readonly locale: HostObservable<LocaleSnapshot> }
+  /** Show the page where the professional licence is bought, for a listing this account cannot install yet. */
+  readonly openSubscriptionPage: (onReturned?: () => void) => void
 }
 
 export type WorkbenchPageProps = PropsRuntime<'main'>
@@ -32,6 +35,7 @@ interface ItemActions {
   /** The product page hides the installed label; its actions already say what the state is. */
   detail?: boolean
   onInstall(): void
+  onUpgrade(): void
   onUpdate(): void
   onUninstall(): void
   onSetEnabled(enabled: boolean): void
@@ -64,7 +68,14 @@ function WorkbenchProgress({ pending, t, name }: {
   </div>
 }
 
-function WorkbenchActions({ item, t, pending, busy, detail, onInstall, onUpdate, onOpen, onFavorite }: ItemActions): ReactNode {
+/** The one action a listing offers while this account holds no professional licence. */
+function UpgradeAction({ t, onUpgrade }: Pick<ItemActions, 't' | 'onUpgrade'>): ReactNode {
+  return <Button variant="primary" size="sm" onClick={onUpgrade} icon={<IconRightUpOutlineRegular size={14} />}>
+    {t('upgrade')}
+  </Button>
+}
+
+function WorkbenchActions({ item, t, pending, busy, detail, onInstall, onUpgrade, onUpdate, onOpen, onFavorite }: ItemActions): ReactNode {
   const favoriteLabel = t(item.favorite ? 'unfavorite' : 'favorite')
   const pendingInstall = pending !== undefined && (pending.kind === 'install' || pending.kind === 'update')
   return <div className={css.actions}>
@@ -75,10 +86,14 @@ function WorkbenchActions({ item, t, pending, busy, detail, onInstall, onUpdate,
     </button>
     {item.installed
       ? <>
-        {item.updateAvailable && <Button variant="primary" size="sm" disabled={busy} onClick={onUpdate}
-          icon={<IconDownloadOutlineRegular size={14} />}>
-          {t(pending?.kind === 'update' ? 'updating' : 'update', { version: item.version })}
-        </Button>}
+        {item.updateAvailable && (item.upgradeRequired && !pendingInstall
+          // The registry refuses an update without the licence too, so its action
+          // leads to the purchase instead of a failure notice.
+          ? <UpgradeAction t={t} onUpgrade={onUpgrade} />
+          : <Button variant="primary" size="sm" disabled={busy} onClick={onUpdate}
+            icon={<IconDownloadOutlineRegular size={14} />}>
+            {t(pending?.kind === 'update' ? 'updating' : 'update', { version: item.version })}
+          </Button>)}
         {item.enabled
           ? item.openable
             ? <Button variant="outline" size="sm" onClick={onOpen}>{t('open')}</Button>
@@ -88,13 +103,17 @@ function WorkbenchActions({ item, t, pending, busy, detail, onInstall, onUpdate,
             </span>
           : <Tag tone="neutral">{t('disabled')}</Tag>}
       </>
-      : <Button variant="primary" size="sm" disabled={busy || !item.installable} onClick={onInstall}
-        title={busy && !pendingInstall ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
-        {t(pending === undefined ? (item.installable ? 'install' : 'offlineInstall')
-          : pending.kind === 'update' ? 'updating'
-            : pending.phase === 'download' ? 'downloading'
-              : pending.phase === 'apply' ? 'applying' : 'installing')}
-      </Button>}
+      : item.upgradeRequired
+        // A licence is bought on the Platform, so the action leads there instead of
+        // promising an installation the registry will refuse.
+        ? <UpgradeAction t={t} onUpgrade={onUpgrade} />
+        : <Button variant="primary" size="sm" disabled={busy || !item.installable} onClick={onInstall}
+          title={busy && !pendingInstall ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
+          {t(pending === undefined ? (item.installable ? 'install' : 'offlineInstall')
+            : pending.kind === 'update' ? 'updating'
+              : pending.phase === 'download' ? 'downloading'
+                : pending.phase === 'apply' ? 'applying' : 'installing')}
+        </Button>}
   </div>
 }
 
@@ -160,12 +179,11 @@ function WorkbenchPreviews({ item, t }: { item: WorkbenchPluginItem; t: Translat
   </>
 }
 
-function WorkbenchDetail({ item, t, actions, onBack, error }: {
+function WorkbenchDetail({ item, t, actions, onBack }: {
   item: WorkbenchPluginItem
   t: TranslateNS<typeof NS>
   actions: ItemActions
   onBack(): void
-  error?: WorkbenchLocaleKey
 }): ReactNode {
   const heading = useRef<HTMLHeadingElement>(null)
   const titleId = useId()
@@ -198,7 +216,6 @@ function WorkbenchDetail({ item, t, actions, onBack, error }: {
     {actions.pending && (actions.pending.kind === 'install' || actions.pending.kind === 'update') &&
       <WorkbenchProgress pending={actions.pending} t={t} name={item.title} />}
     {item.description && <p className={css.summary}>{item.description}</p>}
-    {error && <p className={css.error} role="alert">{t(error)}</p>}
     <WorkbenchPreviews item={item} t={t} />
     {item.links?.length ? <section className={css.linksSection}>
       <h2>{t('relatedLinks')}</h2>
@@ -222,10 +239,11 @@ function WorkbenchDetail({ item, t, actions, onBack, error }: {
 }
 
 /** Keep the current catalog visible during refresh and discard out-of-order responses. */
-export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode {
+export function WorkbenchPage({ pluginStore, openSubscriptionPage, t }: WorkbenchPageProps): ReactNode {
   const [items, setItems] = useState<readonly WorkbenchPluginItem[] | undefined>()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<WorkbenchLocaleKey>()
+  /** The directory read failed; the market keeps its rows and offers a retry. */
+  const [loadFailed, setLoadFailed] = useState(false)
   const [tab, setTab] = useState<Tab>('market')
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('')
@@ -242,10 +260,10 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
       const result = await pluginStore.load(refresh)
       if (request === generation.current) {
         setItems(result)
-        setError(current => current === 'loadError' ? undefined : current)
+        setLoadFailed(false)
       }
     } catch {
-      if (request === generation.current) setError('loadError')
+      if (request === generation.current) setLoadFailed(true)
     } finally {
       if (request === generation.current) setLoading(false)
     }
@@ -258,12 +276,13 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
     return () => { generation.current++; unsubscribe() }
   }, [pluginStore, load])
 
+  // An operation the registry refused reports through the floating notice, so the
+  // cards keep their layout instead of pushing a banner into the grid.
   const act = async (action: () => void | Promise<void>, failure: WorkbenchLocaleKey) => {
-    setError(undefined)
     try {
       await action()
     } catch (error) {
-      setError(needsSignIn(error) ? 'signInRequired' : needsPro(error) ? 'proRequired' : failure)
+      pluginStore.notifyNotice(needsSignIn(error) ? 'signInRequired' : needsPro(error) ? 'proRequired' : failure)
     }
   }
 
@@ -286,6 +305,9 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
   function actions(item: WorkbenchPluginItem): ItemActions {
     return { item, t, pending: item.pending, busy,
       onInstall: () => { void act(() => pluginStore.install(item.id), 'installError') },
+      // The licence lands on the account, so coming back from its page re-reads it
+      // and lets the same card offer the installation.
+      onUpgrade: () => { openSubscriptionPage(() => { void pluginStore.refreshEntitlement() }) },
       onUpdate: () => { void act(() => pluginStore.update(item.id), 'updateError') },
       onUninstall: () => { void act(() => pluginStore.uninstall(item.id), 'uninstallError') },
       onSetEnabled: (enabled) => { void act(() => pluginStore.setEnabled(item.id, enabled), 'toggleError') },
@@ -306,8 +328,7 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
     : tab === 'favorites' ? 'emptyFavorites' : tab === 'installed' ? 'emptyInstalled' : 'emptyMarket'
   return <main className={css.page} ref={page}>
     {detail && <div className={css.content}><WorkbenchDetail item={detail} t={t} actions={actions(detail)}
-      onBack={() => { setError(undefined); setDetailId(undefined) }}
-      {...(error && { error })} /></div>}
+      onBack={() => { setDetailId(undefined) }} /></div>}
     <div className={css.content} hidden={Boolean(detail)}>
       <header className={css.header}>
         <h1 ref={listHeading} tabIndex={-1}>{t('title')}</h1>
@@ -326,11 +347,11 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
             {categories.map(name => <option key={name}>{name}</option>)}
           </select>}
           <Button variant="ghost" size="sm" aria-label={t('refresh')} title={t('refresh')}
-            disabled={loading} onClick={() => { setError(undefined); void load(true) }}
+            disabled={loading} onClick={() => { setLoadFailed(false); void load(true) }}
             icon={<IconRefreshOutlineRegular size={15} />} />
         </div>
       </div>
-      {error && <p className={css.error} role="alert">{t(error)}</p>}
+      {loadFailed && <p className={css.error} role="alert">{t('loadError')}</p>}
       <section className={css.results} id={`${tabsId}-${tab}-panel`} role="tabpanel"
         aria-labelledby={`${tabsId}-${tab}`} aria-busy={loading}>
         {loading && items === undefined && <p className={css.empty} role="status">{t('loading')}</p>}
@@ -341,7 +362,6 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
         <div className={css.grid}>
           {visible.map(item => <WorkbenchCard key={item.id} {...actions(item)} onDetails={(button) => {
             returnTo.current = { button, scroll: page.current?.scrollTop ?? 0 }
-            setError(undefined)
             setDetailId(item.id)
           }} />)}
         </div>

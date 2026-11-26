@@ -18,7 +18,7 @@ const media: WorkbenchPluginItem = {
   category: '创作', version: '1.0.0', packageName: '@example/media',
   panelId: 'media', registry: 'https://npm.qingclaw.com/',
   installed: false, installable: true, openable: false, favorite: false, updateAvailable: false, enabled: true,
-  previewUrl: 'https://example.com/media-preview.png',
+  upgradeRequired: false, previewUrl: 'https://example.com/media-preview.png',
 }
 const notes: WorkbenchPluginItem = {
   ...media, id: 'notes', panelId: 'notes', title: '研究笔记', category: '研究', author: '研究组', packageName: '@example/notes',
@@ -42,11 +42,22 @@ function setup(initial = [media, notes]) {
     uninstall: vi.fn(async (id: string) => update(id, { installed: false, openable: false })),
     setEnabled: vi.fn(async (id: string, enabled: boolean) => update(id, { enabled })),
     open: vi.fn(),
+    notifyNotice: vi.fn((_key: Parameters<WorkbenchPluginStore['notifyNotice']>[0]) => {}),
+    dismissNotice: vi.fn(),
+    notice: vi.fn(() => undefined),
+    // The licence lands on the account, so every listing drops the upgrade action at once.
+    refreshEntitlement: vi.fn(async () => {
+      items = items.map(item => item.upgradeRequired ? { ...item, upgradeRequired: false } : item)
+      notify()
+    }),
     readReadme: vi.fn(async (_id: string, _version: string, _language: string) => ({ markdown: '## 使用指南\n\n在灵感页新建素材。' })),
     dispose: vi.fn(),
   } satisfies WorkbenchPluginStore
-  const page = () => render(<WorkbenchPage {...({ t, useLocale, pluginStore: store } as unknown as WorkbenchPageProps)} />)
-  return { store, page, update }
+  const openSubscriptionPage = vi.fn<(onReturned?: () => void) => void>()
+  const page = () => render(<WorkbenchPage {...({
+    t, useLocale, pluginStore: store, openSubscriptionPage,
+  } as unknown as WorkbenchPageProps)} />)
+  return { store, page, update, openSubscriptionPage }
 }
 
 it('keeps project creation out of the market', async () => {
@@ -114,23 +125,54 @@ it('opens installed workbenches offline and explains why new installs are disabl
   expect(store.open).toHaveBeenCalledWith(notes.id)
 })
 
-it('asks for a signed-in account when the private registry refuses the install or the documentation', async () => {
+it('reports a refused operation through the floating notice instead of a banner in the grid', async () => {
   const { store, page } = setup()
   store.install.mockRejectedValueOnce(Object.assign(new Error('Sign in'), { code: 'qingclaw-workbench/sign-in-required' }))
   page()
   const card = within(await screen.findByRole('article', { name: media.title }))
   fireEvent.click(card.getByRole('button', { name: zh.install }))
-  expect((await screen.findByRole('alert')).textContent).toBe(zh.signInRequired)
-
+  await waitFor(() => expect(store.notifyNotice).toHaveBeenCalledWith('signInRequired'))
+  // The market keeps its cards and spacing; nothing is pushed into the grid.
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(screen.getByRole('article', { name: media.title })).toBeTruthy()
+  store.install.mockRejectedValueOnce(Object.assign(new Error('Pro'), { code: 'qingclaw-workbench/pro-required' }))
+  fireEvent.click(card.getByRole('button', { name: zh.install }))
+  await waitFor(() => expect(store.notifyNotice).toHaveBeenLastCalledWith('proRequired'))
+  // A failure the registry did not classify keeps the operation's own message.
+  store.install.mockRejectedValueOnce(new Error('disk full'))
+  fireEvent.click(card.getByRole('button', { name: zh.install }))
+  await waitFor(() => expect(store.notifyNotice).toHaveBeenLastCalledWith('installError'))
 })
 
-it('asks for the professional plan when the installation needs the licence', async () => {
-  const { store, page } = setup()
-  store.install.mockRejectedValueOnce(Object.assign(new Error('Pro'), { code: 'qingclaw-workbench/pro-required' }))
+it('offers the professional upgrade instead of an installation the registry would refuse', async () => {
+  const { page, store, openSubscriptionPage } = setup([{ ...media, upgradeRequired: true }, notes])
   page()
   const card = within(await screen.findByRole('article', { name: media.title }))
-  fireEvent.click(card.getByRole('button', { name: zh.install }))
-  expect((await screen.findByRole('alert')).textContent).toBe(zh.proRequired)
+  expect(card.queryByRole('button', { name: zh.install })).toBeNull()
+  fireEvent.click(card.getByRole('button', { name: zh.upgrade }))
+  expect(store.install).not.toHaveBeenCalled()
+  expect(openSubscriptionPage).toHaveBeenCalledOnce()
+  // Coming back from the page re-reads the licence, and the card offers the installation again.
+  openSubscriptionPage.mock.calls[0]?.[0]?.()
+  await waitFor(() => expect(store.refreshEntitlement).toHaveBeenCalledOnce())
+  await waitFor(() => expect(card.getByRole('button', { name: zh.install })).toBeTruthy())
+  // An installed workbench never offers an upgrade, whatever the account holds.
+  fireEvent.click(screen.getByRole('tab', { name: zh.installed }))
+  expect(within(screen.getByRole('article', { name: notes.title })).queryByRole('button', { name: zh.upgrade })).toBeNull()
+})
+
+it('offers the upgrade instead of an update the registry would refuse', async () => {
+  const { page, store, openSubscriptionPage, update } = setup([{ ...media, installed: true, installable: false,
+    openable: true, installedVersion: '0.9.0', updateAvailable: true, upgradeRequired: true }])
+  page()
+  const card = within(await screen.findByRole('article', { name: media.title }))
+  expect(card.queryByRole('button', { name: '更新到 1.0.0' })).toBeNull()
+  fireEvent.click(card.getByRole('button', { name: zh.upgrade }))
+  expect(store.update).not.toHaveBeenCalled()
+  expect(openSubscriptionPage).toHaveBeenCalledOnce()
+  // An update already running keeps reporting its progress instead of swapping the action.
+  update(media.id, { pending: { kind: 'update', phase: 'install', download: 100, install: 60 } })
+  await waitFor(() => expect(card.getByRole('button', { name: zh.updating })).toBeTruthy())
 })
 
 it('shows the workbench details and installs the exact selection from that page', async () => {
