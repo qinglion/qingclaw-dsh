@@ -9,6 +9,8 @@ import { SignOutDialog } from './SignOutDialog.tsx'
 import { SignInDialog } from './SignInDialog.tsx'
 import { LogoutIcon } from './LogoutIcon.tsx'
 import { AccountAvatar } from './AccountAvatar.tsx'
+import { AccountPlanBadge } from './AccountPlanBadge.tsx'
+import { accountPlanLabelKey, accountPlanTier } from './account-plan.ts'
 import type {} from './account-ui.ts'
 import css from './AccountMenu.module.css'
 
@@ -40,9 +42,12 @@ export function AccountMenu({
   const [expiryNotice, setExpiryNotice] = useState(false)
   useEffect(() => subscribeSessionExpired?.(() => { setExpiryNotice(true) }), [subscribeSessionExpired])
   const profile = account.details?.profile
+  const profileValue = profile?.status === 'ready' ? profile.value : undefined
+  const plan = accountPlanTier(profileValue)
   const signedInFallback = t(allowApiKey ? 'signedIn' : 'signedInGeneric')
-  const label = profile === undefined ? null : profile.status === 'ready'
-    ? profile.value.name || profile.value.contact || signedInFallback : signedInFallback
+  const label = profile === undefined ? null
+    : profileValue === undefined ? signedInFallback
+      : profileValue.name || profileValue.contact || signedInFallback
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
@@ -71,6 +76,8 @@ export function AccountMenu({
           </span>
           : <IconEllipsisOutlineMedium size={14} />}
         {wide && <span className={css.label}>{signedIn ? label : t('more')}</span>}
+        {wide && signedIn && plan !== undefined
+          && <span className={css.plan}><AccountPlanBadge tier={plan} label={t(accountPlanLabelKey(plan))} /></span>}
       </button>}
       items={[
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,

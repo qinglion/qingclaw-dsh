@@ -833,6 +833,37 @@ it('keeps notification DOM inside the launcher while the collapsed rail hides it
   expect(screen.getByRole('status')).toBe(notice)
 })
 
+it.each([
+  { name: 'free account', fields: { plan: 'free' }, label: zh.planFree },
+  { name: 'active professional account', fields: { plan: 'pro', subscriptionActive: true }, label: zh.planPro },
+  { name: 'active team account', fields: { plan: 'team', subscriptionActive: true }, label: zh.planTeam },
+  { name: 'lapsed professional account', fields: { plan: 'pro', subscriptionActive: false }, label: zh.planFree },
+])('labels the $name identity with $label', ({ fields, label }) => {
+  mount({ status: 'credential-stored', attempt: null }, zh, {
+    profile: { status: 'ready', value: { id: null, name: '青狮龙虾', contact: null, ...fields } },
+  })
+  expect(screen.getByText(label)).toBeTruthy()
+})
+
+it('omits the identity badge when the deployment supplies no plan', () => {
+  mount({ status: 'credential-stored', attempt: null }, zh, {
+    profile: { status: 'ready', value: { id: null, name: '青狮龙虾', contact: null } },
+  })
+  expect(screen.queryByText(zh.planFree)).toBeNull()
+  expect(screen.queryByText(zh.planPro)).toBeNull()
+})
+
+it('labels the sidebar launcher with the identity tier and hides it in the collapsed rail', async () => {
+  const operations = operationsOf({ status: 'credential-stored', attempt: null }, {
+    profile: { status: 'ready', value: { id: null, name: '青狮龙虾', contact: null, plan: 'pro', subscriptionActive: true } },
+  })
+  const snapshot = () => operations.hooks.account.getSnapshot()
+  const view = render(await accountMenu(operations, snapshot, false))
+  expect(screen.getByText(en.planPro)).toBeTruthy()
+  view.rerender(await accountMenu(operations, snapshot, false, undefined, undefined, false))
+  expect(screen.queryByText(en.planPro)).toBeNull()
+})
+
 it('displays fractional QingClaw credits when the Platform currency wallets are empty', () => {
   mount({ status: 'credential-stored', attempt: null }, zh, {
     profile: { status: 'ready', value: { id: null, name: null, contact: null, plan: 'free', quotaRemaining: 9_999.123456 } },

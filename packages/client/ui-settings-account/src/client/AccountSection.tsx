@@ -8,6 +8,8 @@ import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { PlatformPage, PlatformPages } from './platform-pages.ts'
 import { formatBalance, formatCredits } from './formatBalance.ts'
 import { AccountAvatar } from './AccountAvatar.tsx'
+import { AccountPlanBadge } from './AccountPlanBadge.tsx'
+import { accountPlanLabelKey, accountPlanTier } from './account-plan.ts'
 import type { AccountAvatarSnapshot } from './account-avatar.ts'
 import { authorizeUrlWithTheme } from './authorize-url.ts'
 import css from './AccountSection.module.css'
@@ -95,6 +97,7 @@ export function AccountSection({
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const profile = details?.profile?.status === 'ready' ? details.profile.value : undefined
+  const plan = accountPlanTier(profile)
   const hasCreditAccount = profile?.plan != null || profile?.quotaRemaining != null
   const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
   const bonusWallets = details?.balance?.status === 'ready'
@@ -166,7 +169,10 @@ export function AccountSection({
             <AccountAvatar avatar={signedIn ? avatar : undefined} avatarFailed={avatarFailed} />
           </span>
           <div className={css.identityCopy}>
-            <span className={css.name}>{signedIn ? profile?.name || signedInFallback : t('signedOut')}</span>
+            <span className={css.nameRow}>
+              <span className={css.name}>{signedIn ? profile?.name || signedInFallback : t('signedOut')}</span>
+              {signedIn && plan !== undefined && <AccountPlanBadge tier={plan} label={t(accountPlanLabelKey(plan))} />}
+            </span>
             <span className={css.status} role="status">{status}</span>
           </div>
         </div>
