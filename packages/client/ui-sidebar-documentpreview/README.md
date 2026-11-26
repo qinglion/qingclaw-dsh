@@ -40,8 +40,6 @@ Document implementations register metadata with `ctx.documentPreviews.register({
 
 `loading: 'text-pages'` and `'bytes-complete'` use the shared file reader. With `'renderer'`, the selected body mounts before any bytes are read and receives `content: { kind: 'renderer', revision, loaded, failed, reload }`. Its injected face owns content loading, errors, store updates, and cancellation. `loaded(version)` records the displayed source version and ends loading. `failed()` ends loading without recording a successful version, allowing a later file change to retry; reports from replaced revisions are ignored. `reload()` increments the revision, which the body observes to cancel and replace its request. The body also cancels on unmount and tab closure, retains settled content in its declared tab store, and releases that state when the tab ends. [Office previews](#office-preview) use this mode without putting converted bytes or font metadata in the shared file store.
 
-The Session-scoped list slot `sidebar.right.tab.document.contentActions` adds toolbar controls when the tab is visible and its document content is available. Each control receives the original resource address, the file name, a callback for the current preview body bounds in viewport CSS pixels, and the tab’s existing page-opening action.
-
 <a id="addresses"></a>
 ## Addresses
 
@@ -133,7 +131,7 @@ The page refresh shortcut reuses the selected preview’s reload operation, incl
 
 `ctx.sidebarRight.openResource(address, { params: { line } })` carries a 1-based source line through the `file` parameters. In `text-pages` mode, the owner loads sequential pages until that line or EOF. Plain-text and code renderers declare `sourceLines`; Markdown does not. A renderer without `sourceLines` answers the navigation without moving the body, and a later switch to plain text or code does not replay it. A navigation stays pending while a `sourceLines` renderer has not drawn the line. Code navigation scrolls the inner source viewport directly. The landed line receives a band that holds for 0.6 s and then fades out over 1.4 s; toggling wrap or resizing the preview removes it early; restoring a remounted tab's scroll position adds no band. Byte-mode renderers do not consume source-line navigation. Each completed navigation revision is answered once. Opening the same file without `revealIfOpened: false` focuses its existing tab and delivers a new revision.
 
-Document toolbar contributions can supply saved screenshot outlines for the current file. File navigation can also carry the capture location and an optional action target to reveal. The preview draws red outlines over the matching file version and renders the actions registered in `sidebar.right.tab.document.captureAction`. PDF and image positions follow the scaled page or image. Text positions follow source lines or rendered Markdown blocks. Document path labels expose a file [context menu](../ui-context-menu/README.md), retaining the selected line and current pane.
+Document path labels expose a file [context menu](../ui-context-menu/README.md), retaining the selected line and current pane.
 
 <a id="model-experience"></a>
 ## Model Experience

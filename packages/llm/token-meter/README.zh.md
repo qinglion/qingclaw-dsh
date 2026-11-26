@@ -46,13 +46,13 @@ const price = ctx.tokenMeter.estimateMessage(message)
 
 ### 会话投影
 
-token-meter 通过必需的 `ctx.sessionProjections` 服务注册三个客户端投影单元和一个仅供宿主使用的单元。Host 消费方调用 `ctx.tokenMeter.contextPressure(session)` 同步读取提供方报告的最新提示词规模和路由容量；注册句柄保留在内部。`tokenUsage` 携带完整持久日志中的 `uncachedInputTokens`、`outputTokens`、`cacheReadTokens` 与 `cacheWriteTokens`。当有输入用量却缺少缓存读取明细时，`unreportedCacheReadAttempts` 记录涉及的请求次数。会话保留输入和输出总量，并隐藏整段会话的命中率。该投影从版本 3 起会从会话日志重建这项统计。最终 assistant 消息样本会替换同一次尝试的流式用量；`llm/retry-started` 会结束该替换范围，因此同一步骤中的重试会贡献另一次计费用量。`contextPressure` 携带可选 `pressureTokens`（提供方报告的最新提示词规模）、可选 `projectedTokens`（下一个请求的提示词将花费多少）与来自最新一条 `request/context` 记录的可选 `contextWindow`。`contextBreakdown` 携带启发式 `systemTokens`、`toolsTokens` 与 `messageTokens`——上下文的构成，而非提供方计费规模。卸载插件会移除全部四个键。仅宿主使用的 `tokenMeasurement` 保存请求头引用、未结束的步骤，以及最近一次成功调用的用量和输出价格。它不保存消息数组、工具定义、附件数据或价格缓存。计量历史有误时，只记录首次失败的位置，其他投影更新和检查点仍可继续；`measure()` 在该事件处报告原有错误，不提交价格或推进读取位置。状态版本 2 会丢弃旧版计量记录，再从日志重建。
+token-meter 通过必需的 `ctx.sessionProjections` 服务注册三个客户端投影单元和一个仅供宿主使用的单元。Host 消费方调用 `ctx.tokenMeter.contextPressure(session)` 同步读取提供方报告的最新提示词规模和路由容量；注册句柄保留在内部。`tokenUsage` 携带完整持久日志中的 `uncachedInputTokens`、`outputTokens`、`cacheReadTokens` 与 `cacheWriteTokens`。最终 assistant 消息样本会替换同一次尝试的流式用量；`llm/retry-started` 会结束该替换范围，因此同一步骤中的重试会贡献另一次计费用量。`contextPressure` 携带可选 `pressureTokens`（提供方报告的最新提示词规模）、可选 `projectedTokens`（下一个请求的提示词将花费多少）与来自最新一条 `request/context` 记录的可选 `contextWindow`。`contextBreakdown` 携带启发式 `systemTokens`、`toolsTokens` 与 `messageTokens`——上下文的构成，而非提供方计费规模。卸载插件会移除全部四个键。仅宿主使用的 `tokenMeasurement` 保存请求头引用、未结束的步骤，以及最近一次成功调用的用量和输出价格。它不保存消息数组、工具定义、附件数据或价格缓存。计量历史有误时，只记录首次失败的位置，其他投影更新和检查点仍可继续；`measure()` 在该事件处报告原有错误，不提交价格或推进读取位置。状态版本 2 会丢弃旧版计量记录，再从日志重建。
 
 图片省略重新计算现有节点的价格，同时保留此前的用量锚点。固定引用启发式规则不计入 `offloaded` 元数据，因此一次省略决定不改变 `contextBreakdown` 或标量启发式总量，按路由的测量则把所选图片的视觉价格换成占位文本价格。
 
 `contextBreakdown` 把 所有非空且存活的 `system/message` 归入 `systemTokens`；休眠的空节点不贡献 token，没有非空系统消息时为零。`messageTokens` 包含其余所有可见节点。在追加、已计量的压缩与裁剪、系统提示词改写或清空之后，两者之和等于 `measure().nodes[].heuristicTokens`；对非系统范围的未计量替换以零增量折叠，与 `contextPressure` 相同。`toolsTokens` 跟随最新 `request/header`。三个数字都使用固定启发式规则，而非路由图片定价或文件句柄投影；它们是近似构成，不是计费数据或 `projectedTokens`。
 
-`deriveTurnTokenUsage(events)` 为浏览器消费方把一个完整轮次折叠为精确的逐次尝试与整轮用量。生命周期证据缺失、计数不安全或精确总量矛盾时不返回结果；只有每次参与的尝试都报告可选缓存、推理或路由值时，相应汇总才会出现。若仅部分请求有缓存读取明细，`partialCacheReadTokens` 会保留已确认的正命中数，作为该轮缓存读取的下限。
+`deriveTurnTokenUsage(events)` 为浏览器消费方把一个完整轮次折叠为精确的逐次尝试与整轮用量。生命周期证据缺失、计数不安全或精确总量矛盾时不返回结果；只有每次参与的尝试都报告可选缓存、推理或路由值时，相应汇总才会出现。
 
 ### 组合
 

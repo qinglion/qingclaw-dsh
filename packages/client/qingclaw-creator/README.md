@@ -9,11 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The built-in sidebar workbench is available to QingClaw creators and administrators. It lists the account’s npm packages and their versions. Choose a version to request a market listing. Publishing uses the signed-in QingClaw account.
-
-My plugins lists each package under its market listing title and keeps the package name beneath it. Local projects lists every registered workspace with the plugin its root manifest declares, if any. The right Sidebar's start page offers a Workbench publish card beside the files, terminal, and browser doors. It shows the plugin the current Session's directory declares and writes the publish request into that conversation. When that directory's root holds no plugin, it asks once for the one subdirectory to publish instead of listing every package underneath. The association stays with that Session and is stored relative to the Session's directory, so a Session moved into a branch worktree keeps publishing the same package. Its publish action asks the conversation to bump the patch version, publish that release, and commit and push the version change. The page also requests the market listing for that package and version, so publishing no longer needs a detour through the Creator center; a refused listing appears as a titled notice that repeats the website's own message, and the Creator center shows the same notice for a listing it sends. The list is discovery only: the publishing tool is offered to the signed-in creator in every session, so a collection workspace publishes the package in whichever subdirectory the request names.
-
-A listing request is refused until the published release declares its catalog metadata in `qingclaw`; the refusal names the missing fields.
+Creators and administrators get a sidebar workbench that lists the account’s npm packages, each with its versions, and requests a market listing for a chosen version. My plugins lists packages under their market titles; Local projects lists registered workspaces with the plugin each root manifest declares. The right Sidebar’s start page offers a Workbench publish card that names the plugin the current Session’s directory declares, writes the publish request into that conversation, and asks it to bump the patch version, publish, and commit the change.
 
 ## Table of Contents
 

@@ -165,6 +165,7 @@ function syncDocumentLanguage(snapshot: LocaleSnapshot): void {
  */
 export class LocaleRuntime {
   private dicts = new Map<string, Map<string, LocaleDict>>()
+  private overrides = new Map<string, Map<string, LocaleDict>>()
   private bound = new Map<string, Translate>()
   private catalog = new Map<string, LocaleDefinition>()
   private fallbackChains = new Map<string, readonly LocaleId[]>()
@@ -441,6 +442,61 @@ export class LocaleRuntime {
   }
 
   /**
+   * Overlay keys a distribution owns without taking the namespace from its
+   * owner. The overlay answers before the registered dictionary for the same
+   * (namespace, locale, key), so a deployment can replace individual strings
+   * while every other key keeps following the owning package.
+   * @param ns - an already registered namespace.
+   * @param locale - locale tag whose keys this call replaces.
+   * @param dict - the replacement keys; omissions fall through to the owner.
+   * @returns disposer restoring the owner's keys (idempotent).
+   * @throws when locale is not a BCP 47-style tag.
+   */
+  override(ns: string, locale: string, dict: LocaleDict): () => void
+  /**
+   * Overlay several locales at once.
+   * @param ns - an already registered namespace.
+   * @param dicts - replacement keys by locale tag.
+   * @returns disposer restoring the owner's keys (idempotent).
+   */
+  override(ns: string, dicts: Record<string, LocaleDict>): () => void
+  override(ns: string, localeOrDicts: string | Record<string, LocaleDict>, dict?: LocaleDict): () => void {
+    const pairs: [string, LocaleDict][] = typeof localeOrDicts === 'string'
+      // Overload guarantees dict on the single-locale arm.
+      ? [[localeOrDicts, dict as LocaleDict]]
+      : Object.entries(localeOrDicts)
+    for (const [locale] of pairs) {
+      if (!LOCALE_ID_PATTERN.test(locale)) {
+        throw new Error(`locale id "${locale}" is not a BCP 47-style tag`)
+      }
+    }
+    let locales = this.overrides.get(ns)
+    if (!locales) {
+      locales = new Map()
+      this.overrides.set(ns, locales)
+    }
+    // The latest overlay owns the key, so a redeploy replaces an earlier one.
+    for (const [locale, entries] of pairs) {
+      const key = localeKey(locale)
+      locales.set(key, { ...locales.get(key), ...entries })
+    }
+    this.publish(this.snapshot.active, false)
+    return () => {
+      let removed = false
+      for (const [locale, entries] of pairs) {
+        const key = localeKey(locale)
+        const current = locales.get(key)
+        if (current === undefined) continue
+        const remaining = { ...current }
+        for (const name of Object.keys(entries)) delete remaining[name]
+        if (Object.keys(remaining).length === 0) locales.delete(key)
+        else locales.set(key, remaining)
+        removed = true
+      }
+      if (removed) this.publish(this.snapshot.active, false)
+    }
+  }
+  /**
    * Bind a declared namespace to a translate function typed to its
    * dictionary key union (plus the shared common vocabulary) — the same key
    * domain the framework-injected `t` seat carries. The returned reference
@@ -478,6 +534,12 @@ export class LocaleRuntime {
   }
 
   private lookup(ns: string, key: string, chain: readonly LocaleId[]): string | undefined {
+    // A distribution overlay wins over the owner's own dictionary, key by key.
+    const overlay = this.overrides.get(ns)
+    for (const locale of chain) {
+      const value = overlay?.get(localeKey(locale))?.[key]
+      if (value !== undefined) return value
+    }
     const locales = this.dicts.get(ns)
     for (const locale of chain) {
       const value = locales?.get(localeKey(locale))?.[key]

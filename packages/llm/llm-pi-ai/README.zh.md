@@ -141,8 +141,6 @@ Config 更新严格验证发生变化的 provider。初始加载将已存储的�
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
-账号插件可通过 `createPiAiAdapterForProfile` 为提供方配置接入宿主附件存储，在每次调用 `stream` 时传入用户网关密钥、请求发送函数和请求体选项。
-
 <details>
 <summary>实现细节——点击展开</summary>
 
@@ -251,7 +249,7 @@ pi-ai 事件变成 harness 的推理、文本、工具调用、用量与 finish 
 
 #### Token 影响
 
-生成内容只在 loop 记录后才影响后续输入。提供方未单独报告推理 token 时，pi-ai 会把推理 token 并入输出用量，并原样保留其精确 `totalTokens` 值。在 OpenAI Chat Completions 中，提供方明确报告零命中时记录 0，未报告时省略缓存读取数。
+生成内容只在 loop 记录后才影响后续输入。提供方未单独报告推理 token 时，pi-ai 会把推理 token 并入输出用量，并原样保留其精确 `totalTokens` 值。
 
 #### KV Cache 影响
 

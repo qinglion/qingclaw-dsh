@@ -62,8 +62,6 @@ Windows retries one `EPERM` when the lock cannot be observed, because its holder
 
 The lock's parent directory must already exist, so `withFileLock` rejects an invalid parent hierarchy before running the operation. A process that exits while holding the lock leaves the lock sibling behind, and the next writer takes it over. A lock whose record is empty or incomplete, or names a PID that a live process reused, is not taken over; later writers time out with `FileLockError` `FILE_LOCK_TIMEOUT`, which names the `lockPath`, and an operator removes it only after verifying that no writer still owns it. An optional `signal` cancels acquisition and contention waits; the operation owns cancellation after it starts.
 
-Pass `durable: true` to sync the new file before replacement and the containing directory afterward on POSIX. Windows syncs file contents.
-
 -----
 
 <a id="understand-the-implementation"></a>
@@ -123,7 +121,7 @@ Nothing here enters a request prefix, so provider cache reuse is unaffected.
 
 These limits define where the package is not the right tool. They are current package constraints, not a task backlog.
 
-- **Durability is opt-in.** A directory sync failure after rename can leave the replacement visible. Re-read the target before retrying a write that reported failure.
+- **Atomic, not durable** — no `fsync` of the file or its directory, so after a crash the rename may be observed unwound. The file-backed stores here re-read and republish on boot, keeping durability the caller's policy.
 - **Callers supply complete content** — strings and `Uint8Array` (including `Buffer`) are accepted; streaming writes are unsupported.
 - **Some orphaned locks require operator recovery** — a lock whose record is empty or incomplete, or names a PID a live process reused, stays in place; later writers time out without deleting it. A contender that ends between creating a claim and removing the lock leaves both `<filename>.lock` and `<filename>.lock.takeover-<record hash>`, and the operator removes both.
 - **One host and one PID namespace** — the probe runs on the contender's host. Writers on several hosts sharing a network filesystem, or containers sharing a volume, can see a live holder as exited, take over its lock, and write at the same time as it.
