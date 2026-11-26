@@ -1,5 +1,6 @@
 /** Account state and presentation extension points shared with client plugins. */
 import type { AccountClientMetadata, AccountView } from '@deepseek-ai/dsh-deepseek-account/types'
+import type { PlatformPage, PlatformPageExit } from './platform-pages.ts'
 
 /** Latest account-stream availability, without notification state. */
 export interface AccountUiState {
@@ -18,6 +19,18 @@ export interface AccountUi {
    * @returns this client's version, language, and timezone.
    */
   clientMetadata(locale: string): AccountClientMetadata
+  /**
+   * Show one Platform page in this feature's single native host, so a plugin can
+   * send the viewer to the deployment's website without leaving the application.
+   * Absent on a host without the native bridge; callers then have no in-app page.
+   * @param page - Platform destination to show.
+   * @param onClose - runs at most once with the reason the page stopped being live.
+   * @returns release for this request; releasing never runs `onClose`.
+   */
+  readonly openPlatformPage?: (
+    page: PlatformPage,
+    onClose: (reason: PlatformPageExit) => void,
+  ) => () => void
 }
 
 /** Account presentation facts supplied to its notification extension. */

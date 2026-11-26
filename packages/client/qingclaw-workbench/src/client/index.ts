@@ -5,7 +5,7 @@ import qingclawWorkbenchRemote from '@qinglion/dsh-qingclaw-workbench/remote'
 import { mountWorkbench } from './mount.ts'
 
 /** Base Remote carrier, the account licence the market gates on, and the UI services required before mounting. */
-export const inject = ['remote', 'slots', 'locale', 'accountUi']
+export const inject = ['remote', 'slots', 'locale', 'accountUi', 'qingclawPlatform']
 
 /** Mount the package-local generated Remote and its sidebar/main contributions. */
 export async function apply(ctx: Context): Promise<() => Promise<void>> {

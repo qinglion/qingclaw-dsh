@@ -8,6 +8,8 @@ import css from './AccountQuotaBanner.module.css'
 export interface AccountQuotaBannerInjected {
   /** Shared quota facts. */
   readonly hooks: { readonly account: HostObservable<QuotaState> }
+  /** Show the deployment's top-up page. */
+  readonly openTopUp: () => void
 }
 
 type AccountQuotaBannerProps = PropsRuntime<'conversation.input.dock'>
@@ -20,9 +22,8 @@ type AccountQuotaBannerProps = PropsRuntime<'conversation.input.dock'>
  * @param props - composer geometry, quota hook and localized copy.
  * @returns the banner, or null when the account has no low balance.
  */
-export function AccountQuotaBanner({ useAccount, t }: AccountQuotaBannerProps) {
+export function AccountQuotaBanner({ useAccount, openTopUp, t }: AccountQuotaBannerProps) {
   const profile = useAccount(state => state.profile)
-  const topUpUrl = useAccount(state => state.topUpUrl)
   if (profile === undefined) return null
   const { quotaRemaining: remaining, quotaTotal: total } = profile
   if (remaining == null) return null
@@ -33,9 +34,7 @@ export function AccountQuotaBanner({ useAccount, t }: AccountQuotaBannerProps) {
   if (text === null) return null
   return <div className={css.banner} role="status">
     <span className={css.text}>{text}</span>
-    {topUpUrl !== '' && <button type="button" className={css.action} onClick={() => {
-      window.open(topUpUrl, '_blank', 'noopener,noreferrer')
-    }}>
+    {<button type="button" className={css.action} onClick={() => { openTopUp() }}>
       {t('quotaBannerAction')}
     </button>}
   </div>

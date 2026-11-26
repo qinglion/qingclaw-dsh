@@ -40,6 +40,9 @@
     # QingClaw owns model access through its website account and gateway. Never
     # expose the upstream DeepSeek API-key provider during cold start or later.
     allowApiKey: false
+    # QingClaw ships its own feedback control in the sidebar footer, so the
+    # built-in questionnaire row would be a second, unmaintained entry.
+    showContactItem: false
 - insert:
     - id: llm-qingclaw-account
       name: '@qinglion/dsh-llm-qingclaw-account'
@@ -63,6 +66,8 @@
       disabled: !!js "!ctx.get('profileContext')"
     - id: ui-plugin-market
       name: '@deepseek-ai/dsh-client-ui-plugin-market'
+    - id: ui-qingclaw-platform
+      name: '@qinglion/dsh-client-ui-qingclaw-platform'
     - id: ui-qingclaw-account
       name: '@qinglion/dsh-client-ui-qingclaw-account'
     - id: ui-qingclaw-admin

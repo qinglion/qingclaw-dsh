@@ -1,6 +1,7 @@
 /** Source-safe lifecycle for the QingClaw Workbench Remote and its three slot contributions. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@qinglion/dsh-client-ui-qingclaw-platform/client'
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -33,15 +34,7 @@ export function registerWorkbenchUi(ctx: Context): void {
   const injected = (): WorkbenchPageInjected => ({
     pluginStore,
     hooks: { locale: ctx.locale },
-    openSubscriptionPage: (onReturned) => {
-      const url = ctx.accountUi.getSnapshot().view?.links.topUpUrl
-      if (url === undefined || url === '') return
-      window.open(url, '_blank', 'noopener,noreferrer')
-      if (onReturned === undefined) return
-      // A browser tab cannot report its own return, so the next window focus is the viewer coming back.
-      const focus = (): void => { window.removeEventListener('focus', focus); onReturned() }
-      window.addEventListener('focus', focus)
-    },
+    openSubscriptionPage: (onReturned) => { ctx.qingclawPlatform.open('top-up', onReturned) },
   })
   // Failures outlive the market panel, so the shell overlay owns their toast.
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({

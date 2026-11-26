@@ -65,7 +65,12 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { avatar.dispose() }, 'account: profile picture lifetime')
   /** @param locale - requested language. @returns client metadata with the current timezone. */
   const client = (locale: string) => accountClientMetadata(locale, process.env.DSH_CLIENT_VERSION)
-  ctx.provide('accountUi', { getSnapshot: () => snapshot, clientMetadata: client })
+  ctx.provide('accountUi', {
+    getSnapshot: () => snapshot,
+    clientMetadata: client,
+    // Read lazily: the shared host and its channel exist later in this apply.
+    openPlatformPage: (page, onClose) => platformPages.open(page, onClose),
+  })
   let revision = 0
   let refreshing: Promise<void> | undefined
   const refresh = (): Promise<void> => {
@@ -182,6 +187,7 @@ export function apply(ctx: Context): void {
     })
   const operations: AccountSectionInjected = {
     allowApiKey: config.allowApiKey,
+    showContactItem: config.showContactItem,
     avatarFailed: (value) => { avatar.failed(value) },
     subscribeSessionExpired: listener => ctx.remote.$on('deepseek-account/session-expired', listener),
     subscribeModelSignInRequired: listener => ctx.remote.$on('deepseek-account/model-sign-in-required', listener),

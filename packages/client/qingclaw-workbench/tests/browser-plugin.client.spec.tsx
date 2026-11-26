@@ -25,7 +25,8 @@ async function bench() {
   ctx.provide('remote', {} as never)
   // The account feature owns the page where the plan is bought; the market only asks for it.
   const openTopUp = vi.fn()
-  ctx.provide('accountUi', { openTopUp } as never)
+  ctx.provide('accountUi', { getSnapshot: () => ({ view: undefined, failed: false }) } as never)
+  ctx.provide('qingclawPlatform', { open: openTopUp } as never)
   const declare = () => ctx.slots.register({
     name: 'root',
     children: {
@@ -41,7 +42,7 @@ it('registers one transactional sidebar/main pair and removes both with its owne
   const subject = await bench()
   const disposeHoles = subject.declare()
   const fiber = subject.ctx.plugin({
-    inject: ['remote', 'slots', 'locale'],
+    inject: ['remote', 'slots', 'locale', 'qingclawPlatform'],
     apply: registerWorkbenchUi,
   })
   await fiber
@@ -57,7 +58,7 @@ it('registers one transactional sidebar/main pair and removes both with its owne
   expect(injected.pluginStore).toBe(pluginStore)
   const returned = vi.fn()
   injected.openSubscriptionPage(returned)
-  expect(subject.openTopUp).toHaveBeenCalledWith(returned)
+  expect(subject.openTopUp).toHaveBeenCalledWith('top-up', returned)
   expect(createStore).toHaveBeenCalledWith(expect.anything())
 
   // The shell overlay owns the failure toast, so leaving the panel cannot drop it.

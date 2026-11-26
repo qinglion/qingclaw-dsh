@@ -2991,6 +2991,9 @@ importers:
       '@qinglion/dsh-client-ui-qingclaw-feedback':
         specifier: workspace:*
         version: link:../../client/qingclaw-feedback
+      '@qinglion/dsh-client-ui-qingclaw-platform':
+        specifier: workspace:*
+        version: link:../../client/qingclaw-platform
       '@qinglion/dsh-llm-qingclaw-account':
         specifier: workspace:*
         version: link:../../llm/llm-qingclaw-account
@@ -4038,6 +4041,9 @@ importers:
       '@deepseek-ai/dsh-deepseek-account':
         specifier: workspace:*
         version: link:../../account/deepseek-account
+      '@qinglion/dsh-client-ui-qingclaw-platform':
+        specifier: workspace:*
+        version: link:../qingclaw-platform
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -4217,6 +4223,33 @@ importers:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
 
+  packages/client/qingclaw-platform:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../locale
+      '@deepseek-ai/dsh-client-test-runtime':
+        specifier: workspace:*
+        version: link:../../test-support/client-runtime
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../ui-renderer
+      '@deepseek-ai/dsh-client-ui-settings-account':
+        specifier: workspace:*
+        version: link:../ui-settings-account
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../ui-slots
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+
   packages/client/qingclaw-workbench:
     dependencies:
       '@deepseek-ai/dsh-atomic-write':
@@ -4271,6 +4304,9 @@ importers:
       '@deepseek-ai/dsh-util-crypto':
         specifier: workspace:*
         version: link:../../util/crypto
+      '@qinglion/dsh-client-ui-qingclaw-platform':
+        specifier: workspace:*
+        version: link:../qingclaw-platform
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

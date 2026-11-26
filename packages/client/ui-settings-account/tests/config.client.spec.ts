@@ -19,6 +19,7 @@ it('injects configured contact options and removes the listener on disposal', as
     contactFormUrl: config.contactFormUrl, contactSource: config.contactSource,
     desktopOnboarding: true,
     allowApiKey: true,
+    showContactItem: true,
   } }])
   await ctx.fiber.dispose()
   table.length = 0

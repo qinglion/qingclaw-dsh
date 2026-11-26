@@ -11,6 +11,8 @@ export interface ContactConfig {
   desktopOnboarding: boolean
   /** Whether sign-in surfaces may hand off to the official API-key editor. */
   allowApiKey: boolean
+  /** Whether the account menu offers the built-in questionnaire row. */
+  showContactItem: boolean
 }
 /** Validate public account UI options. */
 export const ContactConfigFields = {
@@ -18,6 +20,7 @@ export const ContactConfigFields = {
   contactSource: z.string().default(''),
   desktopOnboarding: z.boolean().default(true),
   allowApiKey: z.boolean().default(true),
+  showContactItem: z.boolean().default(true),
 }
 /** Validate public account UI options. */
 export const ContactConfig: z<Partial<ContactConfig>, ContactConfig> = z.object(ContactConfigFields)

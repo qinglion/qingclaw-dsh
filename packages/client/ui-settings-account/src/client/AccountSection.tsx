@@ -40,6 +40,8 @@ export interface AccountSnapshot {
 export interface AccountSectionInjected {
   /** Whether this distribution exposes the official API-key credential path; omission keeps the upstream copy. */
   allowApiKey?: boolean | undefined
+  /** Whether the account menu offers the built-in questionnaire row; omission keeps it. */
+  showContactItem?: boolean | undefined
   /** @param snapshot - picture attempt whose rendered image failed; superseded attempts are ignored. */
   avatarFailed: (snapshot: AccountAvatarSnapshot) => void
   /** Subscribe to live credential-expiry notifications.

@@ -12,6 +12,8 @@ export interface AccountQuotaActionInjected {
   readonly hooks: { readonly account: HostObservable<QuotaState> }
   /** Read the account again when the menu opens. */
   readonly refresh: () => Promise<void>
+  /** Show the deployment's usage page. */
+  readonly openUsage: () => void
 }
 
 type AccountQuotaActionProps = PropsRuntime<'sidebar.footer.action'>
@@ -23,12 +25,12 @@ type AccountQuotaActionProps = PropsRuntime<'sidebar.footer.action'>
  * @param props - sidebar width, quota hook, refresh operation and localized copy.
  * @returns the quota control, or null for a signed-out or unreadable account.
  */
-export function AccountQuotaAction({ wide, t, useAccount, refresh }: AccountQuotaActionProps) {
+export function AccountQuotaAction({ wide, t, useAccount, refresh, openUsage }: AccountQuotaActionProps) {
   const state = useAccount(value => value)
   const profile = state.profile
   if (!state.signedIn || profile === undefined) return null
   if (profile.quotaRemaining == null && profile.quotaTotal == null) return null
-  return <QuotaMenu key={profile.id} profile={profile} usageUrl={state.usageUrl} wide={wide} t={t} refresh={refresh} />
+  return <QuotaMenu key={profile.id} profile={profile} wide={wide} t={t} refresh={refresh} openUsage={openUsage} />
 }
 
 /** Credit share of the recharge total; a recharge resets the denominator and refills the numerator. */
@@ -38,8 +40,8 @@ function quotaPercent(remaining: number | null | undefined, total: number | null
   return Math.min(100, Math.round(remaining / total * 100))
 }
 
-function QuotaMenu({ profile, usageUrl, wide, t, refresh }:
-  Pick<AccountQuotaActionProps, 'wide' | 't'> & { profile: QuotaState['profile']; usageUrl: string; refresh: () => Promise<void> }) {
+function QuotaMenu({ profile, wide, t, refresh, openUsage }:
+  Pick<AccountQuotaActionProps, 'wide' | 't'> & { profile: QuotaState['profile']; refresh: () => Promise<void>; openUsage: () => void }) {
   const [open, setOpen] = useState(false)
   const percent = quotaPercent(profile?.quotaRemaining, profile?.quotaTotal)
   const unknown = t('quotaUnknown')
@@ -73,9 +75,9 @@ function QuotaMenu({ profile, usageUrl, wide, t, refresh }:
         <div><dt>{t('quotaRemaining')}</dt><dd>{profile?.quotaRemaining == null ? unknown : formatCredits(profile.quotaRemaining)}</dd></div>
       </dl>
     </div>
-    <MenuItemButton separatorBefore disabled={usageUrl === ''} onSelect={() => {
+    <MenuItemButton separatorBefore onSelect={() => {
       setOpen(false)
-      if (usageUrl !== '') window.open(usageUrl, '_blank', 'noopener,noreferrer')
+      openUsage()
     }}>{t('quotaManage')}</MenuItemButton>
   </Menu>
 }
