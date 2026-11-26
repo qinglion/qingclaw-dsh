@@ -1,7 +1,7 @@
 {
   "name": "@qinglion/dsh-client-ui-qingclaw-feedback",
   "description": "QingClaw account-menu feedback row with the founder's WeChat QR code",
-  "version": "0.2.2-rc.4",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },

@@ -1,7 +1,7 @@
 {
   "name": "@qinglion/dsh-qingclaw-creator",
   "description": "QingClaw creator workspace, personal packages and plugin release panel",
-  "version": "0.2.2-rc.4",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },

@@ -1,7 +1,7 @@
 {
   "name": "@qinglion/dsh-client-ui-qingclaw-admin",
   "description": "QingClaw registry package review and account administration",
-  "version": "0.2.2-rc.4",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
