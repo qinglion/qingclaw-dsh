@@ -33,6 +33,20 @@ it('persists complete selections through its owning profile entry', async () => 
   expect(standalone.agentDefaultModel.currentSelection().model).toBe('original')
 })
 
+it('remembers an explicit user choice and clears the mark on a deployment save', async () => {
+  const { configurationFixture } = await import('../../../settings/settings/tests/configuration-fixture.ts')
+  const { ctx } = await configurationFixture({ hmr: false })
+  expect(ctx.agentDefaultModel.isUserSelected()).toBe(false)
+  await ctx.agentDefaultModel.saveSelection({ provider: 'test', model: 'chosen' }, { userSelected: true })
+  expect(ctx.agentDefaultModel.isUserSelected()).toBe(true)
+  expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'test', model: 'chosen' })
+  const row = ctx.configEditor.configuration().find(entry => entry.entry.options.id === 'default-model')
+  expect(row?.override).toMatchObject({ provider: 'test', model: 'chosen', userSelected: true })
+  await ctx.agentDefaultModel.saveSelection({ provider: 'test', model: 'catalog' })
+  expect(ctx.agentDefaultModel.isUserSelected()).toBe(false)
+  expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'test', model: 'catalog' })
+})
+
 it('serializes overlapping saves and continues after a rejected write', async () => {
   const { configurationFixture } = await import('../../../settings/settings/tests/configuration-fixture.ts')
   const { ctx } = await configurationFixture({ hmr: false })

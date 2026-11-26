@@ -41,6 +41,23 @@ function keyGrant(sequence: number): Response {
   return Response.json({ code: 0, data: { biz_code: 0, biz_data: { api_key: `gateway-key-${sequence}` } } })
 }
 
+/** Website listing shared by the default-follow tests: one plain model and the marked default. */
+const DEFAULT_FOLLOW_LISTING = [
+  { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', input_modalities: ['text'], rate: 1 },
+  { id: 'new-upstream-model', name: 'New Upstream Model', default: true, rate: 0.4 },
+]
+
+/** Serve the model-token grant and the shared listing; refuse every other route. */
+function listingFetch(): typeof fetch {
+  return async (input, init) => {
+    const request = new Request(input, init)
+    const path = new URL(request.url).pathname
+    if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
+    if (path === '/auth-api/v0/dsh/models') return Response.json({ data: DEFAULT_FOLLOW_LISTING })
+    throw new Error(`unexpected request ${request.method} ${request.url}`)
+  }
+}
+
 function completionStream(
   deltas: Record<string, unknown>[] = [{ role: 'assistant', content: 'QingClaw ' }, { content: 'ready' }],
   reason = 'stop',
@@ -195,24 +212,11 @@ describe('QingClaw account provider', () => {
   })
 
   it('offers exactly the website catalog and names each model by its catalog id', async () => {
-    const request: typeof fetch = async (input, init) => {
-      const request = new Request(input, init)
-      const path = new URL(request.url).pathname
-      if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
-      if (path === '/auth-api/v0/dsh/models') {
-        return Response.json({
-          data: [
-            { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', input_modalities: ['text'], rate: 1 },
-            { id: 'new-upstream-model', name: 'New Upstream Model', default: true, rate: 0.4 },
-          ],
-        })
-      }
-      throw new Error(`unexpected request ${request.method} ${request.url}`)
-    }
-    const { ctx } = await mount(request)
+    const { ctx } = await mount(listingFetch())
     const saveSelection = vi.fn(async (_selection: { provider: string; model: string }) => {})
     ctx.provide('agentDefaultModel', {
       currentSelection: () => ({ provider: 'deepseek-account', model: 'deepseek-v4.1-flash' }),
+      isUserSelected: () => false,
       saveSelection,
     } as never)
 
@@ -222,6 +226,30 @@ describe('QingClaw account provider', () => {
     expect(models.map(model => model.name)).toEqual(['deepseek-v4.1-flash', 'new-upstream-model'])
     expect(models[0]?.inputModalities).toEqual(['text'])
     expect(models.map(model => model.rate)).toEqual([1, 0.4])
+  })
+
+  it('keeps a user-saved model while the website default differs', async () => {
+    const { ctx } = await mount(listingFetch())
+    const saveSelection = vi.fn(async (_selection: { provider: string; model: string }) => {})
+    ctx.provide('agentDefaultModel', {
+      currentSelection: () => ({ provider: 'deepseek-account', model: 'deepseek-v4.1-flash' }),
+      isUserSelected: () => true,
+      saveSelection,
+    } as never)
+    await ctx.llm.listModels('deepseek-account')
+    expect(saveSelection).not.toHaveBeenCalled()
+  })
+
+  it('returns a remembered model to the website default once it leaves the catalog', async () => {
+    const { ctx } = await mount(listingFetch())
+    const saveSelection = vi.fn(async (_selection: { provider: string; model: string }) => {})
+    ctx.provide('agentDefaultModel', {
+      currentSelection: () => ({ provider: 'deepseek-account', model: 'retired-model' }),
+      isUserSelected: () => true,
+      saveSelection,
+    } as never)
+    await ctx.llm.listModels('deepseek-account')
+    expect(saveSelection).toHaveBeenCalledWith({ provider: 'deepseek-account', model: 'new-upstream-model' })
   })
 
   it('assembles streamed function arguments and delivers the image returned by the tool in the next request', async () => {
@@ -279,7 +307,8 @@ describe('QingClaw account provider', () => {
     let keyExchanges = 0
     let messageRequests = 0
     const { ctx, rejectToken, refreshUsage } = await mount(async (input, init) => {
-      const path = new URL(new Request(input, init).url).pathname
+      const request = new Request(input, init)
+      const path = new URL(request.url).pathname
       if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
       if (path === '/auth-api/v0/dsh/model_key') {
         return keyGrant(++keyExchanges)

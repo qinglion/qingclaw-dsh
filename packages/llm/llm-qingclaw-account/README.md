@@ -43,6 +43,8 @@ The signed-in platform issues a catalog JWT at `/auth-api/v0/dsh/model_token` an
 
 The desktop bundle sets `catalogURL` to the website’s `/auth-api/v0/dsh/models`. A failed refresh retains the cached catalog, and no models are advertised before the first successful listing. Each model is named by its catalog id: the provider keeps no display names of its own. A listed `rate` is the model's uncached input price divided by the deployment default's standard input price, which the website recomputes on every sync and when the default changes; the provider forwards it as display metadata.
 
+The listing's `default` entry becomes the deployment default only while the saved default is deployment-owned. A selection saved as an explicit user choice survives catalog refreshes; once that model leaves the listing, the website default applies again and the saved default returns to deployment ownership.
+
 | Field | Default | Meaning |
 |---|---|---|
 | `baseURL` | `https://api.qingclaw.com/v1` | OpenAI-compatible API root |

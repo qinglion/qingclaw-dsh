@@ -134,11 +134,15 @@ export function apply(ctx: Context, config: Config): void {
     const preferred = view.listing?.entries.find(entry => Reflect.get(entry, 'default') === true)?.id
     const defaults = ctx.get('agentDefaultModel') as {
       currentSelection(): { provider: string; model: string }
+      isUserSelected(): boolean
       saveSelection(selection: { provider: string; model: string }): Promise<void>
     } | undefined
     if (preferred !== undefined && defaults !== undefined) {
       const current = defaults.currentSelection()
-      if (current.provider === PROVIDER && current.model !== preferred) {
+      // The website default applies until the user saves a choice of their own;
+      // a remembered selection survives refreshes unless its model leaves the catalog.
+      const listed = result.offered.some(model => model.id === current.model)
+      if (current.provider === PROVIDER && current.model !== preferred && (!defaults.isUserSelected() || !listed)) {
         void defaults.saveSelection({ provider: PROVIDER, model: preferred })
       }
     }

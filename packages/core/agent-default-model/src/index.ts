@@ -29,6 +29,8 @@ export interface Config {
   model: Volatile<string>
   /** Adapter-owned reasoning effort; omission follows the provider default. */
   reasoningEffort: Volatile<string | undefined>
+  /** Whether an explicit user choice saved the selection; omission means deployment-owned. */
+  userSelected: Volatile<boolean | undefined>
 }
 
 /** Project stored settings onto the Agent-facing selection type. */
@@ -53,6 +55,7 @@ export class AgentDefaultModelConfig extends Service {
     provider: z.string().required().volatile(),
     model: z.string().required().volatile(),
     reasoningEffort: z.string().volatile(),
+    userSelected: z.boolean().volatile(),
   })
 
   constructor(private readonly ownerContext: Context, private config: Config) {
@@ -74,13 +77,24 @@ export class AgentDefaultModelConfig extends Service {
   }
 
   /**
+   * Whether the persisted selection came from an explicit user choice. Deployment
+   * sync may replace a deployment-owned default but keeps a user-saved one.
+   * @returns true when a user choice saved the selection; false otherwise.
+   */
+  isUserSelected(): boolean {
+    return this.config.userSelected.get() === true
+  }
+
+  /**
    * Save the complete default model selection. A deployment without a configuration
    * editor keeps its composition entry. Saves commit in submission order; a failed
    * save rejects its caller without blocking later saves.
    * @param next - resolved selection accepted by an entry point.
+   * @param options - provenance of the selection; only an explicit user choice marks
+   * the saved default as remembered, and any other save clears that mark.
    * @returns fulfillment after the optional profile write settles.
    */
-  async saveSelection(next: ModelSelection): Promise<void> {
+  async saveSelection(next: ModelSelection, options?: { userSelected?: boolean }): Promise<void> {
     const entry = this.ownerContext.fiber.entry
     if (entry === undefined) return
     const editor = this.ctx.get('configEditor')
@@ -88,6 +102,7 @@ export class AgentDefaultModelConfig extends Service {
     const config = {
       provider: next.provider, model: next.model,
       ...next.reasoningEffort === undefined ? {} : { reasoningEffort: String(next.reasoningEffort) },
+      ...options?.userSelected === true ? { userSelected: true } : {},
     }
     const saved = this.saves.then(() => editor.edit(entry, () => config))
     this.saves = saved.catch(() => {})

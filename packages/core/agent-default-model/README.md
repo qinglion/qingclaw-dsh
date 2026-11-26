@@ -42,12 +42,13 @@ The composition requires a provider and model. Consumers read the live reference
 |---|---|---|
 | `provider` | required | Registered provider route for fresh agents |
 | `model` | required | Provider-owned model id for fresh agents |
+| `userSelected` | unset | Marks the saved selection as an explicit user choice that deployment sync keeps |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-default-model) lists every accepted field. `reasoningEffort` is optional; saving a selection without it removes that field from the profile’s complete config override.
+The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-default-model) lists every accepted field. `reasoningEffort` is optional; saving a selection without it removes that field from the profile’s complete config override. `userSelected` is written only by a save marked as a user choice; every other save removes it.
 
 ### Read and change the default
 
-`currentSelection()` returns a detached `{ provider, model, reasoningEffort? }` for a newly created agent; `saveSelection()` stores the complete selection for later agents.
+`currentSelection()` returns a detached `{ provider, model, reasoningEffort? }` for a newly created agent; `saveSelection()` stores the complete selection for later agents. `saveSelection(selection, { userSelected: true })` additionally marks the saved default as the user's remembered choice, and `isUserSelected()` reports that mark so deployment sync can keep a remembered selection instead of replacing it with its own default.
 
 ```text
 const selection = ctx.agentDefaultModel.currentSelection()
