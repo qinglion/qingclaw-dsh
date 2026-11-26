@@ -90,7 +90,7 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
   const cwd = directoryOf(sessionId)
   const [view, setView] = useState<View>({ kind: 'loading' })
   const [entry, setEntry] = useState('')
-  const [missing, setMissing] = useState(false)
+  const [missing, setMissing] = useState<string>()
   const [entryWarning, setEntryWarning] = useState<string>()
   const [revision, refresh] = useState(0)
   const [listing, setListing] = useState<{ readonly kind: 'idle' | 'pending' | 'done' | 'failed'; readonly message?: string }>({ kind: 'idle' })
@@ -98,7 +98,7 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
   useEffect(() => {
     const controller = new AbortController()
     setView({ kind: 'loading' })
-    setMissing(false)
+    setMissing(undefined)
     void (async () => {
       try {
         const bound = readBinding(key)
@@ -128,10 +128,11 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
   const associate = async (): Promise<void> => {
     const relative = entry.trim()
     if (!relative) return
-    setMissing(false)
+    setMissing(undefined); setEntryWarning(undefined)
     try {
       const found = await getSessionProjectAt(sessionId, relative, cwd, new AbortController().signal)
-      if (found.project === undefined) { setMissing(true); setEntryWarning(found.warning); return }
+      if (found.missing === true) { setMissing(t('publishDirectoryMissing')); return }
+      if (found.project === undefined) { setMissing(t('publishMissing')); setEntryWarning(found.warning); return }
       writeBinding(key, relative)
       setEntry('')
       setView({ kind: 'project', directory: relative, project: found.project })
@@ -184,11 +185,11 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
       <p className={css.hint}>{t('publishDirectoryHint')}</p>
       <div className={css.chooseRow}>
         <Input value={entry} placeholder={t('publishDirectory')} aria-label={t('publishDirectory')}
-          onChange={(event) => { setEntry(event.target.value); setMissing(false); setEntryWarning(undefined) }} />
+          onChange={(event) => { setEntry(event.target.value); setMissing(undefined); setEntryWarning(undefined) }} />
         <Button variant="outline" disabled={!entry.trim()} onClick={() => { void associate() }}>{t('publishUse')}</Button>
       </div>
       {view.warning !== undefined && <p className={css.hint}>{t('publishRootWarning')} {view.warning}</p>}
-      {missing && <CreatorNotice tone="error" title={t('publishMissing')}>
+      {missing !== undefined && <CreatorNotice tone="error" title={missing}>
         {entryWarning === undefined ? undefined : entryWarning}
       </CreatorNotice>}
     </div>}

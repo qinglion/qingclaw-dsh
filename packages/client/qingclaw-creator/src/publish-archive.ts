@@ -62,6 +62,7 @@ async function readArchive(bytes: Buffer): Promise<{ manifest: Record<string, un
 async function targetDirectory(root: string, target: PublishTarget): Promise<string> {
   if (target.directory !== undefined) {
     const directory = await packageDirectory(root, target.directory)
+    if (directory === undefined) throw new Error('当前会话工作区中的包目录不存在。')
     const project = await detectPluginProject(directory)
     if (!project || project.name !== target.packageName || project.version !== target.version) {
       throw new Error('当前会话工作区中的包或版本已变更。')

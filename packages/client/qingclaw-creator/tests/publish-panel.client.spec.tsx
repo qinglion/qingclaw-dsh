@@ -125,6 +125,16 @@ it('shows the website refusal verbatim when a listing is declined', async () => 
   expect(alert.textContent).toContain(message)
 })
 
+it('names a subdirectory that does not exist instead of a failed read', async () => {
+  vi.mocked(getSessionPlugin).mockResolvedValue({})
+  vi.mocked(getSessionProjectAt).mockResolvedValue({ missing: true })
+  mount()
+  fireEvent.change(await screen.findByPlaceholderText(zh.publishDirectory), { target: { value: 'nope' } })
+  fireEvent.click(screen.getByRole('button', { name: zh.publishUse }))
+  const alert = await screen.findByRole('alert')
+  expect(alert.textContent).toBe(zh.publishDirectoryMissing)
+})
+
 it('says so when the chosen directory holds no plugin', async () => {
   vi.mocked(getSessionPlugin).mockResolvedValue({})
   vi.mocked(getSessionProjectAt).mockResolvedValue({})

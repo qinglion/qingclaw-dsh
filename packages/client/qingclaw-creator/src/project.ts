@@ -60,21 +60,21 @@ function pluginProject(manifest: Record<string, unknown>): PluginProject | undef
 }
 
 /**
- * Resolve one directory named relative to a root, rejecting absolute paths,
- * parent segments, and links that leave the root.
+ * Resolve one directory named relative to a root. A malformed path is a
+ * refusal; a path that does not exist, or a link that leaves the root, is
+ * simply not there.
  * @param root - the real path the request is relative to.
  * @param directory - the request's relative directory, `.` for the root.
- * @returns the real directory path.
+ * @returns the real directory path, or undefined when nothing is there.
  */
-export async function packageDirectory(root: string, directory: string): Promise<string> {
+export async function packageDirectory(root: string, directory: string): Promise<string | undefined> {
   const segments = directory.split('/')
   if (directory !== '.' && (!/^[a-zA-Z0-9._@-]+(?:\/[a-zA-Z0-9._@-]+)*$/.test(directory)
     || segments.some(segment => segment === '.' || segment === '..'))) {
     throw new Error('包目录必须是工作区内的相对路径。')
   }
   const resolved = join(root, directory)
-  if (await realpath(resolved).catch(() => undefined) !== resolved) throw new Error('工作区目录已变更。')
-  return resolved
+  return await realpath(resolved).catch(() => undefined) === resolved ? resolved : undefined
 }
 
 /** The Session working-directory service this package reads when the composition mounts it. */
@@ -250,10 +250,22 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
       return Response.json({ error: 'target_not_found', detail: 'no_candidate' }, { status: 404 })
     }
     const directory = params.get('directory')
+    let target = root
+    if (directory !== null) {
+      try {
+        const resolved = await packageDirectory(root, directory)
+        if (resolved === undefined) {
+          // Nothing is at that path, so the page asks for a different one instead
+          // of reporting a failed read.
+          return Response.json({ missing: true }, { headers })
+        }
+        target = resolved
+      } catch {
+        return Response.json({ warning: '包目录必须是工作区内的相对路径。' }, { headers })
+      }
+    }
     try {
-      const project = await detectPluginProject(
-        directory === null ? root : await packageDirectory(root, directory),
-      )
+      const project = await detectPluginProject(target)
       const state: WorkspacePluginState = { ...(project && { project }) }
       return Response.json(state, { headers })
     } catch (error) {

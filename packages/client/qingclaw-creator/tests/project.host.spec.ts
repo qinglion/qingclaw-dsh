@@ -64,6 +64,8 @@ it('answers for a session directory and for one named directory inside it', asyn
   const escaped = await route()(new Request(sessionUrl + '&directory=../outside'))
   const warning = (await escaped.json() as { warning?: string }).warning
   expect(warning).toContain('包目录')
+  const absent = await route()(new Request(sessionUrl + '&directory=nope'))
+  expect(await absent.json()).toEqual({ missing: true })
   const unknown = await route({ session: () => undefined })(new Request(sessionUrl))
   expect(unknown.status).toBe(404)
 })

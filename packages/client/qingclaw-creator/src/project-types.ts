@@ -22,4 +22,6 @@ export interface WorkspacePluginState {
   project?: PluginProject
   /** Why the root manifest could not be read, when the read failed instead of finding nothing. */
   warning?: string
+  /** The named directory does not exist inside the requested root. */
+  missing?: boolean
 }
