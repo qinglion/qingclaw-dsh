@@ -9,6 +9,7 @@ import { inspectArchive } from '../src/publish-archive.ts'
 
 const files = new Map([
   ['assets/workbench/icon.webp', 1000],
+  ['assets/workbench/icon.svg', 600],
   ['assets/workbench/one.webp', 1000],
   ['assets/workbench/two.webp', 1000],
   ['assets/workbench/huge.webp', 3 * 1024 * 1024],
@@ -25,6 +26,17 @@ const workbench = {
 
 it('accepts a complete workbench release', () => {
   expect(listingMetadataIssues(workbench, files)).toEqual([])
+})
+
+it('accepts a vector listing image', () => {
+  // The workbench logo, its previews, and a related-link cover may all be SVG.
+  expect(listingMetadataIssues({ qingclaw: { ...workbench.qingclaw, workbench: {
+    panelId: 'desk', icon: './assets/workbench/icon.svg',
+    previews: ['./assets/workbench/icon.svg', './assets/workbench/two.webp'],
+  } } }, files)).toEqual([])
+  expect(listingMetadataIssues({ qingclaw: { ...workbench.qingclaw, links: [{
+    url: 'https://weixin.qq.com/sph/AHfxwU7MP7', image: 'assets/workbench/icon.svg',
+  }] } }, files)).toEqual([])
 })
 
 it('names every listing field a release still misses', () => {
