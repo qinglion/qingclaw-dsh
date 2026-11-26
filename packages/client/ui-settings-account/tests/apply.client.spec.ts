@@ -87,7 +87,6 @@ it('registers an account-only cold start when a Desktop distribution forbids API
   const entry = c.ctx.slots.entries('settings.onboarding').find(entry => entry.options.id === 'account-sign-in')
   expect(entry?.component).toBe(AccountColdStart)
   expect(entry).toMatchObject({ options: { order: -10 }, locale: 'settings.account' })
-  expect(operations(c).allowApiKey).toBe(false)
   expect(c.ctx.slots.entries('shell.overlay').some(entry => entry.options.id === 'desktop-onboarding')).toBe(false)
 }, 60_000)
 

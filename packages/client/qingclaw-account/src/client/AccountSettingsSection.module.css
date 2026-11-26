@@ -1,0 +1,16 @@
+/* Account page: identity row, credit metrics and actions. */
+.page { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
+.heading { margin: 0; font-size: 16px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+.hint { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
+.identity { display: flex; align-items: center; gap: 12px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.names { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.name { font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan { padding: 1px 8px; border-radius: 999px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); border: 0.5px solid var(--dsw-alias-border-l2); }
+.plan[data-tier='pro'], .plan[data-tier='team'] { color: var(--dsw-alias-state-business-primary); border-color: var(--dsw-alias-state-business-primary); }
+.metrics { display: grid; gap: 8px; margin: 0; }
+.metrics > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.metrics dt { color: var(--dsw-alias-label-secondary); font-size: 13px; }
+.metrics dd { margin: 0; color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.source { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
