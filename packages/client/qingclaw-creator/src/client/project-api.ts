@@ -1,19 +1,19 @@
 import { creatorFetch } from './api.ts'
 import { PROJECT_PATH } from '../types.ts'
-import type { PluginProject, WorkspacePluginState } from '../project-types.ts'
+import type { WorkspacePluginState } from '../project-types.ts'
 
-async function projectAt(query: Record<string, string>, signal: AbortSignal): Promise<PluginProject | undefined> {
+async function projectAt(query: Record<string, string>, signal: AbortSignal): Promise<WorkspacePluginState> {
   const url = new URL(PROJECT_PATH.slice(1), document.baseURI)
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value)
   const response = await creatorFetch(url, { method: 'GET', signal })
   if (!response.ok) {
     // Name the refusal so the page can show why it could not read the directory.
     const detail = await response.json().catch(() => null) as { error?: string; detail?: string } | null
-    const code = detail?.error ?? 'http_' + response.status
+    const code = detail?.error ?? 'http_' + String(response.status)
     throw new Error(detail?.detail === undefined ? code : code + ' · ' + detail.detail)
   }
   const body = await response.json() as WorkspacePluginState
-  return body.project
+  return body
 }
 
 /**
@@ -25,7 +25,7 @@ async function projectAt(query: Record<string, string>, signal: AbortSignal): Pr
  */
 export async function getSessionPlugin(
   sessionId: string, cwd: string | undefined, signal: AbortSignal,
-): Promise<PluginProject | undefined> {
+): Promise<WorkspacePluginState> {
   return projectAt({ session: sessionId, ...(cwd ? { cwd } : {}) }, signal)
 }
 
@@ -39,7 +39,7 @@ export async function getSessionPlugin(
  */
 export async function getSessionProjectAt(
   sessionId: string, directory: string, cwd: string | undefined, signal: AbortSignal,
-): Promise<PluginProject | undefined> {
+): Promise<WorkspacePluginState> {
   return projectAt({ session: sessionId, directory, ...(cwd ? { cwd } : {}) }, signal)
 }
 

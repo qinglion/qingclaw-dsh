@@ -62,7 +62,8 @@ it('answers for a session directory and for one named directory inside it', asyn
   const named = await route()(new Request(sessionUrl + '&directory=dsh-codex'))
   expect(await named.json()).toMatchObject({ project: { name: '@qinglion/dsh-codex' } })
   const escaped = await route()(new Request(sessionUrl + '&directory=../outside'))
-  expect(escaped.status).toBe(404)
+  const warning = (await escaped.json() as { warning?: string }).warning
+  expect(warning).toContain('包目录')
   const unknown = await route({ session: () => undefined })(new Request(sessionUrl))
   expect(unknown.status).toBe(404)
 })

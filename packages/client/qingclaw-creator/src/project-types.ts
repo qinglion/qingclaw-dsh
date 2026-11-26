@@ -20,4 +20,6 @@ export interface PublishCandidate {
 export interface WorkspacePluginState {
   /** Recognized plugin package at the workspace root; absent when the root manifest declares none. */
   project?: PluginProject
+  /** Why the root manifest could not be read, when the read failed instead of finding nothing. */
+  warning?: string
 }

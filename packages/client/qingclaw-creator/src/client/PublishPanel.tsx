@@ -45,7 +45,7 @@ export function publishPrompt(candidate: PublishCandidate): string {
 type View =
   | { readonly kind: 'loading' }
   | { readonly kind: 'failed'; readonly reason: string }
-  | { readonly kind: 'choose' }
+  | { readonly kind: 'choose'; readonly warning?: string }
   | { readonly kind: 'project'; readonly directory: string; readonly project: PluginProject }
 
 const BINDING_PREFIX = 'qingclaw.creator.publish.v1.'
@@ -91,6 +91,7 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
   const [view, setView] = useState<View>({ kind: 'loading' })
   const [entry, setEntry] = useState('')
   const [missing, setMissing] = useState(false)
+  const [entryWarning, setEntryWarning] = useState<string>()
   const [revision, refresh] = useState(0)
   const [listing, setListing] = useState<{ readonly kind: 'idle' | 'pending' | 'done' | 'failed'; readonly message?: string }>({ kind: 'idle' })
   const key = String(sessionId)
@@ -104,8 +105,8 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
         if (bound !== undefined) {
           const associated = await getSessionProjectAt(sessionId, bound, cwd, controller.signal)
           if (controller.signal.aborted) return
-          if (associated !== undefined) {
-            setView({ kind: 'project', directory: bound, project: associated })
+          if (associated.project !== undefined) {
+            setView({ kind: 'project', directory: bound, project: associated.project })
             return
           }
           // The associated directory no longer holds a package; ask again.
@@ -113,7 +114,9 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
         }
         const root = await getSessionPlugin(sessionId, cwd, controller.signal)
         if (controller.signal.aborted) return
-        setView(root === undefined ? { kind: 'choose' } : { kind: 'project', directory: '.', project: root })
+        setView(root.project === undefined
+          ? { kind: 'choose', ...(root.warning && { warning: root.warning }) }
+          : { kind: 'project', directory: '.', project: root.project })
       } catch (error) {
         if (!controller.signal.aborted) {
           setView({ kind: 'failed', reason: error instanceof Error ? error.message : 'unknown' })
@@ -128,10 +131,10 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
     setMissing(false)
     try {
       const found = await getSessionProjectAt(sessionId, relative, cwd, new AbortController().signal)
-      if (found === undefined) { setMissing(true); return }
+      if (found.project === undefined) { setMissing(true); setEntryWarning(found.warning); return }
       writeBinding(key, relative)
       setEntry('')
-      setView({ kind: 'project', directory: relative, project: found })
+      setView({ kind: 'project', directory: relative, project: found.project })
     } catch (error) {
       setView({ kind: 'failed', reason: error instanceof Error ? error.message : 'unknown' })
     }
@@ -181,10 +184,13 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
       <p className={css.hint}>{t('publishDirectoryHint')}</p>
       <div className={css.chooseRow}>
         <Input value={entry} placeholder={t('publishDirectory')} aria-label={t('publishDirectory')}
-          onChange={(event) => { setEntry(event.target.value); setMissing(false) }} />
+          onChange={(event) => { setEntry(event.target.value); setMissing(false); setEntryWarning(undefined) }} />
         <Button variant="outline" disabled={!entry.trim()} onClick={() => { void associate() }}>{t('publishUse')}</Button>
       </div>
-      {missing && <CreatorNotice tone="error" title={t('publishMissing')} />}
+      {view.warning !== undefined && <p className={css.hint}>{t('publishRootWarning')} {view.warning}</p>}
+      {missing && <CreatorNotice tone="error" title={t('publishMissing')}>
+        {entryWarning === undefined ? undefined : entryWarning}
+      </CreatorNotice>}
     </div>}
     {listing.kind === 'done' && <CreatorNotice tone="success" title={t('submitted')} />}
     {listing.kind === 'failed' && <CreatorNotice tone="error" title={t('noticeListingRefused')}>{listing.message}</CreatorNotice>}

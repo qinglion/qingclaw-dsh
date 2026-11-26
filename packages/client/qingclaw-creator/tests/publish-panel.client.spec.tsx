@@ -28,7 +28,7 @@ function mount(directory: string | undefined = cwd) {
 }
 
 it('publishes the plugin of the session directory by writing the request into that conversation', async () => {
-  vi.mocked(getSessionPlugin).mockResolvedValue(desk)
+  vi.mocked(getSessionPlugin).mockResolvedValue({ project: desk })
   const props = mount()
   expect(screen.getByRole('heading', { name: zh.publishTitle })).toBeTruthy()
   expect(await screen.findByText(desk.name + ' · ./')).toBeTruthy()
@@ -53,8 +53,8 @@ it('names the next patch release and drops a prerelease suffix', () => {
 
 it('associates one subdirectory with the session and publishes it on the next visit', async () => {
   const codex: PluginProject = { ...desk, name: '@qinglion/dsh-codex' }
-  vi.mocked(getSessionPlugin).mockResolvedValue(undefined)
-  vi.mocked(getSessionProjectAt).mockResolvedValue(codex)
+  vi.mocked(getSessionPlugin).mockResolvedValue({})
+  vi.mocked(getSessionProjectAt).mockResolvedValue({ project: codex })
   const props = mount()
   expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
   fireEvent.change(screen.getByPlaceholderText(zh.publishDirectory), { target: { value: 'dsh-codex' } })
@@ -69,7 +69,7 @@ it('associates one subdirectory with the session and publishes it on the next vi
 it('reopens on the associated directory without asking again', async () => {
   const codex: PluginProject = { ...desk, name: '@qinglion/dsh-codex' }
   window.localStorage.setItem(BINDING, 'dsh-codex')
-  vi.mocked(getSessionProjectAt).mockResolvedValue(codex)
+  vi.mocked(getSessionProjectAt).mockResolvedValue({ project: codex })
   mount()
   expect(await screen.findByText('@qinglion/dsh-codex · dsh-codex')).toBeTruthy()
   expect(getSessionPlugin).not.toHaveBeenCalled()
@@ -77,8 +77,8 @@ it('reopens on the associated directory without asking again', async () => {
 
 it('drops an association whose directory no longer holds a package', async () => {
   window.localStorage.setItem(BINDING, 'gone')
-  vi.mocked(getSessionPlugin).mockResolvedValue(undefined)
-  vi.mocked(getSessionProjectAt).mockResolvedValue(undefined)
+  vi.mocked(getSessionPlugin).mockResolvedValue({})
+  vi.mocked(getSessionProjectAt).mockResolvedValue({})
   mount()
   expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
   expect(window.localStorage.getItem(BINDING)).toBeNull()
@@ -93,7 +93,7 @@ it('says the session directory could not be read instead of blaming a workspace'
 })
 
 it('requests the listing for the same package version from the page', async () => {
-  vi.mocked(getSessionPlugin).mockResolvedValue(desk)
+  vi.mocked(getSessionPlugin).mockResolvedValue({ project: desk })
   vi.mocked(submitListing).mockResolvedValue({})
   mount()
   fireEvent.click(await screen.findByRole('button', { name: zh.publishList }))
@@ -101,9 +101,22 @@ it('requests the listing for the same package version from the page', async () =
   expect(await screen.findByText(zh.submitted)).toBeTruthy()
 })
 
+it('still asks for a package directory when the root manifest cannot be read', async () => {
+  vi.mocked(getSessionPlugin).mockResolvedValue({ warning: 'EACCES' })
+  mount()
+  expect(await screen.findByText(zh.unrecognizedRoot)).toBeTruthy()
+  expect(screen.getByText(zh.publishRootWarning + ' EACCES')).toBeTruthy()
+  fireEvent.change(screen.getByPlaceholderText(zh.publishDirectory), { target: { value: 'dsh-codex' } })
+  vi.mocked(getSessionProjectAt).mockResolvedValue({ warning: '工作区目录已变更。' })
+  fireEvent.click(screen.getByRole('button', { name: zh.publishUse }))
+  const alert = await screen.findByRole('alert')
+  expect(alert.textContent).toContain(zh.publishMissing)
+  expect(alert.textContent).toContain('工作区目录已变更。')
+})
+
 it('shows the website refusal verbatim when a listing is declined', async () => {
   const message = '该版本缺少上架必填信息：侧边 logo、工作台预览图（至少 2 张）。请在 package.json 的 qingclaw 中补充后重新发版。'
-  vi.mocked(getSessionPlugin).mockResolvedValue(desk)
+  vi.mocked(getSessionPlugin).mockResolvedValue({ project: desk })
   vi.mocked(submitListing).mockRejectedValue(new Error(message))
   mount()
   fireEvent.click(await screen.findByRole('button', { name: zh.publishList }))
@@ -113,8 +126,8 @@ it('shows the website refusal verbatim when a listing is declined', async () => 
 })
 
 it('says so when the chosen directory holds no plugin', async () => {
-  vi.mocked(getSessionPlugin).mockResolvedValue(undefined)
-  vi.mocked(getSessionProjectAt).mockResolvedValue(undefined)
+  vi.mocked(getSessionPlugin).mockResolvedValue({})
+  vi.mocked(getSessionProjectAt).mockResolvedValue({})
   mount()
   fireEvent.change(await screen.findByPlaceholderText(zh.publishDirectory), { target: { value: 'packages/empty' } })
   fireEvent.click(screen.getByRole('button', { name: zh.publishUse }))

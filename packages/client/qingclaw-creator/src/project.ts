@@ -217,8 +217,8 @@ export interface ProjectRouteInputs {
  * @returns the real path, when it names an existing directory.
  */
 async function existingDirectory(value: string | null | undefined): Promise<string | undefined> {
-  if (value === null || value === undefined || !isAbsolute(value)) return
   try {
+    if (typeof value !== 'string' || !isAbsolute(value)) return
     return await realpath(value)
   } catch {
     return
@@ -257,8 +257,12 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
       const state: WorkspacePluginState = { ...(project && { project }) }
       return Response.json(state, { headers })
     } catch (error) {
-      const code = error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : 'unreadable'
-      return Response.json({ error: 'directory_unavailable', detail: code }, { status: 404 })
+      // An unreadable directory still leaves the page usable: it reports no root
+      // project and names what failed, so the user can choose the package itself.
+      const code = error instanceof Error ? (error as { code?: unknown }).code : undefined
+      const reason = typeof code === 'string' ? code : error instanceof Error ? error.message : 'unreadable'
+      const state: WorkspacePluginState = { warning: reason.slice(0, 200) }
+      return Response.json(state, { headers })
     }
   }
 }
