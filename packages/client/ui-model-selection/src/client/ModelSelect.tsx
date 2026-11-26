@@ -168,9 +168,11 @@ export function ModelSelect(
   const { pending } = state
   const busy = pending !== null
 
+  // Each open re-reads the Host catalog: a catalog-only change (a model added,
+  // retired, or repriced) must reach an open menu without restarting the app.
   const reload = (): void => {
     lastActionRef.current = 'load'
-    load()
+    load(true)
   }
 
   useEffect(() => {

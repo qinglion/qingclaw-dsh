@@ -239,6 +239,24 @@ describe('ModelSelect cost multiple', () => {
   })
 })
 
+describe('ModelSelect catalog refresh', () => {
+  it('re-reads the Host catalog on every open instead of reusing the loaded one', () => {
+    const load = vi.fn()
+    render(<ModelSelect renderSlot={renderLabel} locked={false} available
+      directory={createSnapshotStore<ModelDirectoryState>(state())}
+      load={load} resolveText={resolveText} select={vi.fn()} t={t} />)
+    const trigger = screen.getByRole('button', { name: /选择模型，当前/ })
+    expect(load).not.toHaveBeenCalled()
+
+    fireEvent.click(trigger)
+    expect(load).toHaveBeenCalledWith(true)
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    fireEvent.click(trigger)
+    expect(load).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe('ModelSelect reasoning effort', () => {
   it('renders effort names without descriptions and submits the effort as part of the session selection', async () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())
