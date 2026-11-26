@@ -1,7 +1,7 @@
 {
   "name": "@qinglion/dsh-qingclaw-workbench",
   "description": "QingClaw workbench catalog with native plugin installation, favorites, and sidebar launchers",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.2-rc.4",
   "publishConfig": {
     "access": "public"
   },
