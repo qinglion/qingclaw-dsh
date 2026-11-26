@@ -17,6 +17,7 @@
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../../typert/protocol" },
-    { "path": "../../util/atomic-write" }
+    { "path": "../../util/atomic-write" },
+    { "path": "../../boot/plugin-manager" }
   ]
 }

@@ -1,3 +1,5 @@
+import type { PluginInstallRequestId } from '@deepseek-ai/dsh-plugin-manager/types'
+
 /** One public QingClaw video entry normalized from the official Feed v1 response. */
 export interface WorkbenchVideo {
   readonly id: string
@@ -81,6 +83,25 @@ export interface WorkbenchInstallResult {
   readonly application: 'applied' | 'restart-required' | 'overridden' | 'failed' | 'cancelled'
   /** Why the installation ended without applying, when the Host reported a reason. */
   readonly diagnostic?: string
+}
+
+/** The operation one workbench row is running, with the progress its Host install log reports. */
+export interface WorkbenchPendingOperation {
+  readonly kind: 'install' | 'update' | 'uninstall' | 'toggle'
+  /** `starting` precedes the first pnpm output; `apply` enables the installed bundle. */
+  readonly phase: 'starting' | 'download' | 'install' | 'apply'
+  /** Packages reused or downloaded over resolved, 0-100. */
+  readonly download: number
+  /** Packages added over resolved, 0-100. */
+  readonly install: number
+}
+
+/** One installation the Host still runs, for clients that mount while it is in flight. */
+export interface WorkbenchActiveInstall {
+  readonly name: string
+  readonly version: string
+  readonly kind: 'install' | 'update'
+  readonly requestId: PluginInstallRequestId
 }
 
 /** Entries may be shown offline. New installation requires a successful refresh. */

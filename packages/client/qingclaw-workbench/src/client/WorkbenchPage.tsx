@@ -8,6 +8,7 @@ import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS, HostObservable
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
 import type { NS, WorkbenchLocaleKey } from './locales.ts'
+import type { WorkbenchPendingOperation } from '../types.ts'
 import { needsPro, needsSignIn, type WorkbenchPluginItem, type WorkbenchPluginStore } from './workbench-plugin-store.ts'
 import css from './WorkbenchPage.module.css'
 
@@ -26,7 +27,7 @@ type Tab = (typeof tabs)[number]
 interface ItemActions {
   item: WorkbenchPluginItem
   t: TranslateNS<typeof NS>
-  installing: boolean
+  pending?: WorkbenchPendingOperation | undefined
   busy: boolean
   /** The product page hides the installed label; its actions already say what the state is. */
   detail?: boolean
@@ -38,8 +39,34 @@ interface ItemActions {
   onFavorite(): void
 }
 
-function WorkbenchActions({ item, t, installing, busy, detail, onInstall, onUpdate, onOpen, onFavorite }: ItemActions): ReactNode {
+/** Two-stage fetch/link progress for a running installation or update. */
+function WorkbenchProgress({ pending, t, name }: {
+  pending: WorkbenchPendingOperation
+  t: TranslateNS<typeof NS>
+  name: string
+}): ReactNode {
+  const starting = pending.phase === 'starting'
+  const stages = [
+    { id: 'download', label: t('stageDownload'), value: pending.download,
+      active: starting || pending.phase === 'download', indeterminate: starting },
+    { id: 'install', label: t('stageInstall'), value: pending.install,
+      active: pending.phase === 'install', indeterminate: false },
+  ]
+  return <div className={css.progress} role="status" aria-label={t('installProgress', { name })}>
+    {stages.map(stage => <div key={stage.id} className={css.progressStage} data-active={stage.active || undefined}>
+      <span className={css.progressLabel}>{stage.label}</span>
+      <span className={css.progressTrack}>
+        <span className={css.progressFill} data-indeterminate={stage.indeterminate || undefined}
+          style={stage.indeterminate ? undefined : { width: `${stage.value}%` }} />
+      </span>
+      <span className={css.progressValue}>{t('progressValue', { value: stage.value })}</span>
+    </div>)}
+  </div>
+}
+
+function WorkbenchActions({ item, t, pending, busy, detail, onInstall, onUpdate, onOpen, onFavorite }: ItemActions): ReactNode {
   const favoriteLabel = t(item.favorite ? 'unfavorite' : 'favorite')
+  const pendingInstall = pending !== undefined && (pending.kind === 'install' || pending.kind === 'update')
   return <div className={css.actions}>
     <button type="button" className={css.favorite} aria-label={favoriteLabel}
       aria-pressed={item.favorite} title={favoriteLabel} onClick={onFavorite}>
@@ -50,7 +77,7 @@ function WorkbenchActions({ item, t, installing, busy, detail, onInstall, onUpda
       ? <>
         {item.updateAvailable && <Button variant="primary" size="sm" disabled={busy} onClick={onUpdate}
           icon={<IconDownloadOutlineRegular size={14} />}>
-          {t(installing ? 'updating' : 'update', { version: item.version })}
+          {t(pending?.kind === 'update' ? 'updating' : 'update', { version: item.version })}
         </Button>}
         {item.enabled
           ? item.openable
@@ -62,8 +89,11 @@ function WorkbenchActions({ item, t, installing, busy, detail, onInstall, onUpda
           : <Tag tone="neutral">{t('disabled')}</Tag>}
       </>
       : <Button variant="primary" size="sm" disabled={busy || !item.installable} onClick={onInstall}
-        title={busy && !installing ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
-        {t(installing ? 'installing' : item.installable ? 'install' : 'offlineInstall')}
+        title={busy && !pendingInstall ? t('anotherInstall') : undefined} icon={<IconDownloadOutlineRegular size={14} />}>
+        {t(pending === undefined ? (item.installable ? 'install' : 'offlineInstall')
+          : pending.kind === 'update' ? 'updating'
+            : pending.phase === 'download' ? 'downloading'
+              : pending.phase === 'apply' ? 'applying' : 'installing')}
       </Button>}
   </div>
 }
@@ -95,6 +125,8 @@ function WorkbenchCard({ onDetails, ...actions }: ItemActions & {
       {item.author && <span className={css.author}>{item.author}</span>}
       {item.description && <p className={css.description}>{item.description}</p>}
       {item.category && <span className={css.category}>{item.category}</span>}
+      {actions.pending && (actions.pending.kind === 'install' || actions.pending.kind === 'update') &&
+        <WorkbenchProgress pending={actions.pending} t={t} name={item.title} />}
       <WorkbenchActions {...actions} />
     </div>
   </article>
@@ -163,6 +195,8 @@ function WorkbenchDetail({ item, t, actions, onBack, error }: {
       {item.installed && <Switch checked={item.enabled} label={t('enableToggle', { name: item.title })}
         disabled={actions.busy} onChange={(next) => { actions.onSetEnabled(next) }} />}
     </header>
+    {actions.pending && (actions.pending.kind === 'install' || actions.pending.kind === 'update') &&
+      <WorkbenchProgress pending={actions.pending} t={t} name={item.title} />}
     {item.description && <p className={css.summary}>{item.description}</p>}
     {error && <p className={css.error} role="alert">{t(error)}</p>}
     <WorkbenchPreviews item={item} t={t} />
@@ -192,7 +226,6 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
   const [items, setItems] = useState<readonly WorkbenchPluginItem[] | undefined>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<WorkbenchLocaleKey>()
-  const [installing, setInstalling] = useState<string>()
   const [tab, setTab] = useState<Tab>('market')
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('')
@@ -219,25 +252,23 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
   }, [pluginStore])
 
   useEffect(() => {
-    const unsubscribe = pluginStore.subscribe(() => { void load() })
+    // Progress and settlement notifications re-project the store without another Host read.
+    const unsubscribe = pluginStore.subscribe(() => { setItems(pluginStore.snapshot()) })
     void load()
     return () => { generation.current++; unsubscribe() }
   }, [pluginStore, load])
 
-  const act = async (action: () => void | Promise<void>, failure: WorkbenchLocaleKey, installId?: string) => {
+  const act = async (action: () => void | Promise<void>, failure: WorkbenchLocaleKey) => {
     setError(undefined)
-    if (installId) setInstalling(installId)
     try {
       await action()
-      await load()
     } catch (error) {
       setError(needsSignIn(error) ? 'signInRequired' : needsPro(error) ? 'proRequired' : failure)
-    } finally {
-      if (installId) setInstalling(undefined)
     }
   }
 
   const all = items ?? []
+  const busy = all.some(item => item.pending !== undefined)
   const detail = detailId ? all.find(item => item.id === detailId) : undefined
   useLayoutEffect(() => {
     if (detail) {
@@ -253,11 +284,11 @@ export function WorkbenchPage({ pluginStore, t }: WorkbenchPageProps): ReactNode
   }, [detail?.id])
 
   function actions(item: WorkbenchPluginItem): ItemActions {
-    return { item, t, installing: installing === item.id, busy: installing !== undefined,
-      onInstall: () => { void act(() => pluginStore.install(item.id), 'installError', item.id) },
-      onUpdate: () => { void act(() => pluginStore.update(item.id), 'updateError', item.id) },
-      onUninstall: () => { void act(() => pluginStore.uninstall(item.id), 'uninstallError', item.id) },
-      onSetEnabled: (enabled) => { void act(() => pluginStore.setEnabled(item.id, enabled), 'toggleError', item.id) },
+    return { item, t, pending: item.pending, busy,
+      onInstall: () => { void act(() => pluginStore.install(item.id), 'installError') },
+      onUpdate: () => { void act(() => pluginStore.update(item.id), 'updateError') },
+      onUninstall: () => { void act(() => pluginStore.uninstall(item.id), 'uninstallError') },
+      onSetEnabled: (enabled) => { void act(() => pluginStore.setEnabled(item.id, enabled), 'toggleError') },
       onOpen: () => { void act(() => pluginStore.open(item.id), 'openError') },
       onFavorite: () => { void act(() => pluginStore.setFavorite(item.id, !item.favorite), 'preferenceError') },
     }

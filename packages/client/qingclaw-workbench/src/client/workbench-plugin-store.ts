@@ -3,8 +3,10 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { PluginInstallLogChunk, PluginInstallProgress, PluginInstallRequestId } from '@deepseek-ai/dsh-plugin-manager/types'
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type {} from '@qinglion/dsh-qingclaw-workbench/remote'
-import type { WorkbenchCatalogEntry } from '../types.ts'
+import type { WorkbenchActiveInstall, WorkbenchCatalogEntry, WorkbenchInstallResult, WorkbenchPendingOperation } from '../types.ts'
 import { workbenchPanelIcon } from './WorkbenchPanelIcon.tsx'
 
 export interface WorkbenchPluginItem extends WorkbenchCatalogEntry {
@@ -21,6 +23,8 @@ export interface WorkbenchPluginItem extends WorkbenchCatalogEntry {
   readonly openable: boolean
   readonly favorite: boolean
   readonly restartRequired?: boolean
+  /** The operation this row is running; it survives page switches and reloads while the Host runs it. */
+  readonly pending?: WorkbenchPendingOperation
 }
 
 export interface WorkbenchReadmeDocument {
@@ -31,6 +35,8 @@ export interface WorkbenchReadmeDocument {
 export interface WorkbenchPluginStore {
   readReadme(id: string, version: string, language: string): Promise<WorkbenchReadmeDocument | null>
   load(refresh?: boolean): Promise<readonly WorkbenchPluginItem[]>
+  /** The current projection without a Host read, for subscribers reacting to progress. */
+  snapshot(): readonly WorkbenchPluginItem[]
   install(id: string): Promise<void>
   update(id: string): Promise<void>
   uninstall(id: string): Promise<void>
@@ -115,11 +121,29 @@ function updateId(storage: Storage, key: string, id: string, included: boolean):
   storage.setItem(key, JSON.stringify([...values]))
 }
 
+/** Read the last pnpm Progress line of a log chunk into fetch and link percentages. */
+function parseProgress(text: string): { readonly download: number; readonly install: number; readonly added: number } | undefined {
+  const last = [...text.matchAll(/Progress: resolved (\d+), reused (\d+), downloaded (\d+), added (\d+)/g)].at(-1)
+  if (last === undefined) return undefined
+  const total = Number(last[1])
+  if (total <= 0) return undefined
+  const added = Number(last[4])
+  const percent = (value: number): number => Math.min(100, Math.round((value / total) * 100))
+  return { download: percent(Number(last[2]) + Number(last[3])), install: percent(added), added }
+}
+
+/** One running operation, its progress, and the promise that settles it. */
+interface PendingOperation extends WorkbenchPendingOperation {
+  readonly id: string
+  readonly requestId?: PluginInstallRequestId
+  readonly promise: Promise<void>
+}
+
 /** Project the official directory, actual Host inventory and registered main panels. */
 export function createWorkbenchPluginStore(ctx: Context, storage: Storage = window.localStorage): WorkbenchPluginStore {
   const listeners = new Set<() => void>()
   const sidebars = new Map<string, () => void>()
-  const installs = new Map<string, Promise<void>>()
+  const pending = new Map<string, PendingOperation>()
   const restartRequired = new Set<string>()
   /** Removals the Host applied to the profile that the installed inventory may still list until a restart. */
   const removed = new Set<string>()
@@ -161,6 +185,34 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     return entry
   }
 
+  function track(id: string, view: WorkbenchPendingOperation, requestId: PluginInstallRequestId | undefined, promise: Promise<void>): void {
+    pending.set(id, { ...view, id, ...requestId === undefined ? {} : { requestId }, promise })
+    notify()
+  }
+
+  function patch(id: string, changes: Partial<WorkbenchPendingOperation>): void {
+    const current = pending.get(id)
+    /* v8 ignore next -- callers resolve the operation first; settlement can only forget it between the two reads. */
+    if (current === undefined) return
+    pending.set(id, { ...current, ...changes })
+    notify()
+  }
+
+  function forget(id: string): void {
+    pending.delete(id)
+    notify()
+  }
+
+  /** Apply one settled installation outcome and refresh the inventory before notifying. */
+  async function settle(id: string, result: WorkbenchInstallResult): Promise<void> {
+    if (result.application === 'failed' || result.application === 'cancelled' || result.application === 'overridden') {
+      throw new Error(result.diagnostic ?? result.application)
+    }
+    if (result.application === 'restart-required') restartRequired.add(id)
+    await load(true)
+    notify()
+  }
+
   async function read(refresh: boolean): Promise<void> {
     const [catalog, bundles] = await Promise.all([
       ctx.remote.qingclawWorkbench.getWorkbenchCatalog(refresh), ctx.remote.pluginManager.listBundles(),
@@ -178,6 +230,52 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       if (!installed.has(name)) removed.delete(name)
     }
     syncSidebars()
+    // A client that mounted while an installation runs adopts it instead of offering a second install.
+    const active = await ctx.remote.qingclawWorkbench.getActiveInstalls()
+    if (disposed) return
+    if (active.ok) {
+      for (const record of active.value) {
+        if (!pending.has(record.name)) adopt(record)
+      }
+    }
+  }
+
+  /** Await an installation this client did not start, reporting its outcome through the shared settlement. */
+  function adopt(record: WorkbenchActiveInstall): void {
+    const promise = (async () => {
+      const answer = await ctx.remote.pluginManager.waitForInstall(record.requestId)
+      if (!answer.ok) throw remoteFailure(answer.error)
+      const result = answer.value
+      if (result === null) {
+        await load(true)
+        notify()
+        return
+      }
+      const diagnostic = result.error?.diagnostic ?? result.error?.code
+      await settle(record.name, { application: result.application, ...diagnostic === undefined ? {} : { diagnostic } })
+    })()
+    track(record.name, { kind: record.kind, phase: 'starting', download: 0, install: 0 }, record.requestId, promise)
+    // The client that started the installation reports its failure; a recovering client re-reads the inventory.
+    void promise.catch(() => undefined).finally(() => { forget(record.name) })
+  }
+
+  function project(): readonly WorkbenchPluginItem[] {
+    const favorites = readIds(storage, FAVORITES)
+    return entries.map((entry) => {
+      const has = present(entry.packageName)
+      const installedVersion = has ? installed.get(entry.packageName) : undefined
+      const openable = has && hasMain(entry.panelId)
+      const operation = pending.get(entry.packageName)
+      return { ...entry, id: entry.packageName, installed: has, installable: !has && !offline, openable,
+        enabled: !has || enabledBundles.has(entry.packageName),
+        favorite: favorites.has(entry.packageName),
+        updateAvailable: has && managed.has(entry.packageName) && installedVersion !== undefined
+          && compareVersions(installedVersion, entry.version) < 0,
+        ...(installedVersion === undefined ? {} : { installedVersion }),
+        restartRequired: has && !openable && restartRequired.has(entry.packageName),
+        ...operation === undefined ? {} : { pending: {
+          kind: operation.kind, phase: operation.phase, download: operation.download, install: operation.install } } }
+    })
   }
 
   async function load(refresh = false): Promise<readonly WorkbenchPluginItem[]> {
@@ -188,66 +286,46 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       reading = promise
       try { await promise } finally { if (reading === promise) reading = undefined }
     } else await reading
-    const favorites = readIds(storage, FAVORITES)
-    return entries.map((entry) => {
-      const has = present(entry.packageName)
-      const installedVersion = has ? installed.get(entry.packageName) : undefined
-      const openable = has && hasMain(entry.panelId)
-      return { ...entry, id: entry.packageName, installed: has, installable: !has && !offline, openable,
-        enabled: !has || enabledBundles.has(entry.packageName),
-        favorite: favorites.has(entry.packageName),
-        updateAvailable: has && managed.has(entry.packageName) && installedVersion !== undefined
-          && compareVersions(installedVersion, entry.version) < 0,
-        ...(installedVersion === undefined ? {} : { installedVersion }),
-        restartRequired: has && !openable && restartRequired.has(entry.packageName) }
-    })
+    return project()
+  }
+
+  async function run(id: string, kind: 'install' | 'update'): Promise<void> {
+    const existing = pending.get(id)
+    if (existing !== undefined) return existing.promise
+    // Refresh first so an installation the Host already runs is adopted, never duplicated.
+    await load(true)
+    const adopted = pending.get(id)
+    if (adopted !== undefined) return adopted.promise
+    const entry = find(id)
+    if (kind === 'install' ? installed.has(id) : !present(id)) return
+    if (offline) throw new Error(kind === 'install' ? '请联网刷新工作台目录后安装' : '请联网刷新工作台目录后更新')
+    const requestId = randomUUID() as PluginInstallRequestId
+    const promise = (async () => {
+      const result = kind === 'install'
+        ? await ctx.remote.qingclawWorkbench.installWorkbench(entry.packageName, entry.version, requestId)
+        : await ctx.remote.qingclawWorkbench.updateWorkbench(entry.packageName, entry.version, requestId)
+      if (!result.ok) throw remoteFailure(result.error)
+      await settle(id, result.value)
+    })()
+    track(id, { kind, phase: 'starting', download: 0, install: 0 }, requestId, promise)
+    try { await promise } finally { forget(id) }
   }
 
   async function install(id: string): Promise<void> {
-    if (installs.has(id)) return installs.get(id)
-    const pending = (async () => {
-      await load(true)
-      const entry = find(id)
-      if (installed.has(id)) return
-      if (offline) throw new Error('请联网刷新工作台目录后安装')
-      // The Host authorizes the private registry read, so the registry token never reaches the browser.
-      const result = await ctx.remote.qingclawWorkbench.installWorkbench(entry.packageName, entry.version)
-      if (!result.ok) throw remoteFailure(result.error)
-      if (result.value.application === 'failed' || result.value.application === 'cancelled' || result.value.application === 'overridden') {
-        throw new Error(result.value.diagnostic ?? result.value.application)
-      }
-      if (result.value.application === 'restart-required') restartRequired.add(id)
-      await load()
-      notify()
-    })()
-    installs.set(id, pending)
-    try { await pending } finally { installs.delete(id) }
+    return run(id, 'install')
   }
 
   async function update(id: string): Promise<void> {
-    if (installs.has(id)) return installs.get(id)
-    const pending = (async () => {
-      await load(true)
-      const entry = find(id)
-      if (!present(id)) return install(id)
-      if (offline) throw new Error('请联网刷新工作台目录后更新')
-      const result = await ctx.remote.qingclawWorkbench.updateWorkbench(entry.packageName, entry.version)
-      if (!result.ok) throw remoteFailure(result.error)
-      if (result.value.application === 'failed' || result.value.application === 'cancelled'
-        || result.value.application === 'overridden') {
-        throw new Error(result.value.diagnostic ?? result.value.application)
-      }
-      if (result.value.application === 'restart-required') restartRequired.add(id)
-      await load(true)
-      notify()
-    })()
-    installs.set(id, pending)
-    try { await pending } finally { installs.delete(id) }
+    const existing = pending.get(id)
+    if (existing !== undefined) return existing.promise
+    if (!present(id)) return install(id)
+    return run(id, 'update')
   }
 
   async function uninstall(id: string): Promise<void> {
-    if (installs.has(id)) return installs.get(id)
-    const pending = (async () => {
+    const existing = pending.get(id)
+    if (existing !== undefined) return existing.promise
+    const promise = (async () => {
       await load(true)
       const entry = find(id)
       if (!present(id)) return
@@ -263,13 +341,14 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       await load(true)
       notify()
     })()
-    installs.set(id, pending)
-    try { await pending } finally { installs.delete(id) }
+    track(id, { kind: 'uninstall', phase: 'apply', download: 100, install: 100 }, undefined, promise)
+    try { await promise } finally { forget(id) }
   }
 
   async function setEnabled(id: string, enabled: boolean): Promise<void> {
-    if (installs.has(id)) return installs.get(id)
-    const pending = (async () => {
+    const existing = pending.get(id)
+    if (existing !== undefined) return existing.promise
+    const promise = (async () => {
       await load(true)
       const entry = find(id)
       if (!present(id)) return
@@ -283,8 +362,34 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
       await load(true)
       notify()
     })()
-    installs.set(id, pending)
-    try { await pending } finally { installs.delete(id) }
+    track(id, { kind: 'toggle', phase: 'apply', download: 100, install: 100 }, undefined, promise)
+    try { await promise } finally { forget(id) }
+  }
+
+  const byRequest = (requestId: PluginInstallRequestId | undefined): PendingOperation | undefined => {
+    if (requestId === undefined) return undefined
+    for (const operation of pending.values()) {
+      if (operation.requestId === requestId) return operation
+    }
+    return undefined
+  }
+
+  const installState = (progress: PluginInstallProgress): void => {
+    const operation = byRequest(progress.requestId)
+    if (operation === undefined) return
+    if (progress.phase === 'applying') patch(operation.id, { phase: 'apply', download: 100, install: 100 })
+  }
+
+  const installLog = (chunk: PluginInstallLogChunk): void => {
+    const operation = byRequest(chunk.requestId)
+    if (operation === undefined) return
+    const progress = parseProgress(chunk.text)
+    if (progress === undefined) return
+    patch(operation.id, {
+      phase: progress.added > 0 ? 'install' : 'download',
+      download: Math.max(operation.download, progress.download),
+      install: Math.max(operation.install, progress.install),
+    })
   }
 
   const changed = (): void => { void load().then(notify, notify) }
@@ -294,6 +399,8 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
   }
   const disposers = [
     ctx.remote.$on('plugin-manager/changed', changed),
+    ctx.remote.$on('plugin-manager/install-state', installState),
+    ctx.remote.$on('plugin-manager/install-log', installLog),
     ctx.slots.subscribe('main', () => { syncSidebars(); notify() }),
     ctx.slots.inject('sidebar.panellist', () => { syncSidebars(); return clearSidebars }),
   ]
@@ -301,10 +408,10 @@ export function createWorkbenchPluginStore(ctx: Context, storage: Storage = wind
     if (event.key === null || event.key === FAVORITES) notify()
   }
   window.addEventListener('storage', storageChanged)
-  // Restore already-installed launchers before the user opens the directory.
+  // Restore already-installed launchers and in-flight installations before the user opens the directory.
   void load().catch(() => undefined)
   return {
-    load, install, update, uninstall, setEnabled,
+    load, snapshot: project, install, update, uninstall, setEnabled,
     async readReadme(id, version, language) {
       const entry = find(id)
       if (entry.version !== version) throw new Error('工作台版本已变更')

@@ -12,13 +12,15 @@ async function mount(installedVersion: () => string | undefined, enabled = () =>
   const ctx = new Context()
   await ctx.plugin(SlotRegistry)
   const updateWorkbench = vi.fn(async () => ({ ok: true, value: { application: 'applied' } }))
+  const installWorkbench = vi.fn(async () => ({ ok: true, value: { application: 'applied' } }))
   const removeBundle = vi.fn(async () => ({ ok: true, value: { application: 'applied' } }))
   const setBundleEnabled = vi.fn(async (_name: string, _enabled: boolean) => ({ ok: true, value: { application: 'applied' } }))
   ctx.provide('remote', {
     $on: () => () => {},
     qingclawWorkbench: {
       getWorkbenchCatalog: async () => ({ ok: true, value: { entries: [entry], stale: false } }),
-      installWorkbench: vi.fn(async () => ({ ok: true, value: { application: 'applied' } })),
+      getActiveInstalls: async () => ({ ok: true, value: [] }),
+      installWorkbench,
       updateWorkbench,
     },
     pluginManager: {
@@ -29,13 +31,14 @@ async function mount(installedVersion: () => string | undefined, enabled = () =>
       },
       removeBundle,
       setBundleEnabled,
+      waitForInstall: async () => ({ ok: true, value: null }),
     },
   } as never)
   ctx.provide('layout', { selectPanel: vi.fn() } as never)
   const root = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' },
     'sidebar.panellist': { kind: 'list', scope: 'root' } } } as never, () => null)
   const store = createWorkbenchPluginStore(ctx)
-  return { ctx, store, root, updateWorkbench, removeBundle, setBundleEnabled }
+  return { ctx, store, root, updateWorkbench, installWorkbench, removeBundle, setBundleEnabled }
 }
 
 it('offers an update when the catalog is newer and installs it through the Host', async () => {
@@ -52,7 +55,7 @@ it('offers an update when the catalog is newer and installs it through the Host'
     })
     await store.update(name)
 
-    expect(updateWorkbench).toHaveBeenCalledWith(name, '2.0.0')
+    expect(updateWorkbench).toHaveBeenCalledWith(name, '2.0.0', expect.any(String))
     expect((await store.load())[0]).toMatchObject({
       installed: true, installedVersion: '2.0.0', updateAvailable: false,
     })
@@ -88,10 +91,25 @@ it('reports a disabled workbench and toggles it through the plugin manager', asy
   } finally { store.dispose(); root(); await ctx.fiber.dispose() }
 })
 
+it('falls back to installing when an update targets a workbench the profile no longer has', async () => {
+  const { ctx, store, root, updateWorkbench, installWorkbench } = await mount(() => undefined)
+  try {
+    await store.update(name)
+    expect(updateWorkbench).not.toHaveBeenCalled()
+    expect(installWorkbench).toHaveBeenCalledWith(name, '2.0.0', expect.any(String))
+  } finally { store.dispose(); root(); await ctx.fiber.dispose() }
+})
+
 it('orders releases and prereleases like SemVer', () => {
   expect(compareVersions('1.9.0', '2.0.0')).toBeLessThan(0)
   expect(compareVersions('2.0.0-rc.1', '2.0.0')).toBeLessThan(0)
   expect(compareVersions('2.0.0-rc.2', '2.0.0-rc.10')).toBeLessThan(0)
   expect(compareVersions('2.0.0+build.1', '2.0.0')).toBe(0)
   expect(compareVersions('2.0.0', '2.0.0')).toBe(0)
+  expect(compareVersions('1.0.0-alpha', '1.0.0-alpha.1')).toBeLessThan(0)
+  expect(compareVersions('1.0.0-alpha.1', '1.0.0-alpha')).toBeGreaterThan(0)
+  expect(compareVersions('1.0.0-rc.1', '1.0.0-rc.1')).toBe(0)
+  expect(compareVersions('1.0.0-1', '1.0.0-alpha')).toBeLessThan(0)
+  expect(compareVersions('1.0.0-alpha', '1.0.0-1')).toBeGreaterThan(0)
+  expect(compareVersions('1.0.0-alpha', '1.0.0-beta')).toBeLessThan(0)
 })

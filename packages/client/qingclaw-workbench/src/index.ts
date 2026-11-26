@@ -9,8 +9,9 @@ import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typer
 import {
   fetchOfficialFeed, parseCacheRecord, serializeCacheRecord, type WorkbenchCacheRecord,
 } from './feed.ts'
+import type { PluginInstallRequestId } from '@deepseek-ai/dsh-plugin-manager/types'
 import type {
-  ProEntitlement, WorkbenchCatalogEntry, WorkbenchCatalogResult, WorkbenchFeedResult, WorkbenchInstallResult,
+  ProEntitlement, WorkbenchActiveInstall, WorkbenchCatalogEntry, WorkbenchCatalogResult, WorkbenchFeedResult, WorkbenchInstallResult,
 } from './types.ts'
 import { readRegistryReadme } from './readme.ts'
 import { OFFICIAL_REGISTRY, WorkbenchDirectory } from './catalog.ts'
@@ -28,6 +29,7 @@ interface BundleInstaller {
     registry: string
     expected: { readonly name: string; readonly version: string }
     authToken: string
+    requestId: PluginInstallRequestId
   }): Promise<{
     application: WorkbenchInstallResult['application']
     error?: { code?: string; diagnostic?: string }
@@ -94,6 +96,7 @@ export default class QingClawWorkbench extends TypertRemoteService {
   private pending: Promise<WorkbenchFeedResult> | undefined
   private readonly directory: WorkbenchDirectory
   private readonly registry: WorkbenchRegistryAccess
+  private readonly activeInstalls = new Map<string, WorkbenchActiveInstall>()
 
   /** Fetch the public directory of desktop-compatible workbenches. */
   @Remote
@@ -116,28 +119,43 @@ export default class QingClawWorkbench extends TypertRemoteService {
    * The registry token is obtained here so that it never leaves the Host process.
    * @param name - the catalog package name.
    * @param version - the exact listed version.
+   * @param requestId - the caller's id for the manager's install progress and recovery.
    * @returns the installation outcome the product UI reports.
    */
   @Remote
-  async installWorkbench(name: string, version: string): Promise<WorkbenchInstallResult> {
+  async installWorkbench(name: string, version: string, requestId: PluginInstallRequestId): Promise<WorkbenchInstallResult> {
     this.assertOpen()
-    return this.installListed(await this.listedEntry(name, version), '安装')
+    return this.installListed(await this.listedEntry(name, version), '安装', 'install', requestId)
   }
 
   /**
    * Install a newer listed version over the installed copy, with the same registry grant as an installation.
    * @param name - the catalog package name.
    * @param version - the exact listed version to install over the current one.
+   * @param requestId - the caller's id for the manager's install progress and recovery.
    * @returns the installation outcome the product UI reports.
    */
   @Remote
-  async updateWorkbench(name: string, version: string): Promise<WorkbenchInstallResult> {
+  async updateWorkbench(name: string, version: string, requestId: PluginInstallRequestId): Promise<WorkbenchInstallResult> {
     this.assertOpen()
-    return this.installListed(await this.listedEntry(name, version), '升级')
+    return this.installListed(await this.listedEntry(name, version), '升级', 'update', requestId)
+  }
+
+  /**
+   * The installations this Host still runs, so a client that reloaded mid-install can show their progress
+   * and await their outcome instead of starting a second installation.
+   * @returns one record per in-flight workbench installation, empty when none runs.
+   */
+  @Remote
+  async getActiveInstalls(): Promise<readonly WorkbenchActiveInstall[]> {
+    this.assertOpen()
+    return [...this.activeInstalls.values()]
   }
 
   /** Install one listed release for the signed-in account and report the outcome. */
-  private async installListed(entry: WorkbenchCatalogEntry, verb: string): Promise<WorkbenchInstallResult> {
+  private async installListed(
+    entry: WorkbenchCatalogEntry, verb: string, kind: WorkbenchActiveInstall['kind'], requestId: PluginInstallRequestId,
+  ): Promise<WorkbenchInstallResult> {
     const manager = this.ctx.get('pluginManager') as BundleInstaller | undefined
     if (manager === undefined) throw new Error(`当前运行环境不支持${verb}工作台。`)
     // Sign-in is checked first so a signed-out visitor is asked to sign in
@@ -151,15 +169,18 @@ export default class QingClawWorkbench extends TypertRemoteService {
     const archive = new URL(`${entry.packageName}/-/${leaf}-${entry.version}.tgz`, entry.registry).href
     // The registry is pinned so a Host fallback registry never becomes the package transport.
     const options = { enabled: true, saveExact: true, registry: entry.registry,
-      expected: { name: entry.packageName, version: entry.version }, authToken: token }
-    let result = await manager.installBundle(archive, options)
-    // With HMR the manager refuses to install over a running copy; stop it and install again.
-    if (result.error?.code === 'already-installed' && manager.removeBundle !== undefined) {
-      await manager.removeBundle(entry.packageName)
-      result = await manager.installBundle(archive, options)
-    }
-    const diagnostic = result.error?.diagnostic ?? result.error?.code
-    return { application: result.application, ...diagnostic === undefined ? {} : { diagnostic } }
+      expected: { name: entry.packageName, version: entry.version }, authToken: token, requestId }
+    this.activeInstalls.set(entry.packageName, { name: entry.packageName, version: entry.version, kind, requestId })
+    try {
+      let result = await manager.installBundle(archive, options)
+      // With HMR the manager refuses to install over a running copy; stop it and install again.
+      if (result.error?.code === 'already-installed' && manager.removeBundle !== undefined) {
+        await manager.removeBundle(entry.packageName)
+        result = await manager.installBundle(archive, options)
+      }
+      const diagnostic = result.error?.diagnostic ?? result.error?.code
+      return { application: result.application, ...diagnostic === undefined ? {} : { diagnostic } }
+    } finally { this.activeInstalls.delete(entry.packageName) }
   }
 
   /**

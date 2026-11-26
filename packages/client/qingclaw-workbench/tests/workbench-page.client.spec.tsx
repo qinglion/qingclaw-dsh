@@ -27,12 +27,15 @@ const notes: WorkbenchPluginItem = {
 
 function setup(initial = [media, notes]) {
   let items = initial
+  let notify: () => void = () => {}
   const update = (id: string, changes: Partial<WorkbenchPluginItem>) => {
     items = items.map(item => item.id === id ? { ...item, ...changes } : item)
+    notify()
   }
   const store = {
     load: vi.fn(async (_refresh?: boolean) => items),
-    subscribe: vi.fn(() => () => {}),
+    snapshot: vi.fn(() => items),
+    subscribe: vi.fn((listener: () => void) => { notify = listener; return () => { notify = () => {} } }),
     setFavorite: vi.fn((id: string, favorite: boolean) => update(id, { favorite })),
     install: vi.fn(async (id: string) => update(id, { installed: true, openable: true })),
     update: vi.fn(async (id: string) => update(id, { installedVersion: '1.0.0', updateAvailable: false })),
@@ -43,7 +46,7 @@ function setup(initial = [media, notes]) {
     dispose: vi.fn(),
   } satisfies WorkbenchPluginStore
   const page = () => render(<WorkbenchPage {...({ t, useLocale, pluginStore: store } as unknown as WorkbenchPageProps)} />)
-  return { store, page }
+  return { store, page, update }
 }
 
 it('keeps project creation out of the market', async () => {
@@ -281,4 +284,39 @@ it('preserves the tab, search, and category when returning from a workbench deta
   expect(screen.getByRole<HTMLSelectElement>('combobox').value).toBe(media.category)
   expect(screen.getAllByRole('article')).toHaveLength(1)
   expect(screen.getByRole('article', { name: media.title })).toBeTruthy()
+})
+
+it('shows download and install progress, and keeps it when leaving and returning to the page', async () => {
+  const other = { ...notes, id: 'other', packageName: '@example/other', title: '其他工作台',
+    installed: false, installable: true, openable: false }
+  const { page, update } = setup([{ ...media, pending: { kind: 'install', phase: 'download', download: 40, install: 0 } }, other])
+  const view = page()
+  const card = within(await screen.findByRole('article', { name: media.title }))
+  expect(card.getByRole('button', { name: zh.downloading })).toBeTruthy()
+  const progress = within(card.getByRole('status', { name: '自媒体工作台的安装进度' }))
+  expect(progress.getByText(zh.stageDownload)).toBeTruthy()
+  expect(progress.getByText(zh.stageInstall)).toBeTruthy()
+  expect(progress.getByText('40%')).toBeTruthy()
+  const blocked = within(screen.getByRole('article', { name: other.title }))
+    .getByRole<HTMLButtonElement>('button', { name: zh.install })
+  expect(blocked.disabled).toBe(true)
+  view.unmount()
+  page()
+  const returned = within(await screen.findByRole('article', { name: media.title }))
+  expect(returned.getByRole('button', { name: zh.downloading })).toBeTruthy()
+  update(media.id, { pending: { kind: 'install', phase: 'apply', download: 100, install: 100 } })
+  await waitFor(() => expect(returned.getByRole('button', { name: zh.applying })).toBeTruthy())
+})
+
+it('shows the same progress on the product page', async () => {
+  const { page } = setup([{ ...media, installed: true, installable: false, openable: false,
+    installedVersion: '0.9.0', updateAvailable: true,
+    pending: { kind: 'update', phase: 'install', download: 100, install: 60 } }])
+  page()
+  fireEvent.click(within(await screen.findByRole('article', { name: media.title }))
+    .getByRole('button', { name: '查看自媒体工作台详情' }))
+  const detail = within(await screen.findByRole('region', { name: media.title }))
+  expect(detail.getByRole('button', { name: zh.updating })).toBeTruthy()
+  expect(detail.getByRole('status', { name: '自媒体工作台的安装进度' })).toBeTruthy()
+  expect(detail.getByText('60%')).toBeTruthy()
 })
