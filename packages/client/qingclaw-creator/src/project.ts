@@ -68,14 +68,16 @@ function pluginProject(manifest: Record<string, unknown>): PluginProject | undef
  * @returns the real directory path, or undefined when nothing is there.
  */
 export async function packageDirectory(root: string, directory: string): Promise<string | undefined> {
-  // Any name a filesystem accepts is a valid segment — Chinese and spaces
-  // included. Only paths that could leave the root are refused.
-  const segments = directory.split('/')
-  if (directory !== '.' && (directory.startsWith('/') || directory.includes('\\')
-    || /[\x00-\x1f]/.test(directory) || segments.some(segment => segment === '' || segment === '.' || segment === '..'))) {
+  // A relative path, written the way a shell writes one: `dsh-codex`,
+  // `./dsh-codex`, or `.`. Any name a filesystem accepts is a valid segment —
+  // Chinese and spaces included. Only paths that could leave the root are refused.
+  if (directory.startsWith('/') || directory.includes('\\') || /[\x00-\x1f]/.test(directory)) {
     throw new Error('包目录必须是工作区内的相对路径。')
   }
-  const resolved = join(root, directory)
+  const segments = directory.split('/').filter(segment => segment !== '' && segment !== '.')
+  if (segments.some(segment => segment === '..')) throw new Error('包目录必须是工作区内的相对路径。')
+  const relative = segments.length === 0 ? '.' : segments.join('/')
+  const resolved = join(root, relative)
   return await realpath(resolved).catch(() => undefined) === resolved ? resolved : undefined
 }
 
@@ -259,7 +261,8 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
         if (resolved === undefined) {
           // Nothing is at that path, so the page asks for a different one instead
           // of reporting a failed read, and names the path it looked at.
-          return Response.json({ missing: true, path: join(root, directory) }, { headers })
+          const probed = join(root, directory.replace(/^(\.\/)+/, ''))
+          return Response.json({ missing: true, path: probed }, { headers })
         }
         target = resolved
       } catch {

@@ -63,6 +63,13 @@ it('answers for a session directory and for one named directory inside it', asyn
   expect(await empty.json()).toEqual({})
   const named = await route()(new Request(sessionUrl + '&directory=dsh-codex'))
   expect(await named.json()).toMatchObject({ project: { name: '@qinglion/dsh-codex' } })
+  // A path written the way a shell writes one resolves to the same directory.
+  for (const written of ['./dsh-codex', 'dsh-codex/', '././dsh-codex']) {
+    const shell = await route()(new Request(sessionUrl + '&directory=' + encodeURIComponent(written)))
+    expect(await shell.json()).toMatchObject({ project: { name: '@qinglion/dsh-codex' } })
+  }
+  const dotOnly = await route()(new Request(sessionUrl + '&directory=./'))
+  expect(await dotOnly.json()).toEqual({})
   const escaped = await route()(new Request(sessionUrl + '&directory=../outside'))
   const warning = (await escaped.json() as { warning?: string }).warning
   expect(warning).toContain('包目录')
