@@ -57,6 +57,8 @@ it('reports the root project for a registered workspace without changing what it
 it('answers for a session directory and for one named directory inside it', async () => {
   await manifest(root, { name: 'collection', version: '1.0.0' })
   await manifest(join(root, 'dsh-codex'), { ...plugin, name: '@qinglion/dsh-codex' })
+  // Any name a filesystem accepts is a valid segment, Chinese included.
+  await manifest(join(root, '文字稿', '工作台'), { ...plugin, name: '@qinglion/copy' })
   const empty = await route()(new Request(sessionUrl))
   expect(await empty.json()).toEqual({})
   const named = await route()(new Request(sessionUrl + '&directory=dsh-codex'))
@@ -64,8 +66,13 @@ it('answers for a session directory and for one named directory inside it', asyn
   const escaped = await route()(new Request(sessionUrl + '&directory=../outside'))
   const warning = (await escaped.json() as { warning?: string }).warning
   expect(warning).toContain('包目录')
+  const unicode = await route()(new Request(sessionUrl + '&directory=' + encodeURIComponent('文字稿/工作台')))
+  expect(await unicode.json()).toMatchObject({ project: { name: '@qinglion/copy' } })
   const absent = await route()(new Request(sessionUrl + '&directory=nope'))
-  expect(await absent.json()).toEqual({ missing: true })
+  const absentBody = await absent.json() as { missing?: boolean; path?: string }
+  expect(absentBody.missing).toBe(true)
+  // The answer names the path it looked at, so the page can show it.
+  expect(absentBody.path?.endsWith('/nope')).toBe(true)
   const unknown = await route({ session: () => undefined })(new Request(sessionUrl))
   expect(unknown.status).toBe(404)
 })

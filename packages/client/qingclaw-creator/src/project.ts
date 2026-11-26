@@ -68,9 +68,11 @@ function pluginProject(manifest: Record<string, unknown>): PluginProject | undef
  * @returns the real directory path, or undefined when nothing is there.
  */
 export async function packageDirectory(root: string, directory: string): Promise<string | undefined> {
+  // Any name a filesystem accepts is a valid segment — Chinese and spaces
+  // included. Only paths that could leave the root are refused.
   const segments = directory.split('/')
-  if (directory !== '.' && (!/^[a-zA-Z0-9._@-]+(?:\/[a-zA-Z0-9._@-]+)*$/.test(directory)
-    || segments.some(segment => segment === '.' || segment === '..'))) {
+  if (directory !== '.' && (directory.startsWith('/') || directory.includes('\\')
+    || /[\x00-\x1f]/.test(directory) || segments.some(segment => segment === '' || segment === '.' || segment === '..'))) {
     throw new Error('包目录必须是工作区内的相对路径。')
   }
   const resolved = join(root, directory)
@@ -256,8 +258,8 @@ export function projectRoute(inputs: ProjectRouteInputs): (request: Request) => 
         const resolved = await packageDirectory(root, directory)
         if (resolved === undefined) {
           // Nothing is at that path, so the page asks for a different one instead
-          // of reporting a failed read.
-          return Response.json({ missing: true }, { headers })
+          // of reporting a failed read, and names the path it looked at.
+          return Response.json({ missing: true, path: join(root, directory) }, { headers })
         }
         target = resolved
       } catch {

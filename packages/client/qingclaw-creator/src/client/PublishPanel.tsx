@@ -131,7 +131,11 @@ export function PublishPanel({ sessionId, directoryOf, publish, t }: Pick<Props,
     setMissing(undefined); setEntryWarning(undefined)
     try {
       const found = await getSessionProjectAt(sessionId, relative, cwd, new AbortController().signal)
-      if (found.missing === true) { setMissing(t('publishDirectoryMissing')); return }
+      if (found.missing === true) {
+        setMissing(t('publishDirectoryMissing'))
+        setEntryWarning(found.path)
+        return
+      }
       if (found.project === undefined) { setMissing(t('publishMissing')); setEntryWarning(found.warning); return }
       writeBinding(key, relative)
       setEntry('')

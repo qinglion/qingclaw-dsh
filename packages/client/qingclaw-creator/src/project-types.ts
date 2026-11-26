@@ -24,4 +24,6 @@ export interface WorkspacePluginState {
   warning?: string
   /** The named directory does not exist inside the requested root. */
   missing?: boolean
+  /** The path the request resolved against the root, when it named one. */
+  path?: string
 }

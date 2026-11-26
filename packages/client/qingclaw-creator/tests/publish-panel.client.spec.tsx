@@ -127,12 +127,13 @@ it('shows the website refusal verbatim when a listing is declined', async () => 
 
 it('names a subdirectory that does not exist instead of a failed read', async () => {
   vi.mocked(getSessionPlugin).mockResolvedValue({})
-  vi.mocked(getSessionProjectAt).mockResolvedValue({ missing: true })
+  vi.mocked(getSessionProjectAt).mockResolvedValue({ missing: true, path: '/Users/me/collection/nope' })
   mount()
   fireEvent.change(await screen.findByPlaceholderText(zh.publishDirectory), { target: { value: 'nope' } })
   fireEvent.click(screen.getByRole('button', { name: zh.publishUse }))
   const alert = await screen.findByRole('alert')
-  expect(alert.textContent).toBe(zh.publishDirectoryMissing)
+  expect(alert.textContent).toContain(zh.publishDirectoryMissing)
+  expect(alert.textContent).toContain('/Users/me/collection/nope')
 })
 
 it('says so when the chosen directory holds no plugin', async () => {
