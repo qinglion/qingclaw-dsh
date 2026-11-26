@@ -278,9 +278,9 @@ it('surfaces catalog and inventory failures and ignores answers after dispose', 
     const reading = store.load(true)
     await vi.waitFor(() => expect(asked).toBe(true))
     store.dispose()
-    gate.resolve()
+    gate.resolve(undefined)
     await reading
-    expect(await store.load()).toEqual([])
+    expect(await store.load(false)).toEqual([])
   } finally { root(); await ctx.fiber.dispose() }
   const bundlesGate = deferred<unknown>()
   const late = await mountProgress({ bundles: () => bundlesGate.promise })
