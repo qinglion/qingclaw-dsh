@@ -41,7 +41,10 @@ interface BundleInstaller {
 /** Minimal account reader used for the professional entitlement gate. */
 interface AccountProfileReader {
   getProfile(client: { version: string; locale: string; timezoneOffsetSeconds: number }): Promise<
-    | { status: 'ready'; value: { plan?: string | null; subscriptionEndsAt?: string | null } }
+    | {
+      status: 'ready'
+      value: { plan?: string | null; subscriptionEndsAt?: string | null; subscriptionActive?: boolean | null }
+    }
     | { status: 'failed' }
     | null
   >
@@ -245,7 +248,14 @@ export default class QingClawWorkbench extends TypertRemoteService {
     }
   }
 
-  /** Read the signed-in account's QingClaw professional entitlement. */
+  /**
+   * Read the signed-in account's QingClaw professional entitlement.
+   *
+   * A licence counts only while the plan is professional, its period has not
+   * ended, and the account's wallet still carries that subscription: an
+   * entitlement edited on its own never grants access. The platform answers the
+   * same question for registry reads, so both ends agree.
+   */
   @Remote
   async getEntitlement(): Promise<ProEntitlement> {
     try {
@@ -260,6 +270,7 @@ export default class QingClawWorkbench extends TypertRemoteService {
       const plan = result.value.plan ?? null
       const endsAt = result.value.subscriptionEndsAt ?? null
       const active = plan === 'pro' && (endsAt === null || Date.parse(endsAt) > Date.now())
+        && result.value.subscriptionActive === true
       return { active, plan, endsAt }
     } catch {
       return { active: false, plan: null, endsAt: null }

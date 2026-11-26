@@ -23,12 +23,18 @@ async function fixture(options: {
   manager?: boolean
   entries?: WorkbenchCatalogEntry[]
   plan?: 'pro' | 'free'
+  /** Wallet subscription state; a professional plan normally carries one. */
+  subscriptionActive?: boolean
 } = {}) {
   const ctx = new Context()
   const installBundle = vi.fn(options.install ?? (async () => ({ application: 'applied', changed: true })))
   ctx.provide('deepseekAccount', {
     getPlatformSession: async () => ({ origin: 'https://qingclaw.com', token: 'platform-token' }),
-    getProfile: async () => ({ status: 'ready', value: { plan: options.plan ?? 'pro', subscriptionEndsAt: null } }),
+    getProfile: async () => ({ status: 'ready', value: {
+      plan: options.plan ?? 'pro',
+      subscriptionEndsAt: null,
+      subscriptionActive: options.subscriptionActive ?? (options.plan ?? 'pro') === 'pro',
+    } }),
   })
   if (options.manager !== false) ctx.provide('pluginManager', { installBundle })
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (url) => {
@@ -61,6 +67,15 @@ it('lets a free account browse but refuses to install without the professional l
     expect(await ctx.qingclawWorkbench.getWorkbenchCatalog(false)).toMatchObject({
       entries: [expect.objectContaining({ packageName: entry.packageName })],
     })
+    await expect(ctx.qingclawWorkbench.installWorkbench(entry.packageName, entry.version, requestId))
+      .rejects.toMatchObject({ code: 'qingclaw-workbench/pro-required' })
+    expect(installBundle).not.toHaveBeenCalled()
+  } finally { vi.unstubAllGlobals(); await ctx.fiber.dispose() }
+})
+
+it('refuses a professional plan whose wallet subscription is no longer active', async () => {
+  const { ctx, installBundle } = await fixture({ subscriptionActive: false })
+  try {
     await expect(ctx.qingclawWorkbench.installWorkbench(entry.packageName, entry.version, requestId))
       .rejects.toMatchObject({ code: 'qingclaw-workbench/pro-required' })
     expect(installBundle).not.toHaveBeenCalled()
