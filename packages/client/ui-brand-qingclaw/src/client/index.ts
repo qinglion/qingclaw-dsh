@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { QingClawBrandMark, QingClawBrandName } from './Brand.tsx'
 import { de, en, es, fr, ja, NS, pt, ru, zh } from './locales.ts'
+import { applyTerms } from './terms.ts'
 
 /** Required services: the UI slot registry and locale dictionary registry. */
 export const inject = ['slots', 'locale']
@@ -19,6 +20,7 @@ export function apply(ctx: ClientContext): void {
     () => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }),
     'client-ui-brand-qingclaw: dictionaries',
   )
+  applyTerms(ctx)
   ctx.slots.inject('sidebar.brand.mark', () =>
     ctx.slots.inject('sidebar.brand.name', () =>
       ctx.slots.inject('conversation.hero.brand.mark', function* () {

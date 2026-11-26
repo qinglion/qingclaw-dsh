@@ -13,4 +13,5 @@
 .metrics dt { color: var(--dsw-alias-label-secondary); font-size: 13px; }
 .metrics dd { margin: 0; color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .source { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.confirm { color: var(--dsw-alias-label-secondary); font-size: 12px; }

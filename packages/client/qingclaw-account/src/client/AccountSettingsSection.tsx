@@ -1,4 +1,5 @@
 /** QingClaw account settings page: identity, plan and credits for the signed-in website account. */
+import { useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatCredits } from './formatCredits.ts'
@@ -22,6 +23,8 @@ export interface AccountSettingsInjected {
   readonly openTopUp: () => void
   /** Show the deployment's usage page. */
   readonly openUsage: () => void
+  /** Whether signing out would interrupt running account tasks. */
+  readonly hasRunningTasks: () => Promise<boolean>
 }
 
 type AccountSettingsProps = PropsRuntime<'settings.section'>
@@ -44,7 +47,10 @@ export function planTier(plan: string | null | undefined, active: boolean | null
  * @param props - quota facts, account operations and localized copy.
  * @returns the QingClaw account page.
  */
-export function AccountSettingsSection({ useAccount, signIn, signOut, refresh, openTopUp, openUsage, t }: AccountSettingsProps) {
+export function AccountSettingsSection({
+  useAccount, signIn, signOut, refresh, openTopUp, openUsage, hasRunningTasks, t,
+}: AccountSettingsProps) {
+  const [confirming, setConfirming] = useState(false)
   const state = useAccount(value => value)
   const profile = state.profile
   if (!state.signedIn || profile === undefined) {
@@ -61,6 +67,12 @@ export function AccountSettingsSection({ useAccount, signIn, signOut, refresh, o
   if (profile.trialTokens && profile.trialTokens > 0) sources.push(t('quotaTrial'))
   if (profile.topupTokens && profile.topupTokens > 0) sources.push(t('quotaPurchased'))
   const unknown = t('quotaUnknown')
+  const requestSignOut = (): void => {
+    void hasRunningTasks().then((running) => {
+      if (!running) return signOut()
+      setConfirming(true)
+    }).catch(() => { setConfirming(true) })
+  }
   return <section className={css.page}>
     <header className={css.identity}>
       {profile.avatarUrl ? <img className={css.avatar} src={profile.avatarUrl} alt="" /> : null}
@@ -79,7 +91,13 @@ export function AccountSettingsSection({ useAccount, signIn, signOut, refresh, o
       <Button variant="primary" onClick={() => { openTopUp() }}>{t('topUp')}</Button>
       <Button variant="outline" onClick={() => { openUsage() }}>{t('quotaManage')}</Button>
       <Button variant="outline" onClick={() => { void refresh().catch(() => undefined) }}>{t('refresh')}</Button>
-      <Button variant="outline" onClick={() => { void signOut().catch(() => undefined) }}>{t('signOut')}</Button>
+      {confirming
+        ? <>
+          <span className={css.confirm}>{t('signOutConfirm')}</span>
+          <Button variant="outline" onClick={() => { setConfirming(false); void signOut().catch(() => undefined) }}>{t('signOutConfirmAction')}</Button>
+          <Button variant="outline" onClick={() => { setConfirming(false) }}>{t('cancel')}</Button>
+        </>
+        : <Button variant="outline" onClick={requestSignOut}>{t('signOut')}</Button>}
     </div>
   </section>
 }

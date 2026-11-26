@@ -67,6 +67,11 @@ export function apply(ctx: Context): void {
     name: 'settings.section', id: 'account', order: -10, priority: -10, label: () => t('nav'), locale: NS,
     inject: (): AccountSettingsInjected => ({
       hooks, signIn, signOut, refresh: () => quota.refresh(), openTopUp, openUsage,
+      // An unreadable answer asks before dropping the grant rather than interrupting silently.
+      hasRunningTasks: async () => {
+        const result = await ctx.remote.account.hasRunningAccountTasks()
+        return result.ok ? result.value : true
+      },
     }),
   }, AccountSettingsSection)))
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
