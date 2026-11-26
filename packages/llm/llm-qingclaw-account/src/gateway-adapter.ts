@@ -47,7 +47,7 @@ export function registerAccountAdapter<C extends ResolvedDeepSeekOptions>(
       ...(entry?.imagePixelBudget === undefined ? {} : {
         requestImagePixelBudget: entry.imagePixelBudget === 'low' ? 512 * 512 : entry.imagePixelBudget,
       }),
-      ...(entry?.imageMaxBytes === undefined ? {} : { requestImageMaxBytes: entry.imageMaxBytes }),
+      ...(entry?.imageTargetBytes === undefined ? {} : { requestImageMaxBytes: entry.imageTargetBytes }),
       reasoning: connection.defaults.thinking === 'disabled' ? 'off' : connection.defaults.reasoningEffort ?? 'high',
       models: [{
         id: model,

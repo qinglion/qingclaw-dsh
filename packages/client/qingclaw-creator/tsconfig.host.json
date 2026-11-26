@@ -10,7 +10,7 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../credentials/deepseek-account"
+      "path": "../../account/deepseek-account"
     },
     {
       "path": "../connection/tsconfig.host.json"

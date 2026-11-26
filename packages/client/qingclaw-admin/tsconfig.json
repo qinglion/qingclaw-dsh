@@ -5,7 +5,7 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../api/remotes/tsconfig.client.json" },
-    { "path": "../../credentials/deepseek-account" },
+    { "path": "../../account/deepseek-account" },
     { "path": "../connection/tsconfig.host.json" },
     { "path": "../locale/tsconfig.client.json" },
     { "path": "../ui-renderer" },

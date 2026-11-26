@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
-import type { DeepSeekAccount, PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
+import type { AccountRequestCredential, DeepSeekAccount, PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
 import { BlockAssembler, createAssistantMessage, createToolResultMessage, createUserMessage, type GenerateOptions, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import LocalAttachments from '../../../attachment/attachment-local/src/index.ts'
@@ -88,7 +88,7 @@ async function finishOf(ctx: Context, options: Partial<GenerateOptions> = {}) {
 
 async function mount(request: typeof fetch) {
   const refreshUsage = vi.fn(async (_token: string): Promise<void> => {})
-  const rejectToken = vi.fn(async (_token: string): Promise<void> => {})
+  const rejectToken = vi.fn(async (): Promise<void> => {})
   const session: PlatformSession = {
     origin: 'https://beta.qingclaw.test',
     token: 'long-lived-device-session',
@@ -99,9 +99,14 @@ async function mount(request: typeof fetch) {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(LlmRuntime)
-  const account: Pick<DeepSeekAccount, 'getPlatformSession' | 'rejectToken' | 'refreshUsage'> = {
+  const account: Pick<DeepSeekAccount, 'getPlatformSession' | 'refreshUsage'> & {
+    resolveRequestCredential: (url: string) => Promise<AccountRequestCredential>
+  } = {
     getPlatformSession: async (): Promise<PlatformSession> => session,
-    rejectToken, refreshUsage,
+    refreshUsage,
+    resolveRequestCredential: async () => ({
+      headers: {}, revoked: new AbortController().signal, reject: rejectToken,
+    }),
   }
   ctx.provide('deepseekAccount', account as DeepSeekAccount)
   await ctx.plugin(QingClawAccount, { baseURL: 'https://gateway.qingclaw.test/test/v1' })

@@ -24,7 +24,7 @@
       "path": "../../identity/anonymous-user-id"
     },
     {
-      "path": "../../credentials/deepseek-account"
+      "path": "../../account/deepseek-account"
     },
     {
       "path": "../../core/session"

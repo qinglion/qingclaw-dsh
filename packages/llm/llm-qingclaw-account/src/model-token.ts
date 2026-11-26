@@ -37,7 +37,12 @@ interface CachedGrant extends ModelGrant {
 /** Dependencies of one cache instance, injectable for deterministic transport and clock tests. */
 export interface ModelTokenCacheDependencies {
   /** Long-lived QingClaw device session owner. */
-  readonly account: Pick<DeepSeekAccount, 'getPlatformSession' | 'rejectToken'>
+  readonly account: Pick<DeepSeekAccount, 'getPlatformSession'> & Partial<Pick<DeepSeekAccount, 'resolveRequestCredential'>>
+  /**
+   * Destination the account validates before releasing a credential; the public
+   * rejection path only accepts the account service's own inference origin.
+   */
+  readonly rejectUrl?: () => string
   /** Deadline of one Platform token exchange. */
   readonly timeoutMs: () => number
   /** Wall clock used for JWT expiry; defaults to `Date.now`. */
@@ -103,6 +108,7 @@ function endpointFailure(status: number): LlmError {
 /** In-memory short-token owner. It never persists a model JWT or exposes the device token to the gateway. */
 export class ModelTokenCache {
   private readonly account: ModelTokenCacheDependencies['account']
+  private readonly rejectUrl: (() => string) | undefined
   private readonly timeoutMs: () => number
   private readonly now: () => number
   private readonly request: typeof fetch
@@ -116,6 +122,7 @@ export class ModelTokenCache {
   /** @param dependencies - account service, deadline, clock, and HTTP transport. */
   constructor(dependencies: ModelTokenCacheDependencies) {
     this.account = dependencies.account
+    this.rejectUrl = dependencies.rejectUrl
     this.timeoutMs = dependencies.timeoutMs
     this.now = dependencies.now ?? (() => Date.now())
     this.request = dependencies.request ?? fetch
@@ -209,7 +216,11 @@ export class ModelTokenCache {
       await response.body?.cancel().catch(() => undefined)
       this.invalidateSession(key)
       try {
-        await this.account.rejectToken(session.token)
+        // Upstream keeps its own token rejection private; the public contract is the
+        // credential object's reject(), which drops the grant the destination refused.
+        const destination = this.rejectUrl?.() ?? session.origin
+        const credential = await this.account.resolveRequestCredential?.(destination)
+        await credential?.reject()
       } catch (_deviceSessionRemovalFailed) {
         // The authentication failure remains authoritative; a matching later account read can retry removal.
       }

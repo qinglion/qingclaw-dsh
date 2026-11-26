@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { DeepSeekAccount, PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
+import type { AccountRequestCredential, DeepSeekAccount, PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
 import { ModelTokenCache } from '../src/model-token.ts'
 
 const caches: ModelTokenCache[] = []
@@ -26,13 +26,17 @@ function fixture(options: {
   request: typeof fetch
   session?: () => PlatformSession | null
 }) {
-  const rejectToken = vi.fn(async (_token: string): Promise<void> => {})
-  const account: Pick<DeepSeekAccount, 'getPlatformSession' | 'rejectToken'> = {
+  const rejectToken = vi.fn(async (): Promise<void> => {})
+  const account: Pick<DeepSeekAccount, 'getPlatformSession'> & {
+    resolveRequestCredential: (url: string) => Promise<AccountRequestCredential>
+  } = {
     getPlatformSession: async () => options.session?.() ?? {
       origin: 'https://beta.qingclaw.com', token: 'device-session', userId: null,
       requestHeaders: { cookie: 'deployment=beta' },
     },
-    rejectToken,
+    resolveRequestCredential: async () => ({
+      headers: {}, revoked: new AbortController().signal, reject: rejectToken,
+    }),
   }
   const cache = new ModelTokenCache({
     account,
@@ -129,7 +133,7 @@ it('clears the matching long-lived device session only when model_token answers 
   const unauthorized: typeof fetch = vi.fn(async () => new Response(null, { status: 401 }))
   const first = fixture({ request: unauthorized })
   await expect(first.cache.resolve()).rejects.toMatchObject({ code: 'ACCOUNT_SIGN_IN_REQUIRED' })
-  expect(first.rejectToken).toHaveBeenCalledExactlyOnceWith('device-session')
+  expect(first.rejectToken).toHaveBeenCalledOnce()
 
   const forbidden: typeof fetch = vi.fn(async () => new Response(null, { status: 403 }))
   const second = fixture({ request: forbidden })

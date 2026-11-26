@@ -1,7 +1,7 @@
 /** Video tool arguments, media slots, and the request body the gateway receives. */
 import { Buffer } from 'node:buffer'
 import { Context } from '@deepseek-ai/cordis'
-import type { DeepSeekAccount, PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
+import type { AccountRequestCredential, DeepSeekAccount, PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
 import { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as QingClawAccount from '../src/index.ts'
@@ -39,10 +39,14 @@ async function mount(options: { fs?: FakeFileSystem } = {}) {
     userId: null,
     requestHeaders: {},
   }
-  const account: Pick<DeepSeekAccount, 'getPlatformSession' | 'rejectToken' | 'refreshUsage'> = {
+  const account: Pick<DeepSeekAccount, 'getPlatformSession' | 'refreshUsage'> & {
+    resolveRequestCredential: (url: string) => Promise<AccountRequestCredential>
+  } = {
     getPlatformSession: async (): Promise<PlatformSession> => session,
-    rejectToken: async (): Promise<void> => {},
     refreshUsage: async (): Promise<void> => {},
+    resolveRequestCredential: async () => ({
+      headers: {}, revoked: new AbortController().signal, reject: async (): Promise<void> => {},
+    }),
   }
   const ctx = new Context()
   contexts.push(ctx)

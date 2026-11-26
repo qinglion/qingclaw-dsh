@@ -40,9 +40,9 @@ interface MediaFileSystem {
   readBytes(target: object, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array>
 }
 
-async function requestQingclawListing(url: string, token: string, signal: AbortSignal): Promise<ModelListing> {
+async function requestQingclawListing(url: string, credential: Readonly<Record<string, string>>, signal: AbortSignal): Promise<ModelListing> {
   const headers = new Headers(attributionHeaders())
-  headers.set(MODEL_TOKEN_HEADER, `Bearer ${token}`)
+  for (const [name, value] of Object.entries(credential)) headers.set(name, value)
   headers.set('accept', 'application/json')
   let response: Response
   try {
@@ -97,7 +97,11 @@ export function apply(ctx: Context, config: Config): void {
   const settings = () => resolveOptions(plainOptions(config))
   settings()
   installTurnUsageRefresh(ctx, PROVIDER)
-  const tokens = new ModelTokenCache({ account: ctx.deepseekAccount, timeoutMs: () => settings().modelTokenTimeoutMs })
+  const tokens = new ModelTokenCache({
+    account: ctx.deepseekAccount,
+    rejectUrl: () => settings().protocol.baseURL,
+    timeoutMs: () => settings().modelTokenTimeoutMs,
+  })
   const keys = new ModelKeyCache({ account: ctx.deepseekAccount, timeoutMs: () => settings().modelTokenTimeoutMs })
   ctx.effect(() => () => Promise.all([tokens.dispose(), keys.dispose()]), 'llm-qingclaw-account: credential caches')
   ctx.on('deepseek-account/signed-out', () => { tokens.clear(); keys.clear() })
@@ -111,12 +115,18 @@ export function apply(ctx: Context, config: Config): void {
   }).models
   const catalog = createModelListingCache(ctx, name, PROVIDER, {
     settings: () => settings().catalog,
-    credential: async () => await tokens.resolve(),
-    load: async (url, token, signal) => {
+    credential: async () => {
+      const token = await tokens.resolve()
+      return token === undefined ? undefined : { [MODEL_TOKEN_HEADER]: `Bearer ${token}` }
+    },
+    load: async (url, credential, signal) => {
       try {
-        return await requestQingclawListing(url, token, signal)
+        return await requestQingclawListing(url, credential, signal)
       } catch (error) {
-        if (error instanceof LlmError && error.failure.status === 401) tokens.reject(token)
+        if (error instanceof LlmError && error.failure.status === 401) {
+          const rejected = credential[MODEL_TOKEN_HEADER]
+          if (rejected !== undefined && rejected.startsWith('Bearer ')) tokens.reject(rejected.slice('Bearer '.length))
+        }
         throw error
       }
     },
