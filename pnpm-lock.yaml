@@ -4026,12 +4026,18 @@ importers:
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: workspace:*
         version: link:../ui-conversation
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: workspace:*
+        version: link:../ui-layout
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:*
         version: link:../ui-primitives
       '@deepseek-ai/dsh-client-ui-renderer':
         specifier: workspace:*
         version: link:../ui-renderer
+      '@deepseek-ai/dsh-client-ui-settings':
+        specifier: workspace:*
+        version: link:../ui-settings
       '@deepseek-ai/dsh-client-ui-settings-account':
         specifier: workspace:*
         version: link:../ui-settings-account
@@ -4045,7 +4051,7 @@ importers:
         specifier: workspace:*
         version: link:../../account/deepseek-account
       '@qinglion/dsh-client-ui-qingclaw-platform':
-        specifier: workspace:*
+        specifier: workspace:~
         version: link:../qingclaw-platform
       '@testing-library/react':
         specifier: ^16.3.3
@@ -4086,6 +4092,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-settings-account':
         specifier: workspace:*
         version: link:../ui-settings-account
+      '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: workspace:*
+        version: link:../ui-sidebar
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -4156,6 +4165,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-sidebar':
         specifier: workspace:*
         version: link:../ui-sidebar
+      '@deepseek-ai/dsh-client-ui-sidebar-right':
+        specifier: workspace:*
+        version: link:../ui-sidebar-right
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -4201,6 +4213,9 @@ importers:
       '@deepseek-ai/dsh-client-test-runtime':
         specifier: workspace:*
         version: link:../../test-support/client-runtime
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: workspace:*
+        version: link:../ui-layout
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:*
         version: link:../ui-primitives
@@ -4210,6 +4225,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-settings-account':
         specifier: workspace:*
         version: link:../ui-settings-account
+      '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: workspace:*
+        version: link:../ui-sidebar
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -4308,7 +4326,7 @@ importers:
         specifier: workspace:*
         version: link:../../util/crypto
       '@qinglion/dsh-client-ui-qingclaw-platform':
-        specifier: workspace:*
+        specifier: workspace:~
         version: link:../qingclaw-platform
       '@testing-library/react':
         specifier: ^16.3.3

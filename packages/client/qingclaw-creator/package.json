@@ -73,6 +73,7 @@
     "@deepseek-ai/dsh-api-session-controller": "workspace:*",
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:*",
     "@deepseek-ai/dsh-client-ui-sidebar": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "workspace:*",
     "@deepseek-ai/dsh-client-ui-workspace": "workspace:*",
     "@deepseek-ai/dsh-host-webserver": "workspace:*",
     "@deepseek-ai/dsh-workspace": "workspace:*",
