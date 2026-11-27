@@ -8,12 +8,6 @@
       "exit": "上游把产品名做成配置后删除"
     },
     {
-      "glob": "apps/desktop/resources/**",
-      "kind": "brand",
-      "intent": "应用与托盘图标是发行版资产",
-      "exit": "永久（资产属于发行版）"
-    },
-    {
       "glob": "apps/desktop/tests/**",
       "kind": "test-adaptation",
       "intent": "桌面端断言发行版文案、图标与部署元数据",
@@ -36,12 +30,6 @@
       "kind": "distribution",
       "intent": "桌面端接线：发行版身份、手机配对、部署环境与文案接缝",
       "exit": "通用部分逐步提 PR"
-    },
-    {
-      "glob": "apps/desktop/renderer/**",
-      "kind": "brand",
-      "intent": "欢迎页品牌标记是发行版资产",
-      "exit": "永久（资产属于发行版）"
     },
     {
       "glob": "apps/desktop/cli/**",
