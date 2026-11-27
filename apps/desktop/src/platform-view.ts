@@ -5,6 +5,7 @@ import { WebContentsView, session, shell, type Session, type View, type WebFrame
 import type { PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
 import { mergePlatformCookies, platformClientHeaders } from '@deepseek-ai/dsh-deepseek-account/client-metadata'
 import { desktopClientMetadata } from './client-metadata.ts'
+import { SYSTEM_THEME_REQUEST, withSystemTheme } from './platform-theme.ts'
 
 import { PLATFORM_IPC, type PlatformLocale } from './platform-ipc.ts'
 
@@ -55,7 +56,8 @@ export class DesktopPlatformView {
    * @param blocked - Whether shell policy or an update prompt prevents opening a product view.
    */
   constructor(private readonly preload: string, private readonly getLocale: () => PlatformLocale,
-    private readonly platform: 'darwin' | 'win32', private readonly blocked: (owner: PlatformOwner) => boolean) {}
+    private readonly platform: 'darwin' | 'win32',
+    private readonly blocked: (owner: PlatformOwner) => boolean) {}
 
   /** @param next - private Host credentials; identity enrichment preserves an already open temporary document. */
   setSession(next: PlatformSession | null): void {
@@ -152,7 +154,7 @@ export class DesktopPlatformView {
     view.webContents.setWindowOpenHandler(({ url }) => {
       const destination = new URL(url)
       if (destination.protocol === 'https:' && !destination.username && !destination.password) {
-        void shell.openExternal(url).catch(() => {
+        void shell.openExternal(withSystemTheme(url, account.origin)).catch(() => {
           // An OS browser-launch failure leaves the embedded page available for retry.
         })
       }
@@ -174,6 +176,9 @@ export class DesktopPlatformView {
     view.setBounds(bounds)
     try {
       const url = new URL(page === 'usage' ? '/usage' : '/top_up', account.origin)
+      // The embedded browser already reports the Desktop palette as the system
+      // one; naming the system keeps a stored website toggle from overriding it.
+      url.searchParams.set('theme', SYSTEM_THEME_REQUEST)
       if (account.embeddedPageDist) url.searchParams.set('dist', account.embeddedPageDist)
       await view.webContents.loadURL(url.href)
     } catch (error) {

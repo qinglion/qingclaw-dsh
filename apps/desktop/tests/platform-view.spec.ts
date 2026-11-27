@@ -86,7 +86,7 @@ it('bootstraps only the owned main frame and never puts the token in a URL', asy
   const sender = view().webContents
   const event = { sender, senderFrame: sender.mainFrame }
   expect(manager.bootstrap(event)).toEqual({ origin: 'https://platform.deepseek.com', token: 'fixture-secret', locale: 'en_US' })
-  expect(sender.loadURL).toHaveBeenCalledWith('https://platform.deepseek.com/usage')
+  expect(sender.loadURL).toHaveBeenCalledWith('https://platform.deepseek.com/usage?theme=system')
   expect(() => manager.bootstrap({ ...event, senderFrame: { url: sender.mainFrame.url } })).toThrow()
   expect(() => manager.bootstrap({ ...event, sender: {} })).toThrow()
   sender.mainFrame.url = 'https://other.example/usage'
@@ -102,7 +102,7 @@ it('destroys old documents on sign-out or credential replacement', async () => {
   expect(first.close).toHaveBeenCalledOnce()
   expect(() => manager.bootstrap({ sender: first, senderFrame: first.mainFrame })).toThrow()
   await manager.open(owner, 'top-up', bounds)
-  expect(view().webContents.loadURL).toHaveBeenCalledWith('https://platform.deepseek.com/top_up')
+  expect(view().webContents.loadURL).toHaveBeenCalledWith('https://platform.deepseek.com/top_up?theme=system')
   const second = view().webContents
   manager.setSession(null)
   expect(second.close).toHaveBeenCalledOnce()
@@ -182,6 +182,9 @@ it('opens HTTPS payment links in the system browser without an embedded child wi
   const handler = view().webContents.setWindowOpenHandler.mock.calls[0]![0] as (details: { url: string }) => { action: string }
   expect(handler({ url: 'https://payment.example/order' })).toEqual({ action: 'deny' })
   expect(state.openExternal).toHaveBeenCalledWith('https://payment.example/order')
+  // A Platform page opened from the embedded document asks for the same appearance.
+  expect(handler({ url: 'https://platform.deepseek.com/workbenches' })).toEqual({ action: 'deny' })
+  expect(state.openExternal).toHaveBeenLastCalledWith('https://platform.deepseek.com/workbenches?theme=system')
   vi.mocked(state.openExternal).mockClear()
   for (const url of ['file:///tmp/test', 'javascript:alert(1)', 'https://user:pass@payment.example/order']) {
     expect(handler({ url })).toEqual({ action: 'deny' })
@@ -249,6 +252,17 @@ it('injects deployment headers only at the Platform origin and excludes them fro
   manager.close()
 })
 
+it('asks every Platform page to follow the appearance of the browser showing it', async () => {
+  const { manager, owner } = setup()
+  manager.setSession({ origin: 'https://platform.deepseek.com', userId: 'fixture-user' as AccountUserId, token: 'fixture-secret' })
+  await manager.open(owner, 'usage', bounds)
+  expect(view().webContents.loadURL).toHaveBeenLastCalledWith('https://platform.deepseek.com/usage?theme=system')
+  await manager.open(owner, 'top-up', bounds)
+  expect(view().webContents.loadURL).toHaveBeenLastCalledWith('https://platform.deepseek.com/top_up?theme=system')
+  manager.close()
+  await manager.dispose()
+})
+
 it.each(['usage', 'top-up'] as const)('selects the configured frontend deployment for %s', async (page) => {
   const { manager, owner } = setup()
   manager.setSession({ origin: 'https://platform.deepseek.com', userId: 'fixture-user' as AccountUserId, token: 'fixture-secret', embeddedPageDist: 'feat/test&other=value' })
@@ -256,7 +270,7 @@ it.each(['usage', 'top-up'] as const)('selects the configured frontend deploymen
   const url = new URL(view().webContents.loadURL.mock.calls[0]![0] as string)
   expect(url.origin).toBe('https://platform.deepseek.com')
   expect(url.pathname).toBe(page === 'usage' ? '/usage' : '/top_up')
-  expect([...url.searchParams]).toEqual([['dist', 'feat/test&other=value']])
+  expect([...url.searchParams]).toEqual([['theme', 'system'], ['dist', 'feat/test&other=value']])
   const previous = view().webContents
   manager.setSession({ origin: 'https://platform.deepseek.com', userId: 'fixture-user' as AccountUserId, token: 'fixture-secret', embeddedPageDist: 'another' })
   expect(previous.close).toHaveBeenCalledOnce()
@@ -425,7 +439,7 @@ it('waits for authentication cleanup before reopening and ignores superseded ope
   cleared.resolve(undefined)
   await Promise.all([obsolete, current])
   expect(state.views).toHaveLength(2)
-  expect(view().webContents.loadURL).toHaveBeenCalledWith('https://platform.deepseek.com/top_up')
+  expect(view().webContents.loadURL).toHaveBeenCalledWith('https://platform.deepseek.com/top_up?theme=system')
   manager.close()
 })
 

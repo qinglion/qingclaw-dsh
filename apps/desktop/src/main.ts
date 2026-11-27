@@ -31,6 +31,7 @@ import { resolveDesktopPaths } from './paths.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
 import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
+import { SYSTEM_THEME_REQUEST, withSystemTheme } from './platform-theme.ts'
 import { installDesktopFileDrag } from './file-drag.ts'
 import { installDesktopDirectoryPicker } from './directory-picker.ts'
 import { installQingclawExtras } from './ipc-extras.ts'
@@ -254,20 +255,26 @@ function chromeFallbackFill(): string {
 }
 
 /**
- * Add the effective Desktop palette to a Platform authorization URL so the
- * login page opens in the application's theme. `system` resolves through
- * `nativeTheme.shouldUseDarkColors`, which follows the theme source the
- * application preload publishes.
+ * Ask the Platform authorization page to follow the appearance of the browser
+ * opening it, so a palette the visitor stored there cannot override it.
  * @param authorizeUrl - validated Platform authorization URL.
- * @returns the authorization URL carrying `theme=light` or `theme=dark`.
+ * @returns the authorization URL carrying `theme=system`.
  */
 function platformLoginUrl(authorizeUrl: string): string {
   const url = new URL(authorizeUrl)
-  url.searchParams.set('theme', nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
+  url.searchParams.set('theme', SYSTEM_THEME_REQUEST)
   return url.href
 }
 
-function createWindow(preload: string, show = false, primary = false): BrowserWindow {
+/**
+ * Create an application window.
+ * @param preload - bundled application preload path.
+ * @param show - whether to show the window immediately.
+ * @param primary - whether this is the primary product window.
+ * @param platformOrigin - Platform origin whose pages follow the Desktop palette.
+ * @returns the created window.
+ */
+function createWindow(preload: string, show = false, primary = false, platformOrigin?: string): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -302,7 +309,9 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     },
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
+    if (['http:', 'https:'].includes(new URL(url).protocol)) {
+      void shell.openExternal(withSystemTheme(url, platformOrigin))
+    }
     return { action: 'deny' }
   })
   if (process.platform === 'darwin' || process.platform === 'win32') {
@@ -378,7 +387,9 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     if (destination.protocol !== `${SCHEME}:`
       && !(destination.protocol === 'http:' && destination.origin === current.origin)) {
       event.preventDefault()
-      if (['http:', 'https:'].includes(destination.protocol)) void shell.openExternal(url)
+      if (['http:', 'https:'].includes(destination.protocol)) {
+        void shell.openExternal(withSystemTheme(url, platformOrigin))
+      }
     }
   })
   return window
@@ -540,11 +551,13 @@ async function main(): Promise<void> {
     return next.promise
   }
   const platformView = new DesktopPlatformView(join(app.getAppPath(), 'lib', 'preload-platform-account.cjs'),
-    () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US', process.platform === 'win32' ? 'win32' : 'darwin',
+    () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US',
+    process.platform === 'win32' ? 'win32' : 'darwin',
     owner => isMandatory() || updateOverlays.input(owner).blocked)
+  const resolvePlatformOrigin = (): string => sealedDeployment?.platformOrigin ?? hostEnvironment.QINGCLAW_PLATFORM_ORIGIN
+    ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test
   const phoneAccount = createPhoneAccount({
-    platformOrigin: () => sealedDeployment?.platformOrigin ?? hostEnvironment.QINGCLAW_PLATFORM_ORIGIN
-      ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test,
+    platformOrigin: resolvePlatformOrigin,
     pairingPath: join(app.getPath('userData'), 'desktop', 'mobile-pairing.json'),
     designCss: () => readFileSync(join(app.getAppPath(), 'lib/welcome/design-platform.css'), 'utf8'),
     harnessUrl: () => {
@@ -1364,7 +1377,7 @@ async function main(): Promise<void> {
     }
   }
   const createMainWindow = (): BrowserWindow => {
-    const window = createWindow(appPreload, false, true)
+    const window = createWindow(appPreload, false, true, resolvePlatformOrigin())
     mainWindow = window
     browserGuests.bind(window, (guest, name) => shortcuts.attachGuest(window, guest, name))
     shortcuts.attach(window)
