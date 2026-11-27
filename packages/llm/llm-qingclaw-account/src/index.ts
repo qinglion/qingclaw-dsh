@@ -1,4 +1,5 @@
 /** QingClaw short-token authentication, model discovery, and model gating. */
+import { randomUUID } from 'node:crypto'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type { Context } from '@deepseek-ai/cordis'
 import { APP_IDENTITY, attributionHeaders, LlmError } from '@deepseek-ai/dsh-llm'
@@ -13,8 +14,8 @@ import type {
 import { registerAccountAdapter } from './gateway-adapter.ts'
 import { Config, plainOptions, resolveOptions } from './config.ts'
 import {
-  dataUrlOf, imageMediaTypeOf, isHostedReference, MAX_IMAGE_BYTES, mediaKindOf, MediaArgumentError,
-  readVideoArgs, VIDEO_SYNTHESIS_PATH, videoSynthesisRequest,
+  dataUrlOf, DEFAULT_VIDEO_SECONDS, imageMediaTypeOf, isHostedReference, MAX_IMAGE_BYTES, mediaKindOf,
+  MediaArgumentError, readVideoArgs, SMART_DURATION, VIDEO_SYNTHESIS_PATH, videoSynthesisRequest,
 } from './media.ts'
 import type { MediaItem, MediaType, VideoArgs } from './media.ts'
 import { ModelKeyCache } from './model-key.ts'
@@ -40,7 +41,11 @@ interface MediaFileSystem {
   readBytes(target: object, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array>
 }
 
-async function requestQingclawListing(url: string, credential: Readonly<Record<string, string>>, signal: AbortSignal): Promise<ModelListing> {
+async function requestQingclawListing(
+  url: string,
+  credential: Readonly<Record<string, string>>,
+  signal: AbortSignal,
+): Promise<ModelListing> {
   const headers = new Headers(attributionHeaders())
   for (const [name, value] of Object.entries(credential)) headers.set(name, value)
   headers.set('accept', 'application/json')
@@ -186,6 +191,93 @@ export function apply(ctx: Context, config: Config): void {
       if (!response.ok) throw new LlmError(`QingClaw media request failed: ${response.status} ${text.slice(0, 300)}`, 'UNKNOWN')
       return text
     }
+    const platformRequest = async (
+      path: string,
+      body: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> => {
+      const session = await ctx.deepseekAccount.getPlatformSession()
+      if (session === null) {
+        throw new LlmError('Sign in to QingClaw to generate media.', 'ACCOUNT_SIGN_IN_REQUIRED')
+      }
+      const response = await fetch(`${session.origin}${path}`, {
+        method: 'POST',
+        headers: { 'x-dsh-auth-token': session.token, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const text = await response.text()
+      let parsed: { data?: { biz_code?: number; biz_msg?: string; biz_data?: Record<string, unknown> } }
+      try {
+        parsed = JSON.parse(text) as typeof parsed
+      } catch {
+        throw new LlmError(`QingClaw media billing failed: ${response.status}`, 'UNKNOWN', { status: response.status })
+      }
+      const data = parsed.data
+      if (response.status === 402) {
+        const message = String(data?.biz_data?.message
+          ?? '额度不足，无法生成。请升级专业版或购买更多额度。')
+        throw new LlmError(message, 'ACCOUNT_QUOTA', { status: 402 })
+      }
+      if (response.status === 401) {
+        throw new LlmError('Sign in to QingClaw to generate media.', 'ACCOUNT_SIGN_IN_REQUIRED')
+      }
+      if (!response.ok || data?.biz_code !== 0) {
+        throw new LlmError(
+          `QingClaw media billing failed: ${response.status} ${data?.biz_msg ?? ''}`.trim(),
+          'UNKNOWN',
+          { status: response.status },
+        )
+      }
+      return data?.biz_data ?? {}
+    }
+    const authorizeMedia = async (
+      kind: 'image' | 'video' | 'audio',
+      model: string,
+      units: number,
+      metadata: Record<string, unknown>,
+    ): Promise<{ charge_id: string; ticket: string; remaining?: number }> => await platformRequest(
+      '/auth-api/v0/dsh/media/authorize',
+      { request_id: randomUUID(), kind, model, units, metadata },
+    ) as { charge_id: string; ticket: string; remaining?: number }
+    const settleMedia = async (chargeId: string, providerTaskId?: string): Promise<void> => {
+      try {
+        await platformRequest('/auth-api/v0/dsh/media/settle', {
+          charge_id: chargeId,
+          ...(providerTaskId === undefined ? {} : { provider_task_id: providerTaskId }),
+        })
+      } catch (error) {
+        console.warn(LOG_TAG, `media settle failed: ${String(error)}`)
+      }
+    }
+    const refundMedia = async (chargeId: string, reason: string): Promise<void> => {
+      try {
+        await platformRequest('/auth-api/v0/dsh/media/refund', { charge_id: chargeId, reason })
+      } catch (error) {
+        console.warn(LOG_TAG, `media refund failed: ${String(error)}`)
+      }
+    }
+    const refundVideoTask = async (taskId: string): Promise<void> => {
+      try {
+        await platformRequest('/auth-api/v0/dsh/media/refund', { provider_task_id: taskId, reason: 'provider_failed' })
+      } catch (error) {
+        console.warn(LOG_TAG, `media refund failed: ${String(error)}`)
+      }
+    }
+    const taskIdOf = (text: string): string | undefined => {
+      try {
+        const parsed = JSON.parse(text) as { id?: string; output?: { task_id?: string } }
+        return parsed.output?.task_id ?? parsed.id
+      } catch {
+        return undefined
+      }
+    }
+    const videoStatusOf = (text: string): string | undefined => {
+      try {
+        const parsed = JSON.parse(text) as { status?: string; output?: { task_status?: string } }
+        return (parsed.status ?? parsed.output?.task_status)?.toLowerCase()
+      } catch {
+        return undefined
+      }
+    }
     const files = ctx.get('fs') as MediaFileSystem | undefined
     /**
      * Turn one media argument into a reference the gateway fetches or decodes.
@@ -241,12 +333,25 @@ export function apply(ctx: Context, config: Config): void {
           },
           output: textOutput,
           timeoutMs: 180_000,
-          execute: async (args: { prompt: string; size?: string; n?: number }) => await mediaRequest('/v1/images/generations', {
-            model: settings().imageModel,
-            prompt: args.prompt,
-            ...(args.size === undefined ? {} : { size: args.size }),
-            ...(args.n === undefined ? {} : { n: args.n }),
-          }),
+          execute: async (args: { prompt: string; size?: string; n?: number }) => {
+            const model = settings().imageModel
+            const charge = await authorizeMedia('image', model, args.n ?? 1, {
+              ...(args.size === undefined ? {} : { size: args.size }),
+            })
+            try {
+              const result = await mediaRequest('/v1/images/generations', {
+                model,
+                prompt: args.prompt,
+                ...(args.size === undefined ? {} : { size: args.size }),
+                ...(args.n === undefined ? {} : { n: args.n }),
+              }, { 'x-qingclaw-media-ticket': `Bearer ${charge.ticket}` })
+              await settleMedia(charge.charge_id)
+              return result
+            } catch (error) {
+              await refundMedia(charge.charge_id, 'provider_error')
+              throw error
+            }
+          },
         }),
         toolRegistry.register({
           name: 'video_generate',
@@ -308,12 +413,25 @@ export function apply(ctx: Context, config: Config): void {
           execute: async (args: unknown, exec?: { signal?: AbortSignal }) => {
             const call = readVideoArgs(args)
             const media = await collectMedia(call, exec?.signal)
-            return await mediaRequest(
-              VIDEO_SYNTHESIS_PATH,
-              videoSynthesisRequest(call, media, settings().videoModel),
-              { 'X-DashScope-Async': 'enable' },
-              exec?.signal,
-            )
+            const model = settings().videoModel
+            const billedSeconds = call.seconds === SMART_DURATION ? DEFAULT_VIDEO_SECONDS : call.seconds
+            const charge = await authorizeMedia('video', model, billedSeconds, {
+              resolution: call.resolution,
+              seconds: billedSeconds,
+            })
+            try {
+              const result = await mediaRequest(
+                VIDEO_SYNTHESIS_PATH,
+                videoSynthesisRequest(call, media, model),
+                { 'X-DashScope-Async': 'enable', 'x-qingclaw-media-ticket': `Bearer ${charge.ticket}` },
+                exec?.signal,
+              )
+              await settleMedia(charge.charge_id, taskIdOf(result))
+              return result
+            } catch (error) {
+              await refundMedia(charge.charge_id, 'provider_error')
+              throw error
+            }
           },
         }),
         toolRegistry.register({
@@ -325,13 +443,25 @@ export function apply(ctx: Context, config: Config): void {
           },
           output: textOutput,
           timeoutMs: 120_000,
-          execute: async (args: { text: string; voice?: string }) => await mediaRequest(
-            '/audio/api/v1/services/aigc/multimodal-generation/generation',
-            {
-              model: settings().audioModel,
-              input: { text: args.text, voice: args.voice ?? 'Cherry' },
-            },
-          ),
+          execute: async (args: { text: string; voice?: string }) => {
+            const model = settings().audioModel
+            const charge = await authorizeMedia('audio', model, args.text.length, { characters: args.text.length })
+            try {
+              const result = await mediaRequest(
+                '/audio/api/v1/services/aigc/multimodal-generation/generation',
+                {
+                  model,
+                  input: { text: args.text, voice: args.voice ?? 'Cherry' },
+                },
+                { 'x-qingclaw-media-ticket': `Bearer ${charge.ticket}` },
+              )
+              await settleMedia(charge.charge_id)
+              return result
+            } catch (error) {
+              await refundMedia(charge.charge_id, 'provider_error')
+              throw error
+            }
+          },
         }),
         toolRegistry.register({
           name: 'video_get',
@@ -348,6 +478,8 @@ export function apply(ctx: Context, config: Config): void {
             })
             const text = await response.text()
             if (!response.ok) throw new LlmError(`QingClaw video status failed: ${response.status} ${text.slice(0, 300)}`, 'UNKNOWN')
+            const status = videoStatusOf(text)
+            if (status === 'failed' || status === 'canceled') await refundVideoTask(args.id)
             return text
           },
         }),

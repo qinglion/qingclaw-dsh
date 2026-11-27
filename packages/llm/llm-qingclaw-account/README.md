@@ -58,6 +58,8 @@ The listing's `default` entry becomes the deployment default only while the save
 
 The plugin registers `image_generate`, `video_generate`, and `video_get` whenever the composition provides a tool registry. They authenticate with the same gateway key as Chat Completions and return the gateway's JSON answer unchanged.
 
+Each generation first asks the website for a charge ticket through `/auth-api/v0/dsh/media/authorize`. The website debits the account and lowers its gateway quota by the exact cost, then returns a two-minute ticket. A 402 surfaces the website's insufficient-credit message and the gateway is never called. The gateway media route requires `X-QingClaw-Media-Ticket`; the plugin settles on success and refunds when the provider call fails.
+
 `video_generate` creates one asynchronous task on `/video/api/v1/services/aigc/video-generation/video-synthesis`. The model routes on the media slots, so this one route covers text-to-video, first-frame animation, reference composition, video editing, and extension:
 
 | Field | Meaning |

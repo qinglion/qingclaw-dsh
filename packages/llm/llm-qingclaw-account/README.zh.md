@@ -56,6 +56,8 @@ kind: "package-reference"
 
 组合提供了工具注册表时，插件注册 `image_generate`、`video_generate` 和 `video_get`。它们使用与 Chat Completions 相同的网关密钥鉴权，并原样返回网关的 JSON 应答。
 
+每次生成前先向官网申请计费票据（`/auth-api/v0/dsh/media/authorize`）。官网扣减账户额度并同步降低网关配额，再返回两分钟有效的票据。额度不足时官网返回 402，插件直接展示「额度不足，请升级或充值」，不会调用网关。网关媒体路由要求 `X-QingClaw-Media-Ticket`；调用成功后结算，失败时退款。
+
 `video_generate` 在 `/video/api/v1/services/aigc/video-generation/video-synthesis` 上创建一个异步任务。模型按素材槽位自动路由，因此同一条路由即可覆盖文生视频、首帧生视频、参考生视频、视频编辑和视频延长：
 
 | 字段 | 含义 |

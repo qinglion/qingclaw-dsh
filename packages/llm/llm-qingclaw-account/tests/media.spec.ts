@@ -70,6 +70,23 @@ function keyExchange(): Response {
   return Response.json({ code: 0, data: { biz_code: 0, biz_data: { api_key: 'gateway-key-1' } } })
 }
 
+/** Answer the website's media authorization and settlement calls. */
+function platformResponse(path: string): Response | undefined {
+  if (path === '/auth-api/v0/dsh/media/authorize') {
+    return Response.json({
+      code: 0,
+      data: { biz_code: 0, biz_data: { charge_id: 'mc_test', ticket: 'media-ticket', remaining: 1_000 } },
+    })
+  }
+  if (path.endsWith('/media/settle') || path.endsWith('/media/refund')) {
+    return Response.json({
+      code: 0,
+      data: { biz_code: 0, biz_data: { charge_id: 'mc_test', status: 'charged', remaining: 1_000 } },
+    })
+  }
+  return undefined
+}
+
 describe('video generation arguments', () => {
   it('defaults the clip to five seconds at 480P with no media', () => {
     expect(readVideoArgs({ prompt: 'a whale' })).toEqual({
@@ -226,8 +243,11 @@ describe('video_generate tool', () => {
       const request = new Request(input, init)
       const path = new URL(request.url).pathname
       if (path === '/auth-api/v0/dsh/model_key') return keyExchange()
+      const platform = platformResponse(path)
+      if (platform !== undefined) return platform
       if (path === '/video/api/v1/services/aigc/video-generation/video-synthesis') {
         expect(request.headers.get('x-dashscope-async')).toBe('enable')
+        expect(request.headers.get('x-qingclaw-media-ticket')).toBe('Bearer media-ticket')
         bodies.push(await request.json() as Record<string, unknown>)
         return Response.json({ output: { task_id: 'task-1', task_status: 'PENDING' } })
       }
@@ -261,6 +281,8 @@ describe('video_generate tool', () => {
       const request = new Request(input, init)
       const path = new URL(request.url).pathname
       if (path === '/auth-api/v0/dsh/model_key') return keyExchange()
+      const platform = platformResponse(path)
+      if (platform !== undefined) return platform
       bodies.push(await request.json() as Record<string, unknown>)
       return Response.json({ output: { task_id: 'task-2', task_status: 'PENDING' } })
     })
@@ -272,6 +294,31 @@ describe('video_generate tool', () => {
       type: 'first_frame',
       url: 'data:image/jpeg;base64,' + Buffer.from(bytes).toString('base64'),
     }])
+  })
+
+  it("surfaces the website's insufficient-credit message without calling the gateway", async () => {
+    const requests: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const request = new Request(input, init)
+      const path = new URL(request.url).pathname
+      requests.push(path)
+      if (path === '/auth-api/v0/dsh/model_key') return keyExchange()
+      if (path === '/auth-api/v0/dsh/media/authorize') {
+        return Response.json({
+          code: 0,
+          data: {
+            biz_code: 1,
+            biz_msg: 'insufficient_credits',
+            biz_data: { required: 2_250, available: 1_000, message: '额度不足，无法生成。请升级专业版或购买更多额度。' },
+          },
+        }, { status: 402 })
+      }
+      throw new Error('unexpected request ' + request.url)
+    })
+    const { video } = await mount()
+    await expect(video.execute({ prompt: 'a whale', seconds: 5 }))
+      .rejects.toThrow('额度不足，无法生成')
+    expect(requests).not.toContain('/video/api/v1/services/aigc/video-generation/video-synthesis')
   })
 
   it('refuses a local reference video, which the gateway fetches by URL only', async () => {
