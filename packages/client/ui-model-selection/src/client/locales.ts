@@ -10,7 +10,9 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'provider.account': '青狮账号',
+  'rate.value': '{value}x',
+  'rate.aria': '成本倍率 {value}',
+  'provider.account': 'DeepSeek 账号',
   'command.label': '模型',
   'command.description': '选择本会话使用的模型',
   'option.loadError': '目录加载失败：{message}',
@@ -33,8 +35,6 @@ export const zh = {
   'search.empty': '没有匹配的模型。',
   'empty.models': '暂无可用模型',
   'empty.efforts': '当前模型未提供推理等级。',
-  'rate.value': '{value}x',
-  'rate.aria': '成本倍率 {value}',
 } satisfies Record<string, string>
 
 /** The model namespace key union. */
@@ -42,7 +42,9 @@ export type ModelKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'provider.account': 'QingClaw Account',
+  'rate.value': '{value}x',
+  'rate.aria': 'Cost multiple {value}',
+  'provider.account': 'DeepSeek Account',
   'command.label': 'Model',
   'command.description': 'Select the model for this conversation',
   'option.loadError': 'Catalog failed to load: {message}',
@@ -65,13 +67,13 @@ export const en = {
   'search.empty': 'No matching models.',
   'empty.models': 'No models available.',
   'empty.efforts': 'This model provides no reasoning effort levels.',
-  'rate.value': '{value}x',
-  'rate.aria': 'Cost multiple {value}',
 } satisfies Record<ModelKey, string>
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
-  'provider.account': 'QingClaw アカウント',
+  'rate.value': '{value}x',
+  'rate.aria': 'コスト倍率 {value}',
+  'provider.account': 'DeepSeek アカウント',
   'command.label': 'モデル',
   'command.description': 'この会話で使用するモデルを選択',
   'option.loadError': 'カタログの読み込みに失敗しました: {message}',
@@ -94,13 +96,13 @@ export const ja = {
   'search.empty': '一致するモデルがありません。',
   'empty.models': '利用可能なモデルがありません。',
   'empty.efforts': 'このモデルには推論強度の設定がありません。',
-  'rate.value': '{value}x',
-  'rate.aria': 'コスト倍率 {value}',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
-  'provider.account': 'Cuenta QingClaw',
+  'rate.value': '{value}x',
+  'rate.aria': 'Multiplicador de coste {value}',
+  'provider.account': 'Cuenta DeepSeek',
   'command.label': 'modelo',
   'command.description': 'Selecciona el modelo para esta conversación',
   'option.loadError': 'No se pudo cargar el catálogo: {message}',
@@ -123,13 +125,13 @@ export const es = {
   'search.empty': 'No hay modelos coincidentes.',
   'empty.models': 'No hay modelos disponibles.',
   'empty.efforts': 'Este modelo no proporciona niveles de esfuerzo de razonamiento.',
-  'rate.value': '{value}x',
-  'rate.aria': 'Multiplicador de coste {value}',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
-  'provider.account': 'Compte QingClaw',
+  'rate.value': '{value}x',
+  'rate.aria': 'Multiplicateur de coût {value}',
+  'provider.account': 'Compte DeepSeek',
   'command.label': 'Modèle',
   'command.description': 'Sélectionnez le modèle pour cette conversation',
   'option.loadError': 'Échec du chargement du catalogue : {message}',
@@ -152,13 +154,13 @@ export const fr = {
   'search.empty': 'Aucun modèle correspondant.',
   'empty.models': 'Aucun modèle disponible.',
   'empty.efforts': 'Ce modèle ne fournit aucun niveau d’effort de raisonnement.',
-  'rate.value': '{value}x',
-  'rate.aria': 'Multiplicateur de coût {value}',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
 export const de = {
-  'provider.account': 'QingClaw-Konto',
+  'rate.value': '{value}x',
+  'rate.aria': 'Kostenfaktor {value}',
+  'provider.account': 'DeepSeek-Konto',
   'command.label': 'Modell',
   'command.description': 'Wählen Sie das Modell für dieses Gespräch aus',
   'option.loadError': 'Katalog konnte nicht geladen werden: {message}',
@@ -181,13 +183,13 @@ export const de = {
   'search.empty': 'Keine passenden Modelle.',
   'empty.models': 'Keine Modelle verfügbar.',
   'empty.efforts': 'Dieses Modell liefert keine Argumentationsaufwandsstufen.',
-  'rate.value': '{value}x',
-  'rate.aria': 'Kostenfaktor {value}',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
-  'provider.account': 'Аккаунт QingClaw',
+  'rate.value': '{value}x',
+  'rate.aria': 'Кратность стоимости {value}',
+  'provider.account': 'DeepSeek Аккаунт',
   'command.label': 'Модель',
   'command.description': 'Выберите модель для этого разговора',
   'option.loadError': 'Не удалось загрузить каталог: {message}.',
@@ -210,13 +212,13 @@ export const ru = {
   'search.empty': 'Нет подходящих моделей.',
   'empty.models': 'Нет доступных моделей.',
   'empty.efforts': 'Эта модель не обеспечивает обоснования уровней усилий.',
-  'rate.value': '{value}x',
-  'rate.aria': 'Кратность стоимости {value}',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
-  'provider.account': 'Conta QingClaw',
+  'rate.value': '{value}x',
+  'rate.aria': 'Multiplicador de custo {value}',
+  'provider.account': 'DeepSeek Conta',
   'command.label': 'Modelo',
   'command.description': 'Selecione o modelo para esta conversa',
   'option.loadError': 'Falha ao carregar o catálogo: {message}',
@@ -239,6 +241,4 @@ export const pt = {
   'search.empty': 'Não há modelos correspondentes.',
   'empty.models': 'Nenhum modelo disponível.',
   'empty.efforts': 'Este modelo não fornece níveis de esforço de raciocínio.',
-  'rate.value': '{value}x',
-  'rate.aria': 'Multiplicador de custo {value}',
 } satisfies Record<keyof typeof en, string>

@@ -121,12 +121,12 @@ describe('WebSearchCard billing', () => {
   it('shows each DeepSeek API billing menu with the selected billing and its explanation', () => {
     renderPage(apis())
     expect(billingMenu(en.searchSection).textContent).toBe('Automatic')
-    expect(billingMenu(en.fetchSection).textContent).toBe('Signed-in QingClaw account')
+    expect(billingMenu(en.fetchSection).textContent).toBe('Signed-in DeepSeek account')
     expect(region(en.searchSection).getByText(
-      "Follows the conversation's QingClaw account or DeepSeek API key; with other models, uses the API key first, then the signed-in account.",
+      "Follows the conversation's DeepSeek account or API key; with other models, uses the API key first, then the signed-in account.",
       { exact: true },
     )).toBeTruthy()
-    expect(region(en.fetchSection).getByText('Requires signing in to QingClaw.', { exact: true }))
+    expect(region(en.fetchSection).getByText('Requires signing in to DeepSeek.', { exact: true }))
       .toBeTruthy()
     expect(screen.queryByText(/^Overridden by /)).toBeNull()
   })
@@ -153,7 +153,7 @@ describe('WebSearchCard billing', () => {
     const { actions } = renderPage(apis())
     fireEvent.click(billingMenu(en.fetchSection))
     expect(screen.getAllByRole('menuitem').map(item => item.textContent))
-      .toEqual(['Automatic', 'Signed-in QingClaw account', 'DeepSeek API key'])
+      .toEqual(['Automatic', 'Signed-in DeepSeek account', 'DeepSeek API key'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'DeepSeek API key' }))
     fireEvent.click(billingMenu(en.searchSection))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Automatic' }))
@@ -186,18 +186,18 @@ describe('WebSearchCard billing', () => {
 
   it('carries the approved billing copy in both locales', () => {
     expect([en.billing, en.billingAuto, en.billingAccount, en.billingApiKey])
-      .toEqual(['Billing', 'Automatic', 'Signed-in QingClaw account', 'DeepSeek API key'])
+      .toEqual(['Billing', 'Automatic', 'Signed-in DeepSeek account', 'DeepSeek API key'])
     expect([zh.billing, zh.billingAuto, zh.billingAccount, zh.billingApiKey])
-      .toEqual(['计费方式', '自动', '已登录的青狮账号', 'DeepSeek API Key'])
+      .toEqual(['计费方式', '自动', '已登录的 DeepSeek 账号', 'DeepSeek API Key'])
     expect([zh.billingAutoHint, zh.billingAccountHint, zh.billingApiKeyHint, zh.billingAdvancedOverride]).toEqual([
-      '跟随当前会话的青狮账号或 DeepSeek API Key；会话用其他模型时，优先用 API Key，没有则用已登录账号。',
-      '需要先登录青狮账号。',
+      '跟随当前会话的 DeepSeek 账号或 API Key；会话用其他模型时，优先用 API Key，没有则用已登录账号。',
+      '需要先登录 DeepSeek 账号。',
       '使用「模型」页配置的 API Key，需要先配置。',
       '已被 {fields} 覆盖',
     ])
     expect([en.billingAutoHint, en.billingAccountHint, en.billingApiKeyHint, en.billingAdvancedOverride]).toEqual([
-      "Follows the conversation's QingClaw account or DeepSeek API key; with other models, uses the API key first, then the signed-in account.",
-      'Requires signing in to QingClaw.',
+      "Follows the conversation's DeepSeek account or API key; with other models, uses the API key first, then the signed-in account.",
+      'Requires signing in to DeepSeek.',
       'Uses the API key from the Models page; set one first.',
       'Overridden by {fields}',
     ])

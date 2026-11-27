@@ -30,13 +30,13 @@ export const RunningStatus = memo(function RunningStatus({ startTime, paused, ho
     const timer = setInterval(() => { setNow(Date.now()) }, LIVE_RUN_CLOCK_INTERVAL_MS)
     return () => { clearInterval(timer) }
   }, [startTime, paused, holding])
-  const label = startTime === undefined ? t('chat.thinking') : t('chat.thinkingFor', {
+  const label = startTime === undefined ? t('chat.deepDiving') : t('chat.deepDivingFor', {
     duration: formatRunDuration(Math.max(1000, now - startTime), t).map(part => part.text).join(''),
   })
   return (
     <div className={css.running} data-chat-running data-holding={holding ? '' : undefined} aria-hidden={holding || undefined}>
       {holding ? null : (
-        <span className={a11yCss.visuallyHidden} role="status" aria-live="polite" aria-atomic="true">{t('chat.thinking')}</span>
+        <span className={a11yCss.visuallyHidden} role="status" aria-live="polite" aria-atomic="true">{t('chat.deepDiving')}</span>
       )}
       <span className={css.runningDivider} aria-hidden="true" />
       <span className={css.runningContent}>
