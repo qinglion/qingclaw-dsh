@@ -67,6 +67,8 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
   // Messages and assembled blocks are plain data. Each caller owns its assembler.
   '@deepseek-ai/dsh-llm': ['BlockAssembler', 'callConfigEquals', 'createUserMessage'],
   '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],
+  // A fixed ordering constant; the candidate type a bundled skill builds carries no runtime identity.
+  '@deepseek-ai/dsh-skill': ['BUNDLED_SKILL_RANK'],
   '@deepseek-ai/dsh-storage-domain': ['defineDomain'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
   // Both operate only on the caller's subprocess service and handle; the module memoizes only the binary path.
