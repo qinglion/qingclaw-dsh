@@ -49,6 +49,11 @@ const replaceName = (line, locale, name) => locale === 'zh_CN'
 /** Installer copy that names this application rather than a foreign installation. */
 const NAMING_KEYS = ['INSTALLER_LAUNCH_FAILED', 'INSTALLER_RUNNING', 'INSTALLER_PATH_OWNERSHIP']
 
+/**
+ * `apply` writes this distribution's inputs for packaging; `--check` instead
+ * fails when the checkout does not carry them yet. The repository itself must
+ * keep upstream content, which scripts/verify-qingclaw-packaging-inputs.mjs owns.
+ */
 const check = process.argv.includes('--check')
 const drift = []
 
@@ -86,5 +91,5 @@ if (!check) {
   for (const path of drift) console.error(`  ${path}`)
   process.exitCode = 1
 } else {
-  console.log('brand-assets: every packaging input already carries this distribution')
+  console.log('brand-assets: every packaging input carries this distribution')
 }
