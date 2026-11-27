@@ -88,11 +88,10 @@ describe('QingClaw distribution bundle', () => {
     const model = composed.find(row => row.id === 'llm-qingclaw-account')
     expect(model?.name).toBe('@qinglion/dsh-llm-qingclaw-account')
     const modelConfig = model?.config as Record<string, unknown> | undefined
-    expect(Object.keys(modelConfig ?? {}).sort()).toEqual(['audioModel', 'baseURL', 'catalogURL', 'imageModel', 'maxTokens', 'videoModel'])
+    expect(Object.keys(modelConfig ?? {}).sort()).toEqual(['audioModel', 'baseURL', 'catalogURL', 'imageModel', 'videoModel'])
     expect(modelConfig?.baseURL).toEqual({
       __jsExpr: "(process.env.QINGCLAW_INFERENCE_ORIGIN || 'https://api.qingclaw.com').replace(/\\/+$/, '') + '/v1'",
     })
-    expect(modelConfig?.maxTokens).toBe(8_192)
 
     const workbench = composed.find(row => row.id === 'qingclaw-workbench')
     expect(workbench?.name).toBe('@qinglion/dsh-qingclaw-workbench')

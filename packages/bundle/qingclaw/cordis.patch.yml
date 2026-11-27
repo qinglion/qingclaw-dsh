@@ -55,7 +55,8 @@
         imageModel: qwen-image-3.0
         videoModel: wan3.0-video-prime
         audioModel: qwen3-tts-flash
-        maxTokens: 8192
+        # Each model's gateway card declares its own output capacity, so the route
+        # keeps the plugin default instead of narrowing every model to 8192.
 
 - insert:
     - id: qingclaw-workbench
