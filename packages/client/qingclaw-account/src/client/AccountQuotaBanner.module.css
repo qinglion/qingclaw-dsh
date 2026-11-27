@@ -10,21 +10,21 @@
   max-width: calc(var(--dsh-composer-card-max-width, 100%) - 26px);
   margin: 0 auto 8px;
   padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--dsh-warning, #d97706) 38%, transparent);
-  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 38%, transparent);
+  border-radius: var(--dsw-radius-md);
   /* The composer seat's fade band lets transcript text scroll under this card.
      A filled warning tint over the card surface, plus a strong backdrop blur,
      keeps that text from showing through while preserving the frosted edge. */
   background:
     linear-gradient(
-      color-mix(in srgb, var(--dsh-warning, #d97706) 12%, transparent),
-      color-mix(in srgb, var(--dsh-warning, #d97706) 7%, transparent)
+      color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent),
+      color-mix(in srgb, var(--dsw-alias-state-warn-primary) 7%, transparent)
     ),
-    color-mix(in srgb, var(--dsw-alias-card-fill, #fff) 80%, transparent);
+    color-mix(in srgb, var(--dsw-alias-card-fill) 80%, transparent);
   -webkit-backdrop-filter: blur(28px) saturate(150%);
   backdrop-filter: blur(28px) saturate(150%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 22%), 0 1px 2px rgb(0 0 0 / 4%);
-  color: var(--dsw-alias-label-primary, var(--dsh-text, #1f2937));
+  color: var(--dsw-alias-label-primary);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -37,12 +37,14 @@
 .action {
   flex: none;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--dsw-radius-sm);
   padding: 4px 9px;
-  background: var(--dsh-warning, #d97706);
-  color: #fff;
+  background: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-label-primary-inverted);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
 }
-.action:hover { filter: brightness(1.06); }
+@media (hover: hover) and (pointer: fine) {
+  .action:hover { filter: brightness(1.06); }
+}

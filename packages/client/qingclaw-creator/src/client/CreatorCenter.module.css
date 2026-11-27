@@ -7,13 +7,15 @@
 .page h1, .page h2, .page p { margin: 0; }
 .page h1 { font-size: 26px; font-weight: 500; }
 .page h2 { font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
-.tabs { padding-bottom: 12px; margin-bottom: 22px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+.tabs { padding-bottom: 12px; margin-bottom: 22px; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
 .list { list-style: none; padding: 0; margin: 0; }
-.row { padding-block: 14px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+.row { padding-block: 14px; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
 .muted, .date { color: var(--dsw-alias-label-secondary); font-size: 13px; overflow-wrap: anywhere; }
 .body { display: grid; gap: 16px; }
 .package { background: none; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; padding: 4px 0; overflow-wrap: anywhere; }
-.package:hover { text-decoration: underline; }
+@media (hover: hover) and (pointer: fine) {
+  .package:hover { text-decoration: underline; }
+}
 .body code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .notice {
   display: flex;
@@ -21,9 +23,12 @@
   gap: 10px;
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-bg-layer-2);
+  /* Scrollbars inside a notice sit on the elevated surface, so they follow it. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   font-size: 13px;
   line-height: 1.55;
 }

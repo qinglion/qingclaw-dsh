@@ -6,13 +6,20 @@
   height: 30px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--dsw-radius-sm);
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
 }
-.button:hover, .button:focus-visible {
+@media (hover: hover) and (pointer: fine) {
+  .button:hover {
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+.button:focus-visible {
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-hover);
+  outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 1px;
 }
-.button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
