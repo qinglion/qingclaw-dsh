@@ -41,7 +41,15 @@ describe('QingClaw distribution bundle', () => {
       .toBe('@deepseek-ai/dsh-client-ui-brand-official')
 
     const composed = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
-    expect(composed).toHaveLength(web.length + 9)
+    // The distribution adds exactly these rows over the web-app roster. A new
+    // upstream row reaches this list only through the QingClaw patch, so an
+    // unmirrored addition fails here instead of shipping unnoticed.
+    const added = composed.filter(row => !web.some(upstream => upstream.id === row.id)).map(row => row.id)
+    expect(added.sort()).toEqual([
+      'llm-qingclaw-account', 'plugin-market', 'qingclaw-creator', 'qingclaw-distribution', 'qingclaw-workbench',
+      'ui-brand-qingclaw', 'ui-plugin-market', 'ui-qingclaw-account', 'ui-qingclaw-admin', 'ui-qingclaw-feedback',
+      'ui-qingclaw-platform',
+    ])
     expect(composed.find(row => row.id === 'ui-brand-official')).toMatchObject({
       name: '@deepseek-ai/dsh-client-ui-brand-official',
       disabled: true,
@@ -52,6 +60,8 @@ describe('QingClaw distribution bundle', () => {
     expect(composed.find(row => row.id === 'ui-settings-account')?.config).toEqual({
       desktopOnboarding: false,
       allowApiKey: false,
+      showContactItem: false,
+      section: false,
     })
 
     const account = composed.find(row => row.id === 'deepseek-account')
