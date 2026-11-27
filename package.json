@@ -128,6 +128,7 @@
     "verify-config-source-ownership": "tsx scripts/verify-config-source-ownership.ts",
     "verify-package-meta": "tsx scripts/verify-package-meta.ts",
     "verify-package-readme-model-experience": "tsx scripts/verify-package-readme-model-experience.ts",
+    "verify-qingclaw-patches": "tsx scripts/verify-qingclaw-patches.ts",
     "verify-package-readme-summaries": "tsx scripts/verify-package-readme-summaries.ts",
     "verify-mermaid": "tsx scripts/verify-mermaid.ts",
     "verify-agent-note-classification": "tsx scripts/verify-agent-note-classification.ts",

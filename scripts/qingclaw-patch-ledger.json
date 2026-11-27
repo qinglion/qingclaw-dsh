@@ -1,0 +1,249 @@
+{
+  "base": "origin/master",
+  "entries": [
+    {
+      "glob": "apps/desktop/installer/**",
+      "kind": "brand",
+      "intent": "安装器语言包与产品名常量随发行版走",
+      "exit": "上游把产品名做成配置后删除"
+    },
+    {
+      "glob": "apps/desktop/resources/**",
+      "kind": "brand",
+      "intent": "应用与托盘图标是发行版资产",
+      "exit": "永久（资产属于发行版）"
+    },
+    {
+      "glob": "apps/desktop/tests/**",
+      "kind": "test-adaptation",
+      "intent": "桌面端断言发行版文案、图标与部署元数据",
+      "exit": "跟随上游断言结构，只保留文案差异"
+    },
+    {
+      "glob": "apps/desktop/scripts/**",
+      "kind": "distribution",
+      "intent": "打包与开发脚本按发行版描述符取名并注入部署地址",
+      "exit": "上游支持发行版描述符后删除"
+    },
+    {
+      "glob": "apps/desktop/config/**",
+      "kind": "distribution",
+      "intent": "打包预设里的 App ID 与更新源",
+      "exit": "永久（发行版发布参数）"
+    },
+    {
+      "glob": "apps/desktop/src/**",
+      "kind": "distribution",
+      "intent": "桌面端接线：发行版身份、手机配对、部署环境与文案接缝",
+      "exit": "通用部分逐步提 PR"
+    },
+    {
+      "glob": "apps/desktop/renderer/**",
+      "kind": "brand",
+      "intent": "欢迎页品牌标记是发行版资产",
+      "exit": "永久（资产属于发行版）"
+    },
+    {
+      "glob": "apps/desktop/cli/**",
+      "kind": "brand",
+      "intent": "启动器文件名跟随发行版命令",
+      "exit": "上游把命令名做成配置后删除"
+    },
+    {
+      "glob": "apps/desktop/*",
+      "kind": "distribution",
+      "intent": "桌面端包清单、tsconfig 与构建配置随发行版依赖调整",
+      "exit": "通用部分逐步提 PR"
+    },
+    {
+      "glob": "apps/web/**",
+      "kind": "brand",
+      "intent": "Web 端 PWA 清单、图标与生成器属于发行版品牌",
+      "exit": "图标生成器通用化后提 PR"
+    },
+    {
+      "glob": "apps/cli/**",
+      "kind": "brand",
+      "intent": "CLI 命令名与帮助文案使用发行版名称",
+      "exit": "上游支持命令名配置后删除"
+    },
+    {
+      "glob": "snapshots/web/**",
+      "kind": "test-adaptation",
+      "intent": "录制快照带发行版文案",
+      "exit": "跟随上游快照结构，仅文案差异"
+    },
+    {
+      "glob": "packages/client/ui-settings-account/**",
+      "kind": "config-seam",
+      "intent": "账户命名空间的最小配置缝：平台页宿主、冷启动注册、联系行开关",
+      "exit": "上游提供账户区扩展点后删除"
+    },
+    {
+      "glob": "packages/client/ui-chat/**",
+      "kind": "feature",
+      "intent": "运行中标记与轮次用量的展示增强",
+      "exit": "上游接受 running mark 插槽后删除"
+    },
+    {
+      "glob": "packages/client/ui-model-selection/**",
+      "kind": "feature",
+      "intent": "模型菜单展示计价倍数",
+      "exit": "上游接受计价字段后删除"
+    },
+    {
+      "glob": "packages/client/ui-conversation/**",
+      "kind": "feature",
+      "intent": "输入草稿预填与会话视图扩展",
+      "exit": "上游接受 stageDraft 后删除"
+    },
+    {
+      "glob": "packages/client/ui-agent-preset/**",
+      "kind": "feature",
+      "intent": "预设列表按发行版默认值排序与引导文案",
+      "exit": "上游接受默认预设配置后删除"
+    },
+    {
+      "glob": "packages/client/ui-sidebar-right/**",
+      "kind": "upstream-worthy",
+      "intent": "双栏工作区放置（beside / openTabWorkspace）",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/client/ui-sidebar-documentpreview/**",
+      "kind": "upstream-worthy",
+      "intent": "文档框选取证槽位与坐标换算",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/client/ui-workspace/**",
+      "kind": "upstream-worthy",
+      "intent": "会话模式注册与工作区行行为",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/client/ui-primitives/**",
+      "kind": "brand",
+      "intent": "并列图标集补充与品牌标记",
+      "exit": "上游补充图标后删除"
+    },
+    {
+      "glob": "packages/client/ui-session-status/**",
+      "kind": "feature",
+      "intent": "会话状态桥供桌面角标读取",
+      "exit": "上游提供同名能力后删除"
+    },
+    {
+      "glob": "packages/client/locale/**",
+      "kind": "upstream-worthy",
+      "intent": "发行版文案覆盖 API（ctx.locale.override）",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/client/**",
+      "kind": "feature",
+      "intent": "客户端剩余的功能性补丁",
+      "exit": "逐项提 PR 或搬进青狮插件"
+    },
+    {
+      "glob": "packages/llm/**",
+      "kind": "upstream-worthy",
+      "intent": "模型目录计价倍数、模态与用量口径",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/api/**",
+      "kind": "upstream-worthy",
+      "intent": "模型目录 rate 字段、默认模型尊重用户选择、工作区父目录名",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/boot/**",
+      "kind": "upstream-worthy",
+      "intent": "插件安装读取私服需要的短期令牌",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/core/**",
+      "kind": "upstream-worthy",
+      "intent": "默认模型记录用户显式选择",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/account/**",
+      "kind": "upstream-worthy",
+      "intent": "用量修订刷新与授权取消回调",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/util/**",
+      "kind": "upstream-worthy",
+      "intent": "原子写入与官方 bundle 注册的发行版补充",
+      "exit": "上游合并 PR 后删除",
+      "pr": "待提交"
+    },
+    {
+      "glob": "packages/experimental/**",
+      "kind": "feature",
+      "intent": "实验性统计包的用量口径",
+      "exit": "上游同步后删除"
+    },
+    {
+      "glob": "packages/extensions/**",
+      "kind": "generated",
+      "intent": "槽位目录由本仓生成器产出",
+      "exit": "永久（生成物）"
+    },
+    {
+      "glob": "packages/bundle/**",
+      "kind": "distribution",
+      "intent": "青狮发行版组合层与官方 bundle 列表",
+      "exit": "永久（发行版组合）"
+    },
+    {
+      "glob": "scripts/**",
+      "kind": "distribution",
+      "intent": "发行版门禁与发布族登记",
+      "exit": "通用部分提 PR"
+    },
+    {
+      "glob": "docs/**",
+      "kind": "test-adaptation",
+      "intent": "生成物文档（CLI 帮助、模块图）带发行版名称",
+      "exit": "永久（生成物）"
+    },
+    {
+      "glob": "tsconfig*.json",
+      "kind": "config-seam",
+      "intent": "青狮包的类型别名与工程引用",
+      "exit": "生成器支持多作用域后删除"
+    },
+    {
+      "glob": "package.json",
+      "kind": "distribution",
+      "intent": "根脚本与发布元数据",
+      "exit": "永久"
+    },
+    {
+      "glob": "pnpm-lock.yaml",
+      "kind": "distribution",
+      "intent": "新增工作区包与私服依赖",
+      "exit": "永久（生成物）"
+    },
+    {
+      "glob": ".gitignore",
+      "kind": "distribution",
+      "intent": "本地构建与设计草稿目录",
+      "exit": "永久"
+    }
+  ]
+}
