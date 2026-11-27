@@ -31,7 +31,8 @@ const signedIn: QuotaState = {
   usageUrl: 'https://qingclaw.test/usage',
   profile: {
     id: null, name: '林律师', contact: null, plan: 'pro', subscriptionActive: true,
-    quotaRemaining: 1200, quotaTotal: 5000, trialTokens: 0, topupTokens: 5000,
+    subscriptionEndsAt: '2026-12-31T00:00:00.000Z',
+    quotaRemaining: 1200, quotaTotal: 5000, trialTokens: 300, topupTokens: 4700,
   } as QuotaState['profile'],
 }
 
@@ -88,6 +89,11 @@ it('asks for the account while signed out and shows credits and plan once signed
   expect(screen.getByText('林律师')).toBeTruthy()
   expect(screen.getByText('1,200')).toBeTruthy()
   expect(screen.getByText('5,000')).toBeTruthy()
+  // The remaining credits are also broken down by grant and by purchase.
+  expect(screen.getByText('300')).toBeTruthy()
+  expect(screen.getByText('4,700')).toBeTruthy()
+  // A dated paid plan shows its end date next to the tier.
+  expect(screen.getByText('planEndsAt')).toBeTruthy()
 })
 
 it('confirms before signing out while a task still runs', async () => {

@@ -12,6 +12,11 @@
 .metrics > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .metrics dt { color: var(--dsw-alias-label-secondary); font-size: 13px; }
 .metrics dd { margin: 0; color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.expiry { color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.details { display: grid; gap: 6px; margin: 0; padding: 0; }
+.details > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.details dt { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.details dd { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 .source { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .confirm { color: var(--dsw-alias-label-secondary); font-size: 12px; }

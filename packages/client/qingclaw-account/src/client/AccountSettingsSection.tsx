@@ -63,6 +63,10 @@ export function AccountSettingsSection({
     </section>
   }
   const tier = planTier(profile.plan, profile.subscriptionActive)
+  // Only a paid tier that Platform dated can show an end date; the free tier never expires.
+  const endsAt = tier !== undefined && tier !== 'free' && profile.subscriptionEndsAt
+    ? profile.subscriptionEndsAt.slice(0, 10)
+    : undefined
   const sources: string[] = []
   if (profile.trialTokens && profile.trialTokens > 0) sources.push(t('quotaTrial'))
   if (profile.topupTokens && profile.topupTokens > 0) sources.push(t('quotaPurchased'))
@@ -80,12 +84,19 @@ export function AccountSettingsSection({
         <span className={css.name}>{profile.name ?? profile.contact ?? t('nav')}</span>
         {tier === undefined ? null
           : <span className={css.plan} data-tier={tier}>{t(tier === 'pro' ? 'planPro' : tier === 'team' ? 'planTeam' : 'planFree')}</span>}
+        {endsAt === undefined ? null : <span className={css.expiry}>{t('planEndsAt', { date: endsAt })}</span>}
       </div>
     </header>
     <dl className={css.metrics}>
       <div><dt>{t('quotaRemaining')}</dt><dd>{profile.quotaRemaining == null ? unknown : formatCredits(profile.quotaRemaining)}</dd></div>
       <div><dt>{t('quotaTotal')}</dt><dd>{profile.quotaTotal == null ? unknown : formatCredits(profile.quotaTotal)}</dd></div>
     </dl>
+    {profile.trialTokens || profile.topupTokens
+      ? <dl className={css.details}>
+        {profile.trialTokens ? <div><dt>{t('quotaTrial')}</dt><dd>{formatCredits(profile.trialTokens)}</dd></div> : null}
+        {profile.topupTokens ? <div><dt>{t('quotaPurchased')}</dt><dd>{formatCredits(profile.topupTokens)}</dd></div> : null}
+      </dl>
+      : null}
     <p className={css.source}>{t('quotaSourceValue', { source: sources.join(' + ') || unknown })}</p>
     <div className={css.actions}>
       <Button variant="primary" onClick={() => { openTopUp() }}>{t('topUp')}</Button>

@@ -1,6 +1,7 @@
 /** QingClaw account copy; languages without a translation fall back to English. */
 
 export const en = {
+  planEndsAt: 'Ends {date}',
   nav: 'QingClaw account',
   signedOutTitle: 'Sign in to QingClaw',
   signedOutHint: 'Sign in with your QingClaw website account to use the built-in models and credits.',
@@ -29,6 +30,7 @@ export const en = {
 export type AccountKey = keyof typeof en
 
 export const zh: Record<AccountKey, string> = {
+  planEndsAt: '到期 {date}',
   nav: '青狮账号',
   signedOutTitle: '登录青狮账号',
   signedOutHint: '用青狮官网账号登录后即可使用内置模型与额度。',
