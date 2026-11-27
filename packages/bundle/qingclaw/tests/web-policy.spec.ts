@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { bindScopeParent, createScope, type Scope } from '@deepseek-ai/dsh-scope'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { restrictQingClawWebSearch } from '../src/index.ts'
@@ -27,6 +28,8 @@ function tool(name: string): ToolDefinition {
 async function runtime(): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
+  // The prompt service registers its section admission record through the projection registry.
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime)
   return ctx
