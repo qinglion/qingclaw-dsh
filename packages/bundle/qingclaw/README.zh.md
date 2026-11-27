@@ -60,7 +60,7 @@ patch 定位已有的账号、模型、网页、通知、官方品牌与 Agent p
 
 #### Token 影响
 
-本层不会增加提示词文本。与上游 Web preset 相比，它会移除 `web_search` schema 及其条件引导。它把青狮账号路由的默认最大输出设为 8,192，并且解析后的模型目录不会公开更大的路由上限。实际推理用量仍由所选模型与请求决定。
+本层不会增加提示词文本。与上游 Web preset 相比，它会移除 `web_search` schema 及其条件引导。每个模型的目录条目带有网关卡片的 `max_output_tokens` 与 `context_window`，路由自身沿用插件默认上限，因此单次请求的输出由两者中较小者决定。实际推理用量仍由所选模型与请求决定。
 
 #### KV Cache 影响
 
@@ -73,7 +73,7 @@ patch 定位已有的账号、模型、网页、通知、官方品牌与 Agent p
 - 本 bundle 必须位于 Web 应用层之后，因为它定位后者声明的配置行。
 - `preset-standard` 覆盖会替换完整的上游声明。上游修改该 preset 的插件列表时，需要同步到 [presets/standard.patch.yml](presets/standard.patch.yml)；composition 测试会在 id、顺序或配置偏离时失败。
 - 推理网关需要在 OpenAI 兼容的 Chat Completions 路由上授权桌面消费者组，并按账号统计用量。
-- 8,192 Token 路由设置只是客户端默认值与目录上限，不是安全边界。网关必须独立拒绝修改版客户端的超限请求，或把它们计入额度。
+- 路由的输出上限只是客户端默认值与目录上限，不是安全边界。网关必须独立拒绝修改版客户端的超限请求，或把它们计入额度。
 - 第一版停用账号通知，因为青狮尚未提供可选的通知端点。
 - 第一版收回上游的浏览器反馈界面：会话头部「反馈」行、消息 Like/Dislike 与 `/feedback` 弹窗。这些控件只向会话日志追加仅写日志的事件，展示出来等于承诺一次没有任何青狮通道投递的查看；宿主侧的 `message-feedback` 与 `command-feedback` 服务仍然挂载，青狮自有反馈服务就位后删除 [cordis.patch.yml](cordis.patch.yml) 里 `ui-message-feedback` 的 `disabled` 行即可恢复。
 - 第一版会隐藏 `web_search`，并停用 DeepSeek 网页搜索与 DeepSeek 网页抓取；匿名 HTTP 页面抓取仍然启用，网关搜索要等共享的短模型 JWT 凭据 seam 与 `/v1/tools` 路由完成后再开放。

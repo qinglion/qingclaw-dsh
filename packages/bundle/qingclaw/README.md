@@ -60,7 +60,7 @@ The model sees no extra prompt text and no `web_search` declaration. The standar
 
 #### Token effect
 
-The layer adds no prompt text. Relative to the upstream Web presets, it removes the `web_search` schema and its conditional guidance. It sets 8,192 as the QingClaw account route's default maximum output, and the resolved model catalog does not advertise a larger route limit. Inference usage still depends on the selected model and request.
+The layer adds no prompt text. Relative to the upstream Web presets, it removes the `web_search` schema and its conditional guidance. Each model's catalog entry carries the gateway card's `max_output_tokens` and `context_window`, and the route's own cap stays at the plugin default, so one request's output is bounded by whichever of the two is smaller. Inference usage still depends on the selected model and request.
 
 #### KV Cache effect
 
@@ -73,7 +73,7 @@ The QingClaw request prefix consistently omits `web_search` for presets that oth
 - This bundle must follow the Web application layer because it targets a row declared there.
 - The `preset-standard` override replaces the complete upstream declaration. Mirror upstream changes to that preset's plugin list in [presets/standard.patch.yml](presets/standard.patch.yml); the composition test fails when the ids, their order, or their configuration diverge.
 - The inference gateway must authorize the desktop consumer group and account for usage on the OpenAI-compatible Chat Completions route.
-- The 8,192-token route setting is a client-side default and catalog bound, not a security boundary. The gateway must reject or account for modified-client requests independently.
+- The route's output cap is a client-side default and catalog bound, not a security boundary. The gateway must reject or account for modified-client requests independently.
 - The first release disables account notifications because QingClaw does not yet expose the optional notification endpoints.
 - The first release withdraws the upstream browser feedback surface: the Session header 反馈 row, the message Like/Dislike pair, and the `/feedback` dialog. Those controls only append log-only Session events, so showing them promises a review that no QingClaw channel delivers. The `message-feedback` and `command-feedback` host services stay mounted; delete the `ui-message-feedback` `disabled` row in [cordis.patch.yml](cordis.patch.yml) once a QingClaw-owned feedback service exists.
 - The first release hides `web_search` and disables DeepSeek-backed Web search and DeepSeek Web fetch. Anonymous HTTP page fetch remains enabled; gateway-backed search waits for a shared short-model-JWT credential seam and `/v1/tools` routes.
