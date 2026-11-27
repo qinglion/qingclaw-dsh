@@ -76,7 +76,7 @@ export function SignInDialog({ account, colorScheme, start, cancel, close, useAp
           {t(copyResult?.messageKey ?? 'copyLink')}
         </button>{t('browserDescription')}
       </p> : <p className={css.description}>
-        {error ? t(failureKey) : expired ? t('timeoutDescription') : t(allowApiKey ? 'loginDescription' : 'accountLoginDescription')}
+        {error ? t(failureKey) : expired ? t('timeoutDescription') : t('loginDescription')}
       </p>}
     </div>
     <div className={css.actions}>

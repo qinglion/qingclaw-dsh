@@ -30,6 +30,9 @@
       "path": "../ui-sidebar"
     },
     {
+      "path": "../qingclaw-platform"
+    },
+    {
       "path": "../ui-slots"
     },
     {

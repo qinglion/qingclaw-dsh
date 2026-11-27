@@ -38,6 +38,8 @@ export interface AccountSnapshot {
 export interface AccountSectionInjected {
   /** Whether the account menu offers the built-in questionnaire row; omission keeps it. */
   showContactItem?: boolean | undefined
+  /** Whether sign-in may offer the official API-key route; omission keeps it. */
+  allowApiKey?: boolean | undefined
   /** @param snapshot - picture attempt whose rendered image failed; superseded attempts are ignored. */
   avatarFailed: (snapshot: AccountAvatarSnapshot) => void
   /** Subscribe to live credential-expiry notifications.

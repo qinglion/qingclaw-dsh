@@ -18,7 +18,6 @@ import { contactUrl } from './contact-url.ts'
 import { authorizeUrlWithTheme } from './authorize-url.ts'
 import { BrowserLogin } from './browser-login.ts'
 import { AccountOnboarding } from './AccountOnboarding.tsx'
-import { AccountColdStart } from './AccountColdStart.tsx'
 import { AccountPlatformHost, type AccountPlatformHostInjected } from './AccountPlatformHost.tsx'
 import { AccountMenu } from './AccountMenu.tsx'
 import { AccountNotices } from './AccountNotices.tsx'
@@ -187,6 +186,7 @@ export function apply(ctx: Context): void {
     })
   const operations: AccountSectionInjected = {
     showContactItem: config.showContactItem,
+    allowApiKey: config.allowApiKey,
     avatarFailed: (value) => { avatar.failed(value) },
     subscribeSessionExpired: listener => ctx.remote.$on('deepseek-account/session-expired', listener),
     subscribeModelSignInRequired: listener => ctx.remote.$on('deepseek-account/model-sign-in-required', listener),
@@ -304,13 +304,6 @@ export function apply(ctx: Context): void {
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.models.sign-in', () => ctx.slots.register({
     name: 'settings.models.sign-in', locale: 'settings.account', inject: () => operations,
   }, AccountOnboarding)))
-  // QingClaw owns desktop cold start: with the API-key route disabled the upstream
-  // multi-step introduction has no first step, so the account dialog replaces it.
-  if (desktop && !config.allowApiKey) {
-    ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
-      name: 'settings.onboarding', id: 'account-sign-in', order: -10, locale: 'settings.account', inject: () => operations,
-    }, AccountColdStart)))
-  }
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('shell.quota-notice', () => ctx.slots.register({
     name: 'shell.quota-notice', locale: 'settings.account',
     select: owner => owner.code === 'ACCOUNT_QUOTA' ? owner : null,

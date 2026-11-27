@@ -21,6 +21,7 @@
     { "path": "../ui-sidebar" },
     { "path": "../ui-slots" },
     { "path": "../ui-settings-account" },
+    { "path": "../qingclaw-platform" },
     { "path": "../../typert/protocol" },
     { "path": "../../boot/plugin-manager" },
     { "path": "../../util/crypto" }

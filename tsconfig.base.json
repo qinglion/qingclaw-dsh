@@ -471,6 +471,10 @@
       "@qinglion/dsh-qingclaw-creator/client": ["./packages/client/qingclaw-creator/src/client/index.ts"],
       "@qinglion/dsh-client-ui-qingclaw-feedback": ["./packages/client/qingclaw-feedback/src"],
       "@qinglion/dsh-client-ui-qingclaw-feedback/client": ["./packages/client/qingclaw-feedback/src/client/index.ts"],
+      "@qinglion/dsh-client-ui-qingclaw-account": ["./packages/client/qingclaw-account/src"],
+      "@qinglion/dsh-client-ui-qingclaw-account/client": ["./packages/client/qingclaw-account/src/client/index.ts"],
+      "@qinglion/dsh-client-ui-qingclaw-platform": ["./packages/client/qingclaw-platform/src"],
+      "@qinglion/dsh-client-ui-qingclaw-platform/client": ["./packages/client/qingclaw-platform/src/client/index.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],

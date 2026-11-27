@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@qinglion/dsh-client-ui-qingclaw-platform/client'
 import { AccountQuotaAction, type AccountQuotaActionInjected } from './AccountQuotaAction.tsx'
 import { AccountQuotaBanner, type AccountQuotaBannerInjected } from './AccountQuotaBanner.tsx'
+import { AccountOnboardingPrompt, type AccountOnboardingPromptInjected } from './AccountOnboardingPrompt.tsx'
 import { AccountSettingsSection, type AccountSettingsInjected } from './AccountSettingsSection.tsx'
 import { de, en, es, fr, ja, pt, ru, zh, type AccountKey } from './locales.ts'
 import { createQuotaStore } from './quota-store.ts'
@@ -74,6 +75,14 @@ export function apply(ctx: Context): void {
       },
     }),
   }, AccountSettingsSection)))
+  // The upstream introduction is disabled in this distribution, so the first run asks for the
+  // account instead; the prompt completes itself once the grant is stored.
+  if ((globalThis as typeof globalThis & { dshDesktop?: unknown }).dshDesktop !== undefined) {
+    ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
+      name: 'settings.onboarding', id: 'qingclaw-account-sign-in', order: -10, locale: NS,
+      inject: (): AccountOnboardingPromptInjected => ({ hooks, signIn }),
+    }, AccountOnboardingPrompt))
+  }
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock', id: 'qingclaw-account-quota', locale: NS,
     inject: (): AccountQuotaBannerInjected => ({ hooks, openTopUp }),
