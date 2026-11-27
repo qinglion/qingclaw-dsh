@@ -1,7 +1,9 @@
 /** Listing metadata a release declares in `qingclaw`, checked before a publish. */
 
-const IMAGE = /^(?:\.\/)?[a-zA-Z0-9_][a-zA-Z0-9._/-]*\.(?:webp|png|jpe?g)$/
-const SITE_IMAGE = /^\/workbenches\/[a-zA-Z0-9_-][a-zA-Z0-9._-]*\.(?:webp|png|jpe?g)$/
+// SVG is a listing image too: the directory serves it as image/svg+xml, so one file stays
+// sharp at every size and can follow the theme instead of baking one colour.
+const IMAGE = /^(?:\.\/)?[a-zA-Z0-9_][a-zA-Z0-9._/-]*\.(?:webp|png|jpe?g|svg)$/
+const SITE_IMAGE = /^\/workbenches\/[a-zA-Z0-9_-][a-zA-Z0-9._-]*\.(?:webp|png|jpe?g|svg)$/
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 function isRecord(value: unknown): value is Record<string, unknown> {
