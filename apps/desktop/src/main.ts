@@ -22,7 +22,6 @@ import {
   nativeImage,
   nativeTheme,
   protocol,
-  safeStorage,
   session,
   shell,
   type IpcMainInvokeEvent,
@@ -34,7 +33,7 @@ import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError 
 import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
 import { installDesktopFileDrag } from './file-drag.ts'
 import { installDesktopDirectoryPicker } from './directory-picker.ts'
-import { capturePageRegion } from './page-capture.ts'
+import { installQingclawExtras } from './ipc-extras.ts'
 import { installMicrophonePermissions } from './microphone-permissions.ts'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
@@ -42,6 +41,7 @@ import { readDeviceInfo } from './device-info.ts'
 import { RemoteMobileBridge } from './mobile/remote-mobile-bridge.ts'
 import { PairingStore } from './mobile/pairing-store.ts'
 import { DesktopMobileAccount, registerMobileRoom } from './mobile-account.ts'
+import { pairingCipher } from './mobile/pairing-cipher.ts'
 import { MobilePairingWindow } from './mobile-pairing-window.ts'
 import { desktopUpdateReadyConfirmation, formatDesktopMessage, resolveDesktopLocale, resolveDesktopStartupLocale } from './locale.ts'
 import type { DesktopMessages } from './locale.ts'
@@ -269,37 +269,6 @@ function platformLoginUrl(authorizeUrl: string): string {
   const url = new URL(authorizeUrl)
   url.searchParams.set('theme', nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
   return url.href
-}
-
-/**
- * Protects the persisted phone pairing at rest.
- *
- * The record carries a credential that grants remote access to this desktop's sessions. The
- * platform key store seals it when available; otherwise the owner-only file mode is the only
- * protection, and the next launch after a key-store change starts a fresh pairing.
- * @returns sealing helpers for the pairing store.
- */
-function pairingCipher(): { seal(plaintext: string): string; unseal(value: string): string | undefined } {
-  if (safeStorage.isEncryptionAvailable()) {
-    return {
-      seal: plaintext => 'encrypted:' + safeStorage.encryptString(plaintext).toString('base64'),
-      unseal: (value) => {
-        if (!value.startsWith('encrypted:')) return undefined
-        try {
-          return safeStorage.decryptString(Buffer.from(value.slice('encrypted:'.length), 'base64'))
-        } catch {
-          // A rotated or unavailable key-store entry is expected; the phone scans again.
-          return undefined
-        }
-      },
-    }
-  }
-  return {
-    seal: plaintext => 'plain:' + Buffer.from(plaintext, 'utf8').toString('base64'),
-    unseal: value => value.startsWith('plain:')
-      ? Buffer.from(value.slice('plain:'.length), 'base64').toString('utf8')
-      : undefined,
-  }
 }
 
 function createWindow(preload: string, show = false, primary = false): BrowserWindow {
@@ -897,7 +866,6 @@ async function main(): Promise<void> {
   })
 
   installDesktopDirectoryPicker(() => mainWindow)
-  ipcMain.handle(DESKTOP_IPC.capturePageRegion, (event, region: unknown) => capturePageRegion(assertProductSender(event), region))
   installMicrophonePermissions(session.defaultSession, () => mainWindow?.webContents)
   const shortcuts = installDesktopShortcuts(() => mainWindow, app.getPath('userData'),
     process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'windows' : 'linux', () => { refreshApplicationMenu() }, window => updateOverlays.input(window))
@@ -977,15 +945,8 @@ async function main(): Promise<void> {
     if (source !== 'light' && source !== 'dark' && source !== 'system') return
     nativeTheme.themeSource = source
   })
-  // The application badge mirrors the unread completions the page counts; nothing else sets it.
-  ipcMain.on(DESKTOP_IPC.attentionBadge, (event, count: unknown) => {
-    const window = mainWindow
-    if (window === undefined || event.sender !== window.webContents
-      || event.senderFrame !== window.webContents.mainFrame
-      || !event.senderFrame.url.startsWith(`${SCHEME}://app/`)) return
-    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) return
-    appBadge.set(count)
-  })
+  // The distribution's own channels: page capture and the completion badge.
+  installQingclawExtras({ mainWindow: () => mainWindow, assertProductSender, badge: appBadge })
   ipcMain.handle(DESKTOP_IPC.localeBootstrap, async (event) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame
       || new URL(event.senderFrame.url).origin !== new URL(applicationUrl).origin) {
