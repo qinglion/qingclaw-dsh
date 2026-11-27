@@ -1,7 +1,7 @@
 {
   "name": "@qinglion/dsh-client-ui-qingclaw-platform",
   "description": "QingClaw website pages opened inside the application's native Platform host",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.3-alpha.2",
   "publishConfig": {
     "access": "public"
   },

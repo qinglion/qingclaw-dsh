@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-qingclaw-bundle",
   "description": "QingClaw distribution layer over the DSH Web application bundle",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.3-alpha.2",
   "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"

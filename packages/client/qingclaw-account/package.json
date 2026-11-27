@@ -1,7 +1,7 @@
 {
   "name": "@qinglion/dsh-client-ui-qingclaw-account",
   "description": "QingClaw credit quota banner and sidebar quota control, composed from upstream slots",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.3-alpha.2",
   "publishConfig": {
     "access": "public"
   },
