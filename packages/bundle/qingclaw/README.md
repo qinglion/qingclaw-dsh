@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This bundle is the QingClaw-owned distribution layer over the DSH Web application. It keeps upstream Web composition intact, routes account and model traffic to QingClaw-owned services, disables the unavailable Platform-notification surface, and replaces the official browser-brand row with the QingClaw brand plugin. Desktop and browser deployments can select the same layer.
+This bundle is the QingClaw-owned distribution layer over the DSH Web application. It keeps upstream Web composition intact, routes account and model traffic to QingClaw-owned services, disables the unavailable Platform-notification and in-app feedback surfaces, and replaces the official browser-brand row with the QingClaw brand plugin. Desktop and browser deployments can select the same layer.
 
 ## Table of Contents
 
@@ -75,6 +75,7 @@ The QingClaw request prefix consistently omits `web_search` for presets that oth
 - The inference gateway must authorize the desktop consumer group and account for usage on the OpenAI-compatible Chat Completions route.
 - The 8,192-token route setting is a client-side default and catalog bound, not a security boundary. The gateway must reject or account for modified-client requests independently.
 - The first release disables account notifications because QingClaw does not yet expose the optional notification endpoints.
+- The first release withdraws the upstream browser feedback surface: the Session header 反馈 row, the message Like/Dislike pair, and the `/feedback` dialog. Those controls only append log-only Session events, so showing them promises a review that no QingClaw channel delivers. The `message-feedback` and `command-feedback` host services stay mounted; delete the `ui-message-feedback` `disabled` row in [cordis.patch.yml](cordis.patch.yml) once a QingClaw-owned feedback service exists.
 - The first release hides `web_search` and disables DeepSeek-backed Web search and DeepSeek Web fetch. Anonymous HTTP page fetch remains enabled; gateway-backed search waits for a shared short-model-JWT credential seam and `/v1/tools` routes.
 - QingClaw 1.0 local-data migration and the existing free and paid skill catalog are deliberately outside the first QingClaw 2.0 slice.
 

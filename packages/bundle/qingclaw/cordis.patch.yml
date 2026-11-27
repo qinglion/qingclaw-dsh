@@ -125,6 +125,16 @@
 - id: ui-account-notifications
   disabled: true
 
+# No in-app feedback surface ships yet. The Session header 反馈 row, the message
+# Like/Dislike pair and the /feedback dialog all only append log-only Session
+# events, and this distribution has no channel that delivers them anywhere;
+# showing the entry would promise the user a review that never happens. The
+# host-side message-feedback and command-feedback services stay mounted, so a
+# QingClaw-owned feedback service can re-enable the browser surface by removing
+# this row.
+- id: ui-message-feedback
+  disabled: true
+
 - id: ui-brand-official
   name: '@deepseek-ai/dsh-client-ui-brand-official'
   disabled: true

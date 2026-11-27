@@ -160,6 +160,17 @@ describe('QingClaw distribution bundle', () => {
     expect(minimalConfig?.plugins?.some(row => row.id === 'tool-web')).toBe(false)
   })
 
+  it('withdraws the upstream browser feedback surface until QingClaw delivers feedback', () => {
+    const upstream = composeEntries([bundle('base'), bundle('web-app')])
+    const qingclaw = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
+    const row = 'ui-message-feedback'
+    const name = '@deepseek-ai/dsh-client-ui-message-feedback'
+
+    expect(upstream.find(entry => entry.id === row)).toMatchObject({ name })
+    expect(upstream.find(entry => entry.id === row)?.disabled).not.toBe(true)
+    expect(qingclaw.find(entry => entry.id === row)).toMatchObject({ name, disabled: true })
+  })
+
   it('disables upstream DeepSeek telemetry and request metadata only in QingClaw', () => {
     const telemetryRows = [
       ['desktop-product-telemetry', '@deepseek-ai/dsh-host-product-telemetry-otel'],
