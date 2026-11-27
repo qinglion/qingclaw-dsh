@@ -224,8 +224,12 @@ export function apply(ctx: Context, config: Config): void {
       }
       const data = parsed.data
       if (response.status === 402) {
-        const message = String(data?.biz_data?.message
-          ?? '额度不足，无法生成。请升级专业版或购买更多额度。')
+        // The platform may name the shortfall in `biz_data.message`; anything
+        // other than a string leaves the localized default in place.
+        const declared = data?.biz_data?.message
+        const message = typeof declared === 'string' && declared.length > 0
+          ? declared
+          : '额度不足，无法生成。请升级专业版或购买更多额度。'
         throw new LlmError(message, 'ACCOUNT_QUOTA', { status: 402 })
       }
       if (response.status === 401) {
@@ -238,7 +242,7 @@ export function apply(ctx: Context, config: Config): void {
           { status: response.status },
         )
       }
-      return data?.biz_data ?? {}
+      return data.biz_data ?? {}
     }
     const authorizeMedia = async (
       kind: 'image' | 'video' | 'audio',
