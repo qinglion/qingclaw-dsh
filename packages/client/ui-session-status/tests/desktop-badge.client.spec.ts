@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
 import type { ISessions, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces, WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionPendingInteraction } from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -17,13 +18,18 @@ afterEach(async () => {
   Reflect.deleteProperty(window, 'dshDesktop')
 })
 
-function bench() {
+function bench(phase: WorkspaceSnapshot['phase'] = 'ready') {
   const update = vi.fn()
   Object.assign(window, { dshDesktop: { attention: { update } } })
   const ctx = new Context()
   roots.push(ctx)
   ctx.provide('remote', { $on: () => () => {}, sessionStatus: { mark: vi.fn() } } as never)
   const list = createSnapshotStore<SessionListState>({ ids: [], byId: {}, phase: 'ready', projectionsBySession: {} })
+  const workspaces = createSnapshotStore<WorkspaceSnapshot>({
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], phase, state: 'idle', error: null,
+  })
+  const workspaceController: Pick<IWorkspaces, 'list'> = { list: workspaces }
+  ctx.provide('workspaces', workspaceController as never)
   const pending = createSnapshotStore<ReadonlyMap<SessionId, SessionPendingInteraction>>(new Map())
   const sessions: Pick<ISessions, 'list' | 'binding'> = { list, binding: () => undefined }
   ctx.provide('sessions', sessions as never)
@@ -38,10 +44,13 @@ function bench() {
   const record = (id: SessionId, value: Partial<SessionReadState> = {}): SessionReadState => ({
     sessionId: id, completedTurn: 1, failed: false, readTurn: 0, manualUnread: false, ...value,
   })
-  return { ctx, list, status, update, row, record }
+  const setArchives = (archivedSessionIds: readonly SessionId[]): void => {
+    workspaces.set({ ...workspaces.getSnapshot(), archivedSessionIds })
+  }
+  return { ctx, list, workspaces, setArchives, status, update, row, record }
 }
 
-it('counts only listed Sessions whose latest completion is unread', () => {
+it('counts only listed, unarchived Sessions whose latest completion is unread', () => {
   const b = bench()
   const listed = sessionId('listed')
   const unlisted = sessionId('subagent')
@@ -50,16 +59,16 @@ it('counts only listed Sessions whose latest completion is unread', () => {
     [listed, { running: false, pendingInteraction: undefined, completionUnread: true, completionFailed: false }],
     [unlisted, { running: false, pendingInteraction: undefined, completionUnread: true, completionFailed: false }],
   ])
-  expect(unreadCompletionCount([listed], statuses)).toBe(1)
-  expect(unreadCompletionCount([listed, unlisted], statuses)).toBe(2)
-  expect(unreadCompletionCount([listed], new Map())).toBe(0)
+  expect(unreadCompletionCount([listed], statuses, new Set())).toBe(1)
+  expect(unreadCompletionCount([listed, unlisted], statuses, new Set([listed]))).toBe(1)
+  expect(unreadCompletionCount([listed], new Map(), new Set())).toBe(0)
 })
 
-it('reports the unread completion count and lowers it when the Session is read', () => {
+it('reports the unread completion count and lowers it when the Session is read', async () => {
   const b = bench()
   const id = sessionId('finished')
   b.row(id)
-  installDesktopBadge(b.ctx, b.status)
+  await installDesktopBadge(b.ctx, b.status)
   expect(b.update).toHaveBeenLastCalledWith(0)
   b.status.reading.replace([b.record(id)])
   expect(b.update).toHaveBeenLastCalledWith(1)
@@ -68,32 +77,65 @@ it('reports the unread completion count and lowers it when the Session is read',
   expect(b.update).toHaveBeenCalledTimes(3)
 })
 
-it('ignores completions of Sessions the workspace does not list', () => {
+it('ignores completions of Sessions the workspace does not list', async () => {
   const b = bench()
   const listed = sessionId('listed')
   b.row(listed)
-  installDesktopBadge(b.ctx, b.status)
+  await installDesktopBadge(b.ctx, b.status)
   b.status.reading.replace([b.record(sessionId('subagent'))])
   expect(b.update).toHaveBeenCalledTimes(1)
   expect(b.update).toHaveBeenLastCalledWith(0)
 })
 
-it('counts explicit unread marks and sessions that appear after the completion', () => {
+it('updates the badge when unread Sessions are archived or unarchived', async () => {
   const b = bench()
-  installDesktopBadge(b.ctx, b.status)
+  const archived = sessionId('archived')
+  const active = sessionId('active')
+  b.row(archived)
+  b.row(active)
+  b.status.reading.replace([b.record(archived), b.record(active)])
+  b.setArchives([archived])
+  await installDesktopBadge(b.ctx, b.status)
+  expect(b.update).toHaveBeenLastCalledWith(1)
+
+  b.setArchives([archived, active])
+  expect(b.update).toHaveBeenLastCalledWith(0)
+
+  b.setArchives([])
+  expect(b.update).toHaveBeenLastCalledWith(2)
+  expect(b.update).toHaveBeenCalledTimes(3)
+})
+
+it('reports zero until the workspace archive baseline arrives', async () => {
+  const b = bench('pending')
+  const archived = sessionId('archived')
+  const active = sessionId('active')
+  b.row(archived)
+  b.row(active)
+  await installDesktopBadge(b.ctx, b.status)
+  b.status.reading.replace([b.record(archived), b.record(active)])
+  expect(b.update).toHaveBeenCalledExactlyOnceWith(0)
+
+  b.workspaces.set({ ...b.workspaces.getSnapshot(), phase: 'ready', archivedSessionIds: [archived] })
+  expect(b.update.mock.calls).toEqual([[0], [1]])
+})
+
+it('counts explicit unread marks and sessions that appear after the completion', async () => {
+  const b = bench()
+  await installDesktopBadge(b.ctx, b.status)
   b.status.reading.replace([b.record(sessionId('later'), { readTurn: 1, manualUnread: true })])
   expect(b.update).toHaveBeenLastCalledWith(0)
   b.row(sessionId('later'))
   expect(b.update).toHaveBeenLastCalledWith(1)
 })
 
-it('republishes only when the count changes', () => {
+it('republishes only when the count changes', async () => {
   const b = bench()
   const first = sessionId('first')
   const second = sessionId('second')
   b.row(first)
   b.row(second)
-  installDesktopBadge(b.ctx, b.status)
+  await installDesktopBadge(b.ctx, b.status)
   b.status.reading.replace([b.record(first)])
   const published = b.update.mock.calls.length
   b.status.reading.replace([b.record(first), b.record(second)])
@@ -118,9 +160,12 @@ it('removes the badge when the plugin is disposed', async () => {
   const b = bench()
   const id = sessionId('finished')
   b.row(id)
-  installDesktopBadge(b.ctx, b.status)
+  await installDesktopBadge(b.ctx, b.status)
   b.status.reading.replace([b.record(id)])
   expect(b.update).toHaveBeenLastCalledWith(1)
   await b.ctx.fiber.dispose()
   expect(b.update).toHaveBeenLastCalledWith(0)
+  b.setArchives([id])
+  b.setArchives([])
+  expect(b.update.mock.calls).toEqual([[0], [1], [0]])
 })
