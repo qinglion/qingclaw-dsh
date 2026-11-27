@@ -921,7 +921,7 @@ describe('UiWorkspaceService', () => {
 
     await vi.waitFor(() => {
       expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('target'), sessionId: sid('target-review') })
-      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('target-review'), { source: 'mainView' })
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('target-review'), { source: 'mainView', facets: { conversation: true } })
     })
     expect(matchesWorkspace).toHaveBeenCalledExactlyOnceWith(target, expect.any(AbortSignal))
   })
@@ -939,7 +939,7 @@ describe('UiWorkspaceService', () => {
 
     await vi.waitFor(() => {
       expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('target') })
-      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('created-target'), { source: 'mainView' })
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('created-target'), { source: 'mainView', facets: { conversation: true } })
     })
   })
 
