@@ -38,11 +38,7 @@ import { installMicrophonePermissions } from './microphone-permissions.ts'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
 import { readDeviceInfo } from './device-info.ts'
-import { RemoteMobileBridge } from './mobile/remote-mobile-bridge.ts'
-import { PairingStore } from './mobile/pairing-store.ts'
-import { DesktopMobileAccount, registerMobileRoom } from './mobile-account.ts'
-import { pairingCipher } from './mobile/pairing-cipher.ts'
-import { MobilePairingWindow } from './mobile-pairing-window.ts'
+import { createPhoneAccount } from './mobile/create-phone-account.ts'
 import { desktopUpdateReadyConfirmation, formatDesktopMessage, resolveDesktopLocale, resolveDesktopStartupLocale } from './locale.ts'
 import type { DesktopMessages } from './locale.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
@@ -546,33 +542,18 @@ async function main(): Promise<void> {
   const platformView = new DesktopPlatformView(join(app.getAppPath(), 'lib', 'preload-platform-account.cjs'),
     () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US', process.platform === 'win32' ? 'win32' : 'darwin',
     owner => isMandatory() || updateOverlays.input(owner).blocked)
-  const phoneAccount = new DesktopMobileAccount((account) => {
-    const origin = sealedDeployment?.platformOrigin ?? hostEnvironment.QINGCLAW_PLATFORM_ORIGIN
-      ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test
-    const bridge = new RemoteMobileBridge({
-      platformOrigin: origin,
-      desktopTheme: readFileSync(join(app.getAppPath(), 'lib/welcome/design-platform.css'), 'utf8'),
-      createRoom: signal => registerMobileRoom(origin, account, signal),
-      harnessUrl: () => {
-        if (!hostUrl || !hostCookie || backend.state.phase !== 'ready') return undefined
-        const url = new URL(hostUrl)
-        return ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname) ? url.origin : undefined
-      },
-      harnessCookie: () => backend.state.phase === 'ready' ? hostCookie : undefined,
-      locale: () => locale.id.startsWith('zh') ? 'zh' : 'en',
-      pairing: new PairingStore({
-        path: join(app.getPath('userData'), 'desktop', 'mobile-pairing.json'),
-        origin,
-        accountId: account.userId,
-        ...pairingCipher(),
-      }),
-    })
-    const window = new MobilePairingWindow(bridge)
-    return {
-      restore: () => bridge.restore(),
-      open: (parent: BrowserWindow, title: string) => window.open(parent, title),
-      dispose: (options?: { preserveRoom?: boolean }) => window.dispose(options),
-    }
+  const phoneAccount = createPhoneAccount({
+    platformOrigin: () => sealedDeployment?.platformOrigin ?? hostEnvironment.QINGCLAW_PLATFORM_ORIGIN
+      ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test,
+    pairingPath: join(app.getPath('userData'), 'desktop', 'mobile-pairing.json'),
+    designCss: () => readFileSync(join(app.getAppPath(), 'lib/welcome/design-platform.css'), 'utf8'),
+    harnessUrl: () => {
+      if (!hostUrl || !hostCookie || backend.state.phase !== 'ready') return undefined
+      const url = new URL(hostUrl)
+      return ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname) ? url.origin : undefined
+    },
+    harnessCookie: () => backend.state.phase === 'ready' ? hostCookie : undefined,
+    locale: () => locale.id.startsWith('zh') ? 'zh' : 'en',
   })
   const backend = new DesktopBackendController((onFailure) => {
     const hostInspectPort = developmentHostInspectPort(development)
