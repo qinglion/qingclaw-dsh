@@ -41,6 +41,11 @@ interface MediaFileSystem {
   readBytes(target: object, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array>
 }
 
+/** A whole positive token count the catalog declares; anything else declares nothing. */
+function listedCapacity(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined
+}
+
 async function requestQingclawListing(
   url: string,
   credential: Readonly<Record<string, string>>,
@@ -81,6 +86,11 @@ async function requestQingclawListing(
     // The website prices each model against the deployed default, so the
     // listing carries the multiple the selector shows beside the name.
     const rate = listedRate(Reflect.get(item, 'rate'))
+    // The website passes each gateway card's capacity through, so a request's
+    // output and the whole context follow the model actually served. A model
+    // the card declares nothing for keeps the route's own budget.
+    const maxOutputTokens = listedCapacity(Reflect.get(item, 'max_output_tokens'))
+    const contextWindow = listedCapacity(Reflect.get(item, 'context_window'))
     entries.push({
       id,
       ...(isDefault ? { default: true } : {}),
@@ -90,7 +100,8 @@ async function requestQingclawListing(
         usable: true,
         facts: {
           inputModalities: inputModalities.length > 0 ? inputModalities : ['text'],
-          maxOutputTokens: 8192,
+          ...(contextWindow === undefined ? {} : { contextWindow }),
+          ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
         },
       },
     })

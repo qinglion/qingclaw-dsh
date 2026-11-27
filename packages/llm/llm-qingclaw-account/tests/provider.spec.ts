@@ -233,6 +233,33 @@ describe('QingClaw account provider', () => {
     expect(models.map(model => model.rate)).toEqual([1, 0.4])
   })
 
+  it('sizes each request from the capacity the website catalog declares', async () => {
+    const { ctx } = await mount(async (input, init) => {
+      const request = new Request(input, init)
+      const path = new URL(request.url).pathname
+      if (path === '/auth-api/v0/dsh/model_token') return grant(jwt(1))
+      if (path === '/auth-api/v0/dsh/models') {
+        return Response.json({ data: [
+          { id: 'small-model', max_output_tokens: 4_096, context_window: 262_144 },
+          { id: 'wide-model', max_output_tokens: 393_216, context_window: 1_000_000 },
+          { id: 'zero-model', max_output_tokens: 0 },
+          { id: 'fractional-model', max_output_tokens: 8_192.5, context_window: 1_000.5 },
+        ] })
+      }
+      throw new Error(`unexpected request ${request.method} ${request.url}`)
+    })
+
+    // A declared output cap below the route default wins; one above it still answers at the route default.
+    await expect(ctx.llm.resolveModelInfo('deepseek-account', 'small-model'))
+      .resolves.toMatchObject({ context: { contextWindow: 262_144 }, defaultMaxTokens: 4_096 })
+    await expect(ctx.llm.resolveModelInfo('deepseek-account', 'wide-model'))
+      .resolves.toMatchObject({ context: { contextWindow: 1_000_000 }, defaultMaxTokens: 256_000 })
+    // A value the catalog cannot read as a whole positive count declares nothing, so the route budget stays.
+    for (const id of ['zero-model', 'fractional-model']) {
+      await expect(ctx.llm.resolveModelInfo('deepseek-account', id))
+        .resolves.toMatchObject({ context: { contextWindow: 1_000_000 }, defaultMaxTokens: 256_000 })
+    }
+  })
   it('keeps a user-saved model while the website default differs', async () => {
     const { ctx } = await mount(listingFetch())
     const saveSelection = vi.fn(async (_selection: { provider: string; model: string }) => {})
