@@ -20,6 +20,7 @@ it('injects configured contact options and removes the listener on disposal', as
     desktopOnboarding: true,
     allowApiKey: true,
     showContactItem: true,
+    section: true,
   } }])
   await ctx.fiber.dispose()
   table.length = 0

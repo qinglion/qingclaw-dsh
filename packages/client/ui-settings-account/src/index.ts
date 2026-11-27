@@ -30,6 +30,7 @@ export const Config = z.object({
   desktopOnboarding: ContactConfigFields.desktopOnboarding,
   allowApiKey: ContactConfigFields.allowApiKey,
   showContactItem: ContactConfigFields.showContactItem,
+  section: ContactConfigFields.section,
   version: OnboardingSettingsFields.version.volatile(),
   step: OnboardingSettingsFields.step.volatile(),
   purpose: OnboardingSettingsFields.purpose.volatile(),
@@ -54,6 +55,7 @@ export function apply(ctx: Context, config: Config): void {
       desktopOnboarding: config.desktopOnboarding,
       allowApiKey: config.allowApiKey,
       showContactItem: config.showContactItem,
+      section: config.section,
     } satisfies ContactConfig })
   })
 }

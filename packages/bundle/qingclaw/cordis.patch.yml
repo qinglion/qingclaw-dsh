@@ -43,6 +43,9 @@
     # QingClaw ships its own feedback control in the sidebar footer, so the
     # built-in questionnaire row would be a second, unmaintained entry.
     showContactItem: false
+    # The qingclaw-account plugin owns the settings section; without this the
+    # sidebar lists both that page and the shipped one under the same label.
+    section: false
 - insert:
     - id: llm-qingclaw-account
       name: '@qinglion/dsh-llm-qingclaw-account'

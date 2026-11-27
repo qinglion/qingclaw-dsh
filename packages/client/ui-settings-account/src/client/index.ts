@@ -329,6 +329,8 @@ export function apply(ctx: Context): void {
     children: { 'settings.launcher.notifications': { kind: 'single', scope: 'root' } },
   }, AccountNotices)))
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.section', () => {
+    // A distribution that owns the account page turns this off, so one sidebar entry remains.
+    if (!config.section) return () => undefined
     let unregister: (() => void) | undefined
     const update = () => {
       if (snapshot.view?.status === 'credential-stored') {
