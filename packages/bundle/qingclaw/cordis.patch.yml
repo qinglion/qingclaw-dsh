@@ -63,6 +63,11 @@
       name: '@qinglion/dsh-qingclaw-workbench'
       config:
         cacheFile: !!js dshPath('cache', 'qingclaw-workbench', 'feed.json')
+    - id: qingclaw-entitlement
+      name: '@qinglion/dsh-qingclaw-entitlement'
+      config:
+        lockedFile: !!js dshPath('state', 'qingclaw-entitlement', 'locked.json')
+        licenceFile: !!js dshPath('state', 'qingclaw-entitlement', 'licence.json')
 
 - insert:
     - id: plugin-market

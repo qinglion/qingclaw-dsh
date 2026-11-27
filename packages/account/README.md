@@ -22,12 +22,13 @@ The `account/` group signs the user in to DeepSeek through the system browser an
 <a id="packages"></a>
 ## Packages
 
-Two packages provide the account feature and DeepSeek request authentication; their READMEs cover day-to-day use, and the subsystem reference owns the exhaustive contracts.
+Three packages provide the account feature, DeepSeek request authentication, and the QingClaw licence gate; their READMEs cover day-to-day use, and the subsystem reference owns the exhaustive contracts.
 
 | Package | Role | ctx key |
 |---|---|---|
 | [`deepseek-account/`](deepseek-account/README.md) | Browser sign-in, the stored grant, Platform profile, balance, and notification reads, and Host-only request credentials for allowed destinations | `ctx.deepseekAccount` |
 | [`deepseek-auth/`](deepseek-auth/README.md) | Request authentication for every DeepSeek API consumer: orders the API key and the account sign-in by billing, binds each to its deployment, and releases request headers | `ctx.deepseekAuth` |
+| [`qingclaw-entitlement/`](qingclaw-entitlement/README.md) | QingClaw licence gate that remembers enabled workbenches, disables them when the professional licence lapses, and restores them after renewal | — |
 
 -----
 

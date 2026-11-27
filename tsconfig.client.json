@@ -120,6 +120,7 @@
     { "path": "./packages/client/ui-sidebar" },
     { "path": "./packages/client/ui-brand-official" },
     { "path": "./packages/client/ui-brand-qingclaw" },
+    { "path": "./packages/account/qingclaw-entitlement/tsconfig.client.json" },
     { "path": "./packages/client/qingclaw-workbench/tsconfig.client.json" },
     { "path": "./packages/client/qingclaw-admin" },
     { "path": "./packages/client/qingclaw-feedback" },

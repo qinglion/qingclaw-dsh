@@ -22,12 +22,13 @@ kind: "package-group"
 <a id="packages"></a>
 ## 包
 
-两个包提供账号功能和 DeepSeek 请求鉴权；它们的 README 覆盖日常使用，全部约定以子系统参考为准。
+三个包提供账号功能、DeepSeek 请求鉴权和 QingClaw 授权闸门；它们的 README 覆盖日常使用，全部约定以子系统参考为准。
 
 | 包 | 角色 | ctx 键 |
 |---|---|---|
 | [`deepseek-account/`](deepseek-account/README.zh.md) | 浏览器登录、已存授权、Platform 资料、余额与通知读取，以及面向允许目标的仅限 Host 的请求凭据 | `ctx.deepseekAccount` |
 | [`deepseek-auth/`](deepseek-auth/README.zh.md) | 面向所有 DeepSeek API 消费方的请求鉴权：按计费方式排定 API 密钥与账号登录的顺序，把每一种绑定到其部署，并释放请求头 | `ctx.deepseekAuth` |
+| [`qingclaw-entitlement/`](qingclaw-entitlement/README.zh.md) | QingClaw 授权闸门：记住已启用的工作台，专业版失效时禁用，续费后恢复 | — |
 
 -----
 

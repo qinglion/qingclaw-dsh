@@ -54,6 +54,7 @@
     "@qinglion/dsh-client-ui-qingclaw-admin": "workspace:*",
     "@qinglion/dsh-client-ui-qingclaw-feedback": "workspace:*",
     "@qinglion/dsh-qingclaw-creator": "workspace:*",
+    "@qinglion/dsh-qingclaw-entitlement": "workspace:*",
     "@qinglion/dsh-qingclaw-workbench": "workspace:*",
     "@qinglion/dsh-llm-qingclaw-account": "workspace:*"
   },

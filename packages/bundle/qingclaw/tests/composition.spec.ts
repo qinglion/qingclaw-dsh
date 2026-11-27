@@ -27,12 +27,27 @@ describe('QingClaw distribution bundle', () => {
     }
     expect(manifest.dependencies?.['@qinglion/dsh-llm-qingclaw-account']).toBe('workspace:*')
     expect(manifest.dependencies?.['@qinglion/dsh-qingclaw-workbench']).toBe('workspace:*')
+    expect(manifest.dependencies?.['@qinglion/dsh-qingclaw-entitlement']).toBe('workspace:*')
     expect(manifest.dependencies?.['@qinglion/dsh-client-ui-qingclaw-admin']).toBe('workspace:*')
     expect(manifest.dependencies?.['@qinglion/dsh-client-ui-qingclaw-feedback']).toBe('workspace:*')
     expect(manifest.dependencies?.['@qinglion/dsh-qingclaw-creator']).toBe('workspace:*')
     expect(manifest.dependencies?.['@deepseek-ai/dsh-plugin-market']).toBe('workspace:*')
     expect(manifest.dependencies?.['@deepseek-ai/dsh-client-ui-plugin-market']).toBe('workspace:*')
     expect(manifest.dependencies?.['@deepseek-ai/dsh-client-ui-brand-official']).toBe('workspace:*')
+  })
+
+  it('mounts the QingClaw entitlement gate with its state files', () => {
+    const composed = composeEntries([bundle('base'), bundle('web-app'), bundle('qingclaw')])
+    const entitlement = composed.find(row => row.id === 'qingclaw-entitlement')
+    expect(entitlement?.name).toBe('@qinglion/dsh-qingclaw-entitlement')
+    const config = entitlement?.config as Record<string, unknown> | undefined
+    expect(Object.keys(config ?? {}).sort()).toEqual(['licenceFile', 'lockedFile'])
+    expect(config?.lockedFile).toEqual({
+      __jsExpr: "dshPath('state', 'qingclaw-entitlement', 'locked.json')",
+    })
+    expect(config?.licenceFile).toEqual({
+      __jsExpr: "dshPath('state', 'qingclaw-entitlement', 'licence.json')",
+    })
   })
 
   it('owns account origins and brand rows without copying the upstream roster', () => {
@@ -46,7 +61,8 @@ describe('QingClaw distribution bundle', () => {
     // unmirrored addition fails here instead of shipping unnoticed.
     const added = composed.filter(row => !web.some(upstream => upstream.id === row.id)).map(row => row.id)
     expect(added.sort()).toEqual([
-      'llm-qingclaw-account', 'plugin-market', 'qingclaw-creator', 'qingclaw-distribution', 'qingclaw-workbench',
+      'llm-qingclaw-account', 'plugin-market', 'qingclaw-creator', 'qingclaw-distribution', 'qingclaw-entitlement',
+      'qingclaw-workbench',
       'ui-brand-qingclaw', 'ui-plugin-market', 'ui-qingclaw-account', 'ui-qingclaw-admin', 'ui-qingclaw-feedback',
       'ui-qingclaw-platform',
     ])
@@ -110,6 +126,7 @@ describe('QingClaw distribution bundle', () => {
     expect(workbenchConfig?.cacheFile).toEqual({
       __jsExpr: "dshPath('cache', 'qingclaw-workbench', 'feed.json')",
     })
+
 
     const market = composed.find(row => row.id === 'plugin-market')
     expect(market?.name).toBe('@deepseek-ai/dsh-plugin-market')

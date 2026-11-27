@@ -54,6 +54,8 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
   '@deepseek-ai/dsh-atomic-write': ['withFileLock', 'writeFileAtomic'],
   '@deepseek-ai/dsh-deque': ['Deque'],
+  // Joins paths under the resolved Harness home; it holds no state and creates nothing.
+  '@deepseek-ai/dsh-home-paths': ['dshPath'],
   // Builds a dispatcher from the resolved proxy policy; the caller owns and closes it.
   '@deepseek-ai/dsh-http-proxy': ['createRouteDispatcher'],
   // The Liveshare wire codec and identity helpers are stateless functions over caller-owned values.

@@ -463,6 +463,8 @@
       "@deepseek-ai/dsh-webhook/types": ["./packages/experimental/webhook/src/types.ts"],
       "@deepseek-ai/dsh-qingclaw-bundle": ["./packages/bundle/qingclaw/src"],
       "@qinglion/dsh-llm-qingclaw-account": ["./packages/llm/llm-qingclaw-account/src"],
+      "@qinglion/dsh-qingclaw-entitlement": ["./packages/account/qingclaw-entitlement/src"],
+      "@qinglion/dsh-qingclaw-entitlement/client": ["./packages/account/qingclaw-entitlement/src/client/index.ts"],
       "@qinglion/dsh-qingclaw-workbench": ["./packages/client/qingclaw-workbench/src"],
       "@qinglion/dsh-qingclaw-workbench/client": ["./packages/client/qingclaw-workbench/src/client/index.ts"],
       "@qinglion/dsh-client-ui-qingclaw-admin": ["./packages/client/qingclaw-admin/src"],

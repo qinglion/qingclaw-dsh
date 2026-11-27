@@ -1437,6 +1437,61 @@ importers:
         specifier: workspace:*
         version: link:../../util/launch-environment
 
+  packages/account/qingclaw-entitlement:
+    dependencies:
+      '@deepseek-ai/dsh-atomic-write':
+        specifier: workspace:*
+        version: link:../../util/atomic-write
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: workspace:*
+        version: link:../../api/remotes
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../../client/locale
+      '@deepseek-ai/dsh-client-store':
+        specifier: workspace:*
+        version: link:../../client/store
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: workspace:*
+        version: link:../../client/ui-layout
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../../client/ui-renderer
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../../client/ui-slots
+      '@deepseek-ai/dsh-deepseek-account':
+        specifier: workspace:*
+        version: link:../deepseek-account
+      '@deepseek-ai/dsh-plugin-manager':
+        specifier: workspace:*
+        version: link:../../boot/plugin-manager
+      '@qinglion/dsh-client-ui-qingclaw-platform':
+        specifier: workspace:~
+        version: link:../../client/qingclaw-platform
+      '@qinglion/dsh-qingclaw-workbench':
+        specifier: workspace:~
+        version: link:../../client/qingclaw-workbench
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+
   packages/acp/acp:
     dependencies:
       '@agentclientprotocol/sdk':
@@ -3000,6 +3055,9 @@ importers:
       '@qinglion/dsh-qingclaw-creator':
         specifier: workspace:*
         version: link:../../client/qingclaw-creator
+      '@qinglion/dsh-qingclaw-entitlement':
+        specifier: workspace:*
+        version: link:../../account/qingclaw-entitlement
       '@qinglion/dsh-qingclaw-workbench':
         specifier: workspace:*
         version: link:../../client/qingclaw-workbench
