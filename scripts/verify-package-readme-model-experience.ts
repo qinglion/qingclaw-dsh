@@ -58,6 +58,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/qingclaw-admin': { kind: 'none', reason: 'Role-gated account menu navigation and publication review add no model input.' },
   'packages/client/qingclaw-feedback': { kind: 'none', reason: 'Account-menu feedback presentation and a static QR asset add no model input.' },
   'packages/client/qingclaw-account': { kind: 'none', reason: 'Credit banner and sidebar quota control read account facts and add no model input.' },
+  'packages/client/qingclaw-platform': { kind: 'none', reason: 'Opening a deployment page inside the application or a browser tab adds no model input.' },
   'packages/client/ui-file-actions': { kind: 'none', reason: 'Explicit user file saves and clipboard operations add no model input.' },
   'packages/client/ui-entry-customization': { kind: 'none', reason: 'Controls browser launchers and prepares a reviewable Creator draft without submitting model input.' },
   'packages/experimental/client-ui-cot-translation': { kind: 'indirect', reason: 'The translator owns optional paid queries; normal Session activation delegates startup context to the preset.' },

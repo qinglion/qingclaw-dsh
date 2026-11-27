@@ -39,3 +39,8 @@ No model request prefix changes.
 
 - The QR code is a static package asset: changing the contact means replacing `src/client/assets/feedback-qrcode.webp`, and every reader sees the same code.
 - The six non-Chinese, non-English dictionaries fall back to English.
+
+<a id="dev-note"></a>
+### Dev Note
+
+The QR asset is resolved through the package's `./assets/*` export, so it is imported relatively and emitted under `lib/assets/`; a copy in a documentation folder never reaches the built package.

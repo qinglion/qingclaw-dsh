@@ -39,3 +39,8 @@ kind: "package-reference"
 
 - 二维码是静态包资源：更换联系方式需要替换 `src/client/assets/feedback-qrcode.webp`，所有用户看到同一张码。
 - 中文、英文之外的六种字典回退到英文。
+
+<a id="dev-note"></a>
+### 开发备注
+
+二维码资源通过包的 `./assets/*` 导出解析，因此用相对路径导入并输出到 `lib/assets/`；放在文档目录里的副本不会进入构建产物。

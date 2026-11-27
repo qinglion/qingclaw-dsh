@@ -39,3 +39,8 @@ No model request prefix changes.
 
 - A browser host cannot show the page in-application: the QingClaw website does not allow framing, so the tab is the only route there.
 - The destinations are the account's two published links; a deployment that publishes no link opens nothing.
+
+<a id="dev-note"></a>
+### Dev Note
+
+Use `ctx.qingclawPlatform.open(page, onReturned?)`; the service decides between the native view and a browser tab, so a caller never checks the host itself. A second open replaces the pending one, and `onReturned` fires only when the user leaves the page.

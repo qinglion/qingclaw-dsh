@@ -16,6 +16,7 @@ kind: "package-reference"
 - [使用方式](#use-this-package)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 <a id="use-this-package"></a>
 ## 使用方式
@@ -39,3 +40,8 @@ kind: "package-reference"
 
 - 额度数字来自资料读取，网关上报小数时这里取整显示，网关侧仍保留精确值。
 - 输入框横幅不知道原生 Platform 页面是否盖住了输入框；账号包内的旧实现用页面声明做过这个判断。
+
+<a id="dev-note"></a>
+### 开发备注
+
+横幅渲染工作台 Remote 的 `qingclawWorkbench.getEntitlement()` 返回的额度事实，不持有自己的格式。改动这些事实要同时改 Remote 响应和这里，因为横幅从不直接读资料。

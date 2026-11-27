@@ -16,6 +16,7 @@ QingClaw shows how many credits an account has left in two places: a warning ban
 - [Use this package](#use-this-package)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 <a id="use-this-package"></a>
 ## Use this package
@@ -39,3 +40,8 @@ No model request prefix changes.
 
 - The credit facts come from the profile read, so a gateway that reports fractional credits is rounded for display here while the gateway keeps exact amounts.
 - The composer banner does not know when a native Platform page covers the composer; the account package's own banner tracked that claim internally.
+
+<a id="dev-note"></a>
+### Dev Note
+
+The banner renders the credit facts `qingclawWorkbench.getEntitlement()` returns and owns no format of its own. A change to those facts changes the Remote response and this banner together, because the banner never reads the profile directly.

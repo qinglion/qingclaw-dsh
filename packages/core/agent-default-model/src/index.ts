@@ -90,8 +90,8 @@ export class AgentDefaultModelConfig extends Service {
    * editor keeps its composition entry. Saves commit in submission order; a failed
    * save rejects its caller without blocking later saves.
    * @param next - resolved selection accepted by an entry point.
-   * @param options - provenance of the selection; only an explicit user choice marks
-   * the saved default as remembered, and any other save clears that mark.
+   * @param options - how the caller obtained the selection; only an explicit user
+   * choice marks the saved default as remembered, and any other save clears that mark.
    * @returns fulfillment after the optional profile write settles.
    */
   async saveSelection(next: ModelSelection, options?: { userSelected?: boolean }): Promise<void> {

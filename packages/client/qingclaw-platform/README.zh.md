@@ -39,3 +39,8 @@ kind: "package-reference"
 
 - 浏览器宿主无法在应用内展示：官网不允许被 iframe 嵌入，那里只能开标签页。
 - 目的地只有账号公布的两个链接；发行版没有公布链接时不打开任何页面。
+
+<a id="dev-note"></a>
+### 开发备注
+
+调用 `ctx.qingclawPlatform.open(page, onReturned?)`；由服务决定用原生视图还是浏览器标签，调用方不要自己判断宿主。后一次打开会顶掉前一次，`onReturned` 只在用户离开页面时触发。
