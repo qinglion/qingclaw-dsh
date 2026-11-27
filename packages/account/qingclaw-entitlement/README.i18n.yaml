@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/account/qingclaw-entitlement/README.md
+/:
+  en: d174d291431b3728
+  zh: a50efdace1f5da95
+/qingclaw-workbench-entitlement:
+  en: 308472ba3ee8609f
+  zh: 96678766faf067ef
+/qingclaw-workbench-entitlement/summary:
+  en: 4b8be96d85f07f24
+  zh: 27468a3ec2e48d29
+/qingclaw-workbench-entitlement/table-of-contents:
+  en: 122f0d41696980b1
+  zh: 86d189c8925e0cd1
+/qingclaw-workbench-entitlement/use-this-package:
+  en: cb2197f2514c7f63
+  zh: d32df25b398ab21b
+/qingclaw-workbench-entitlement/understand-the-implementation:
+  en: 937e0351dba15c97
+  zh: 9f35ba074dc038a4
+/qingclaw-workbench-entitlement/dev-note:
+  en: 881163321603b695
+  zh: c98ead810560cb00
+/qingclaw-workbench-entitlement/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/qingclaw-workbench-entitlement/model-experience/workbench-tools-and-prompts:
+  en: bffcc25c6b48c34e
+  zh: 4c299524a24a64e6
+/qingclaw-workbench-entitlement/model-experience/workbench-tools-and-prompts/what-the-model-sees:
+  en: eea5820acfc68719
+  zh: 4fb72156a05cdf44
+/qingclaw-workbench-entitlement/model-experience/workbench-tools-and-prompts/token-effect:
+  en: 5e7be10f48e6cf39
+  zh: 0284f63e390ca983
+/qingclaw-workbench-entitlement/model-experience/workbench-tools-and-prompts/kv-cache-effect:
+  en: 0a76f9ee8f6bcbcd
+  zh: f4f7779188f882d7
+/qingclaw-workbench-entitlement/known-limitations-and-deferred-work:
+  en: 7ae7ee6b0ab84599
+  zh: de9138e321be9eec

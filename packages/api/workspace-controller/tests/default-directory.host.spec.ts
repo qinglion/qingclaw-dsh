@@ -14,6 +14,12 @@ describe('system Documents directory', () => {
     expect(run).toHaveBeenCalledWith(command, expect.any(Array), signal, 'hidden')
   })
 
+  it('uses the configured parent directory for the first-use Workspace', async () => {
+    await expect(defaultWorkspaceDirectory(
+      '/documents', new AbortController().signal, { platform: 'linux' }, 'qingclaw',
+    )).resolves.toBe('/documents/qingclaw/default-workspace')
+  })
+
   it('uses the configured directory without a system lookup', async () => {
     const run = vi.fn<NativeCommandRunner>()
     await expect(defaultWorkspaceDirectory('/documents', new AbortController().signal, { platform: 'linux', run }))

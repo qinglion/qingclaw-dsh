@@ -143,7 +143,7 @@ export class ModelListingCache {
       }, (error: unknown) => {
         if (generation !== this.generation) return
         if (!this.failing) {
-          const fallback = this.listing === undefined ? 'using the bundled catalog' : 'keeping the previous catalog'
+          const fallback = this.listing === undefined ? 'no listing is available yet' : 'keeping the previous catalog'
           this.dependencies.warn(`model listing from ${settings.url} failed (${String(error)}); ${fallback}`)
         }
         this.settledAt = this.dependencies.now()

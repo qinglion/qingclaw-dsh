@@ -18,7 +18,6 @@ import {
   IconNewChatOutlineRegular, IconPinFillRegular,
   IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, relativeTime, StateDot, Tooltip, useHoverMarquee, useRowDragPreview,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -134,7 +133,6 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 /** Owner props of one Workspace header row; the access Hooks are the browser root's own standard seats. */
 type ProjectRowItemProps = {
   group: GroupNode
-  newShortcut?: ShortcutCatalogEntry | undefined
   containsCurrentDescendant?: boolean
   onToggle: () => void
   onCreate: (workspaceId: WorkspaceId) => void
@@ -192,7 +190,7 @@ function WorkspaceProjectRow({ workspaceId, ...props }: ProjectRowItemProps & { 
 }
 
 function ProjectRow({
-  group, containsCurrentDescendant = false, onToggle, drag: offeredDrag, home, newShortcut, t, actions,
+  group, containsCurrentDescendant = false, onToggle, drag: offeredDrag, home, t, actions,
   renderFactorySlot, useContextMenuTarget, useContextMenu,
 }: Omit<ProjectRowItemProps, 'onCreate'> & { actions: ProjectRowActions }) {
   const { getTriggerProps } = useContextMenu()
@@ -243,11 +241,10 @@ function ProjectRow({
           })
         )}
         {create !== undefined && (
-          <Tooltip label={t('actions.newSession')} shortcutKeys={newShortcut?.keys} side="bottom" align="end" delayMs={500} portal>
+          <Tooltip label={t('actions.newSession')} side="bottom" align="end" delayMs={500} portal>
             <button
               type="button"
               className={css.iconButton}
-              aria-keyshortcuts={newShortcut?.aria}
               aria-label={t('actions.newSession.aria', { name: label })}
               onClick={(e) => { e.stopPropagation(); create() }}
             >

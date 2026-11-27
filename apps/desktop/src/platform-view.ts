@@ -5,6 +5,7 @@ import { WebContentsView, session, shell, type Session, type View, type WebFrame
 import type { PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
 import { mergePlatformCookies, platformClientHeaders } from '@deepseek-ai/dsh-deepseek-account/client-metadata'
 import { desktopClientMetadata } from './client-metadata.ts'
+import { SYSTEM_THEME_REQUEST, withSystemTheme } from './platform-theme.ts'
 
 import { PLATFORM_IPC, type PlatformLocale } from './platform-ipc.ts'
 
@@ -55,7 +56,8 @@ export class DesktopPlatformView {
    * @param blocked - Whether shell policy or an update prompt prevents opening a product view.
    */
   constructor(private readonly preload: string, private readonly getLocale: () => PlatformLocale,
-    private readonly platform: 'darwin' | 'win32', private readonly blocked: (owner: PlatformOwner) => boolean) {}
+    private readonly platform: 'darwin' | 'win32',
+    private readonly blocked: (owner: PlatformOwner) => boolean) {}
 
   /** @param next - private Host credentials; identity enrichment preserves an already open temporary document. */
   setSession(next: PlatformSession | null): void {
@@ -117,7 +119,8 @@ export class DesktopPlatformView {
     browserSession.setPermissionCheckHandler(() => false)
     const deploymentHeaders = account.requestHeaders ?? {}
     const injectedNames = new Set([...Object.keys(deploymentHeaders),
-      ...Object.keys(platformClientHeaders(this.platform, desktopClientMetadata(this.getLocale())))]
+      ...Object.keys(platformClientHeaders(this.platform, desktopClientMetadata(this.getLocale()))),
+      'x-dsh-auth-token']
       .map(name => name.toLowerCase()))
     const injectedRequests = new Set<number>()
     browserSession.webRequest.onCompleted((details) => { injectedRequests.delete(details.id) })
@@ -127,9 +130,10 @@ export class DesktopPlatformView {
       if (new URL(details.url).origin === account.origin) {
         injectedRequests.add(details.id)
         // The document identifies the UI that is asking, so language and UTC offset are sampled now.
-        const injected = {
+        const injected: Record<string, string> = {
           ...deploymentHeaders,
           ...platformClientHeaders(this.platform, desktopClientMetadata(this.getLocale())),
+          'x-dsh-auth-token': account.token,
         }
         const cookie = headers.cookie ?? ''
         Object.assign(headers, injected)
@@ -150,7 +154,7 @@ export class DesktopPlatformView {
     view.webContents.setWindowOpenHandler(({ url }) => {
       const destination = new URL(url)
       if (destination.protocol === 'https:' && !destination.username && !destination.password) {
-        void shell.openExternal(url).catch(() => {
+        void shell.openExternal(withSystemTheme(url, account.origin)).catch(() => {
           // An OS browser-launch failure leaves the embedded page available for retry.
         })
       }
@@ -172,6 +176,9 @@ export class DesktopPlatformView {
     view.setBounds(bounds)
     try {
       const url = new URL(page === 'usage' ? '/usage' : '/top_up', account.origin)
+      // The embedded browser already reports the Desktop palette as the system
+      // one; naming the system keeps a stored website toggle from overriding it.
+      url.searchParams.set('theme', SYSTEM_THEME_REQUEST)
       if (account.embeddedPageDist) url.searchParams.set('dist', account.embeddedPageDist)
       await view.webContents.loadURL(url.href)
     } catch (error) {

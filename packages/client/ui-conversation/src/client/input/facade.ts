@@ -392,6 +392,14 @@ export class SessionInputShell implements SessionInput {
     return true
   }
 
+  stageDraft(text: string, ids: readonly DraftAttachmentId[]): boolean {
+    if (this.draftInitializationBlocked()) return false
+    this.attachmentIds = [...this.attachmentIds, ...ids]
+    this.draftEditor.appendDraft(text)
+    this.publish()
+    return true
+  }
+
   /**
    * Add validated file references and attachment ids while admission is editable.
    * Drop and paste use this wiring-layer method; other packages use {@link addReferences}.

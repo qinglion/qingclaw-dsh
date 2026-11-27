@@ -397,6 +397,7 @@ export function gatesForMode(selected: Mode): Gate[] {
           docTypecheckScript: 'doc-typecheck:contracts-ready',
         }),
         pnpmScript('module-graph', 'verify-module-graph', { label: 'module graph' }),
+        pnpmScript('qingclaw-packaging-inputs', 'verify-qingclaw-packaging-inputs', { label: 'QingClaw packaging inputs' }),
       ]
     case 'hygiene':
       return [

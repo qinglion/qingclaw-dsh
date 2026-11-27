@@ -61,11 +61,21 @@ describe('TurnUsagePanel', () => {
     const trigger = view.getByRole('button')
     expect(trigger.textContent).toBe('Usage 150 tok')
     fireEvent.click(trigger)
+    expect(view.getByRole('dialog').textContent).toContain('Total input120 tok')
+    expect(view.queryByText('Uncached input')).toBeNull()
     expect(view.queryByText('Provider / model')).toBeNull()
     expect(view.queryByText('Cache hit')).toBeNull()
-    expect(view.queryByText('Cached input')).toBeNull()
+    expect(view.getByRole('dialog').textContent).toContain('Cached inputNot reported')
     expect(view.queryByText('Cache write')).toBeNull()
     expect(view.queryByText(/reasoning/)).toBeNull()
+  })
+
+  it('retains confirmed hits as a lower bound for partially reported turns', () => {
+    const usage = { uncachedInputTokens: 10, outputTokens: 5, totalTokens: 110, partialCacheReadTokens: 80 }
+    const view = render(<TurnUsagePanel usage={usage} t={t} />)
+    fireEvent.click(view.getByRole('button'))
+    expect(view.getByRole('dialog').textContent).toContain('Total input105 tokCached input≥ 80 tok')
+    expect(view.queryByText('Cache hit')).toBeNull()
   })
 
   it('keeps a partial cache hit below 100 in the dialog and closes on Escape or outside pointerdown', () => {

@@ -5,6 +5,9 @@ export const NS = 'chat'
 
 /** Simplified Chinese dictionary and key-set source of truth. */
 export const zh = {
+  'message.turnUsage.totalInput': '总输入',
+  'message.turnUsage.notReported': '未上报',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': '正在分析请求',
   'message.stepProcess.read': '正在读取文件',
   'message.stepProcess.readImage': '正在读取图片',
@@ -222,6 +225,9 @@ export type ChatKey = keyof typeof zh
 
 /** English dictionary, checked against the Chinese key set. */
 export const en = {
+  'message.turnUsage.totalInput': 'Total input',
+  'message.turnUsage.notReported': 'Not reported',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': 'Analyzing the request',
   'message.stepProcess.read': 'Reading files',
   'message.stepProcess.readImage': 'Reading images',
@@ -436,6 +442,9 @@ export const en = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
+  'message.turnUsage.totalInput': '入力合計',
+  'message.turnUsage.notReported': '未報告',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': 'リクエストを分析中',
   'message.stepProcess.read': 'ファイルを読み取り中',
   'message.stepProcess.readImage': '画像を読み取り中',
@@ -650,6 +659,9 @@ export const ja = {
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
+  'message.turnUsage.totalInput': 'Entrada total',
+  'message.turnUsage.notReported': 'Sin datos',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': 'Analizando la solicitud',
   'message.stepProcess.read': 'Leyendo archivos',
   'message.stepProcess.readImage': 'Leyendo imágenes',
@@ -864,6 +876,9 @@ export const es = {
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
+  'message.turnUsage.totalInput': 'Entrée totale',
+  'message.turnUsage.notReported': 'Non renseigné',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': 'Analyser la demande',
   'message.stepProcess.read': 'Lecture de fichiers',
   'message.stepProcess.readImage': 'Lire des images',
@@ -1078,6 +1093,9 @@ export const fr = {
 
 /** German dictionary, checked against the English keys. */
 export const de = {
+  'message.turnUsage.totalInput': 'Eingabe gesamt',
+  'message.turnUsage.notReported': 'Nicht gemeldet',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': 'Analyse der Anfrage',
   'message.stepProcess.read': 'Dateien lesen',
   'message.stepProcess.readImage': 'Bilder lesen',
@@ -1292,6 +1310,9 @@ export const de = {
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
+  'message.turnUsage.totalInput': 'Всего на входе',
+  'message.turnUsage.notReported': 'Нет данных',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': 'Анализ запроса',
   'message.stepProcess.read': 'Чтение файлов',
   'message.stepProcess.readImage': 'Чтение изображений',
@@ -1506,6 +1527,9 @@ export const ru = {
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
+  'message.turnUsage.totalInput': 'Entrada total',
+  'message.turnUsage.notReported': 'Não informado',
+  'message.turnUsage.atLeast': '≥ {count}',
   'message.stepProcess.thinking': 'Analisando a solicitação',
   'message.stepProcess.read': 'Lendo arquivos',
   'message.stepProcess.readImage': 'Lendo imagens',

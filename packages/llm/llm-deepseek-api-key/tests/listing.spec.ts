@@ -103,7 +103,7 @@ it('falls back to the built-in catalog when the listing fails', async () => {
   await ctx.plugin(DeepSeekAuth)
   await ctx.plugin(ApiKey, {})
   expect(await ids(ctx)).toEqual(BUILT_IN)
-  expect(warn).toHaveBeenCalledExactlyOnceWith('[llm-deepseek-api-key]', expect.stringContaining('using the bundled catalog') as string)
+  expect(warn).toHaveBeenCalledExactlyOnceWith('[llm-deepseek-api-key]', expect.stringContaining('no listing is available yet') as string)
 })
 
 it('refuses listed models this build cannot serve before any inference request', async () => {

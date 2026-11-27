@@ -1,6 +1,23 @@
 import { SHIPPED_LOCALE_IDS } from '../../../scripts/shipped-locales.ts'
 import { describe, expect, it } from 'vitest'
-import { en, formatDesktopMessage, resolveDesktopLocale, resolveDesktopStartupLocale, ja, zh, es, fr, de, ru, pt } from '../src/locale.ts'
+import {
+  en,
+  formatDesktopMessage,
+  resolveDesktopLocale,
+  resolveDesktopStartupLocale,
+  ja,
+  zh,
+  es,
+  fr,
+  de,
+  ru,
+  pt,
+} from '../src/locale.ts'
+
+import { brandDictionaries } from '../src/locale-brand.ts'
+
+/** The shipped copy after this distribution's names are applied. */
+const DICTIONARIES = brandDictionaries({ en, zh, ja, es, fr, de, ru, pt })
 
 describe('desktop locale dictionaries', () => {
   it('uses the same concise Chinese configuration error in the toast and details', () => {
@@ -12,17 +29,21 @@ describe('desktop locale dictionaries', () => {
   it('ships baseline and Japanese keys and falls back for unsupported languages', () => {
     expect(Object.keys(zh)).toEqual(Object.keys(en))
     expect(Object.keys(ja)).toEqual(Object.keys(en))
-    expect(resolveDesktopLocale('JA-jp')).toEqual({ id: 'ja', messages: ja })
-    expect(resolveDesktopLocale('zh-Hans-CN').messages).toEqual(zh)
-    expect(resolveDesktopLocale('en-US').messages).toEqual(en)
-    expect(resolveDesktopLocale('it-IT').messages).toEqual(en)
+    expect(resolveDesktopLocale('JA-jp').id).toBe('ja')
+    // Branding is applied to the shipped copy: no upstream product name survives.
+    for (const id of ['ja', 'zh-Hans-CN', 'en-US', 'it-IT'] as const) {
+      const offenders = Object.entries(resolveDesktopLocale(id).messages)
+        .filter(([, value]) => value.includes('DeepSeek Harness') || /\bdsh\b/u.test(value))
+      expect(offenders.map(([key]) => key), id).toEqual([])
+    }
+    expect(resolveDesktopLocale('zh-Hans-CN').messages.welcomeDescription).toBe('律师 AI 助理，就用青狮龙虾')
   })
 
   it.each([
     ['es', 'es-MX', es], ['fr', 'fr-CA', fr], ['de', 'de-DE', de],
     ['ru', 'ru-RU', ru], ['pt', 'pt-BR', pt],
   ] as const)('resolves %s, preserves placeholders, and honors saved preferences', (id, tag, messages) => {
-    expect(resolveDesktopLocale(tag.toUpperCase())).toEqual({ id, messages })
+    expect(resolveDesktopLocale(tag.toUpperCase())).toEqual({ id, messages: DICTIONARIES[id] })
     expect(resolveDesktopStartupLocale(id, ['zh-CN']).id).toBe(id)
     expect(resolveDesktopStartupLocale(null, ['it-IT', tag, 'en-US']).id).toBe(id)
     expect(Object.keys(messages)).toEqual(Object.keys(en))

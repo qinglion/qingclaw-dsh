@@ -20,8 +20,11 @@
  * hands focus back to the cell that opened it. Data and submission ride the
  * same per-session ModelDirectory as the /model popup; exact-model reasoning
  * metadata and the selected effort come from the Host rather than a
- * client-owned vocabulary. A rejected selection announces through the shared
- * transient Toast anchored to the composer card; the in-menu strip with
+ * client-owned vocabulary. A model whose catalog advertises a relative request
+ * cost shows it right-aligned as a cost multiple; the baseline model reads
+ * 1.00x, and a catalog that prices no multiple shows nothing. A rejected
+ * selection announces through the shared transient Toast anchored to the
+ * composer card; the in-menu strip with
  * Retry remains the catalog-load surface. While the directory's pending
  * selection is unsettled, the trigger shows a spinner in place of its
  * chevron, and each row whose value that selection carries shows one in place
@@ -165,9 +168,11 @@ export function ModelSelect(
   const { pending } = state
   const busy = pending !== null
 
+  // Each open re-reads the Host catalog: a catalog-only change (a model added,
+  // retired, or repriced) must reach an open menu without restarting the app.
   const reload = (): void => {
     lastActionRef.current = 'load'
-    load()
+    load(true)
   }
 
   useEffect(() => {
@@ -437,6 +442,10 @@ export function ModelSelect(
     submit(selection)
   }
 
+  // Two decimals keep a column of rows comparable; the unit letter is
+  // locale-owned so a market can change it without touching this component.
+  const rateLabel = (rate: number): string => t('rate.value', { value: rate.toFixed(2) })
+
   const waiting = currentChoice === undefined && state.status === 'loading'
   const modelLabel = waiting
     ? t('trigger.loading')
@@ -649,6 +658,11 @@ export function ModelSelect(
                             <span className={css.optionCopy}>
                               <span className={css.modelName}>{renderModelLabel(group.provider, model, 'option', selected)}</span>
                             </span>
+                            {model.rate === undefined ? null : (
+                              <span className={css.rate} title={t('rate.aria', { value: rateLabel(model.rate) })}>
+                                {rateLabel(model.rate)}
+                              </span>
+                            )}
                             <span className={css.check}>
                               {pending?.provider === group.id && pending.model === model.id
                                 ? <StateDot state="ongoing" />

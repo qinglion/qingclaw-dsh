@@ -31,7 +31,9 @@ import { LoadingIndicator } from './LoadingIndicator.tsx'
 import { PreviewFrame } from './PreviewFrame.tsx'
 import { hostFileOf } from './rpc.ts'
 import type { TextStore } from './store.ts'
-import type { DocumentContent } from './document/contract.ts'
+import { captureKey, CaptureMarkers, type PreviewCaptureFrame } from './document/CaptureMarker.tsx'
+import { captureArea, type DocumentCaptureLocation, type DocumentCaptureRect } from './document/capture-location.ts'
+import type { DocumentCaptureFrame, DocumentCaptureTarget, DocumentContent } from './document/contract.ts'
 import { binaryDocumentPath, matchingDocumentPreviews } from './document/registry.ts'
 import type { DocumentPreviewDefinition } from './document/registry.ts'
 import { unviewableBinaryPath } from './document/unviewable.ts'
@@ -41,6 +43,8 @@ import css from './TextPreview.module.css'
 
 export { linesOf, loadedPages, lastLineLoaded, scrollToLine } from './text/lines.ts'
 export type { LoadedPage } from './text/lines.ts'
+
+const NO_CAPTURES: readonly DocumentCaptureFrame[] = []
 
 /** Private registration inputs; the framework binds the registry source to useDocumentPreviews. */
 export interface TextPreviewInjected extends TextInjected {
@@ -52,7 +56,8 @@ export type TextPreviewProps =
   & PropsRuntime<'sidebar.right.pane.tab'>
   & PropsRenderSlots<
     | 'sidebar.right.tab.document' | 'sidebar.right.tab.document.action' | 'sidebar.right.tab.document.actions'
-    | 'sidebar.right.tab.document.unpreviewable'
+    | 'sidebar.right.tab.document.unpreviewable' | 'sidebar.right.tab.document.contentActions'
+    | 'sidebar.right.tab.document.captureAction'
   >
   & PropsRenderFactories
   & PropsStore<TextStore>
@@ -72,6 +77,11 @@ export function TextPreview({
   const { tab, panel } = useTabInfo()
   const { getTriggerProps } = useContextMenu()
   const { navigation, signal } = tab
+  const captureNavigation = navigation.params !== undefined && 'captureLocation' in navigation.params
+    ? navigation.params.captureLocation : undefined
+  const captureTarget = navigation.params !== undefined && 'captureTarget' in navigation.params
+    ? navigation.params.captureTarget : undefined
+  const [rendererChosenAt, setRendererChosenAt] = useState<number>()
   const meta = useResource<'file'>(tab.contentId)
   const canRead = meta.status !== 'none'
   const file = useMemo(() => hostFileOf(tab.contentId), [tab.contentId])
@@ -85,7 +95,9 @@ export function TextPreview({
     const fallback = definitions.find(definition => definition.id === PLAIN_BODY_ID)
     return fallback === undefined ? matched : [...matched, fallback]
   }, [definitions, file.path, unviewable])
-  const selected = candidates.find(candidate => candidate.id === state?.rendererId) ?? candidates[0]
+  const captureRenderer = rendererChosenAt === navigation.revision ? undefined
+    : candidates.find(candidate => candidate.id === captureNavigation?.renderer)
+  const selected = captureRenderer ?? candidates.find(candidate => candidate.id === state?.rendererId) ?? candidates[0]
   const mode = selected?.loading
   const contentRendererId = mode === 'renderer' ? selected?.id : undefined
   const current = (state?.mode ?? 'text-pages') === mode && state?.contentRendererId === contentRendererId ? state : undefined
@@ -102,6 +114,13 @@ export function TextPreview({
   const scrollportRef = useRef<HTMLElement | null>(null)
   const storedScrollTopRef = useRef(0)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [capturedHere, setCapturedHere] = useState<{
+    readonly location: DocumentCaptureLocation
+    readonly revision: number
+    readonly target: DocumentCaptureTarget | undefined
+  }>()
+  const [captureFrameHidden, setCaptureFrameHidden] = useState(false)
+  const [savedCaptures, setSavedCaptures] = useState<{ readonly address: string; readonly frames: readonly DocumentCaptureFrame[] }>()
   const absolutePath = meta.value?.absolutePath ?? current?.complete?.absolutePath
   const displayPath = absolutePath ?? file.path
   // Contributions that hand the file to the Host wait for its Host path.
@@ -216,6 +235,46 @@ export function TextPreview({
     return { kind: 'text', pages: loaded, text: loaded.filter(page => page.lines > 0).map(page => page.text).join('\n'), eof: current.eof }
   }, [mode, loaded, current?.complete, current?.eof, current?.loadRevision, rendererReload, actions, tab.id])
 
+  const next = loadedThrough + 1
+  const loadNext = useCallback((): void => {
+    if (!canRead || current?.loading || current?.eof) return
+    loadPage(tab.id, file, next, signal, meta.value?.version)
+  }, [canRead, current?.loading, current?.eof, loadPage, tab.id, file, next, signal, meta.value?.version])
+  const getCaptureLocation = useCallback((region: DocumentCaptureRect): DocumentCaptureLocation | undefined => {
+    const port = scrollportRef.current
+    const renderer = selected?.id
+    const version = current?.version
+    if (port === null || renderer === undefined || version === undefined) return undefined
+    if (port.querySelector('[data-html-preview], [data-excel-preview]') !== null) return undefined
+    const reflows = state?.wrap === true || port.querySelector('[data-document-markdown]') !== null
+    return { renderer, version, area: captureArea(port, region, reflows) }
+  }, [selected?.id, current?.version, state?.wrap])
+  const markCapture = useCallback((location: DocumentCaptureLocation, target?: DocumentCaptureTarget): void => {
+    setCapturedHere({ location, revision: navigation.revision, target })
+  }, [navigation.revision])
+  const captureAddress = tab.contentId
+  const reportCaptureFrames = useCallback((frames: readonly DocumentCaptureFrame[]): void => {
+    setSavedCaptures({ address: captureAddress, frames })
+  }, [captureAddress])
+  const recentCapture = capturedHere?.revision === navigation.revision ? capturedHere : undefined
+  const marker = recentCapture?.location ?? captureNavigation
+  const markerTarget = recentCapture === undefined ? captureTarget : recentCapture.target
+  const reported = savedCaptures?.address === captureAddress ? savedCaptures.frames : NO_CAPTURES
+  const activeLocation = marker?.renderer === selected?.id && marker?.version === current?.version ? marker : undefined
+  const activeKey = activeLocation === undefined ? undefined : captureKey(markerTarget)
+  const frames = useMemo(() => {
+    const matching = new Map<string, PreviewCaptureFrame>()
+    for (const frame of reported) {
+      if (frame.location.renderer === selected?.id && frame.location.version === current?.version) {
+        matching.set(captureKey(frame.target), frame)
+      }
+    }
+    if (activeLocation !== undefined && activeKey !== undefined) {
+      matching.set(activeKey, { location: activeLocation, ...(markerTarget === undefined ? {} : { target: markerTarget }) })
+    }
+    return [...matching.values()]
+  }, [reported, selected?.id, current?.version, activeLocation, activeKey, markerTarget])
+
   const frame = {
     path: displayPath,
     pathTrigger: getTriggerProps({ kind: 'file', value: { sessionId, path: displayPath, paneId: panel.id, ...(line === undefined ? {} : { line }) } }),
@@ -252,12 +311,7 @@ export function TextPreview({
       </PreviewFrame>
     )
   }
-  const next = loadedThrough + 1
   const { name } = pathPartsOf(displayPath)
-  const loadNext = (): void => {
-    if (!canRead || current?.loading || current?.eof) return
-    loadPage(tab.id, file, next, signal, meta.value?.version)
-  }
   return (
     <PreviewFrame
       {...frame}
@@ -308,7 +362,7 @@ export function TextPreview({
                 )}
                 items={candidates.map(candidate => ({ id: candidate.id, label: candidate.title() }))}
                 selectedId={selected.id}
-                onSelect={(id) => { actions.selected(tab.id, id); setMenuOpen(false) }}
+                onSelect={(id) => { setRendererChosenAt(navigation.revision); actions.selected(tab.id, id); setMenuOpen(false) }}
                 onClose={() => { setMenuOpen(false) }}
                 align="end"
                 portal
@@ -338,6 +392,12 @@ export function TextPreview({
             </Tooltip>
           )}
           {content !== undefined && renderSlot('sidebar.right.tab.document.action', { content }, { entryKey: selected.id, hookContext: useTabInfo })}
+          {hasContent && tab.visible && renderSlot('sidebar.right.tab.document.contentActions', {
+            resourceAddress: tab.contentId, fileName: name,
+            getBounds: () => scrollportRef.current?.getBoundingClientRect(),
+            captureLocation: getCaptureLocation, markCapture, reportCaptureFrames, hideCaptureFrame: setCaptureFrameHidden,
+            openTab: (kind, options) => { tab.actions.openTab(kind, options) },
+          })}
           <span hidden>
             <Tooltip label={t(state.autoRefresh ? 'autoRefresh.disable' : 'autoRefresh.enable')} side="bottom" delayMs={500}>
               <button type="button" className={css.tool} aria-label={t('autoRefresh')}
@@ -445,6 +505,13 @@ export function TextPreview({
           </button>
         )}
       </div>
+      {tab.visible && frames.length > 0 && <CaptureMarkers frames={frames} activeKey={activeKey}
+        revision={navigation.revision} reveal={recentCapture === undefined} hidden={captureFrameHidden}
+        bodyRef={bodyRef} scrollportRef={scrollportRef}
+        readMore={mode === 'text-pages' && current?.failure === undefined ? loadNext : undefined}
+        renderAction={target => renderSlot('sidebar.right.tab.document.captureAction', {
+          id: target.id, openTab: (kind, options) => { tab.actions.openTab(kind, options) },
+        }, { entryKey: target.key })} />}
     </PreviewFrame>
   )
 }

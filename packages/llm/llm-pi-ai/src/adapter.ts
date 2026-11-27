@@ -77,6 +77,20 @@ const ANTHROPIC_TOOL_UPDATE_PLACEHOLDER: ToolSchema = {
   parameters: { type: 'object', properties: {} },
 }
 
+interface OpenAiUsage {
+  prompt_tokens_details?: { cached_tokens?: number }
+  prompt_cache_hit_tokens?: number
+  cached_tokens?: number
+}
+
+/** pi-ai normalizes an omitted count to zero. Only a provider-reported zero confirms a miss. */
+function reportsOpenAiCacheMiss(event: unknown): boolean | undefined {
+  const chunk = event as { usage?: OpenAiUsage; choices?: { usage?: OpenAiUsage }[] } | null
+  const usage = chunk?.usage ?? chunk?.choices?.[0]?.usage
+  if (!usage) return undefined
+  return (usage.prompt_tokens_details?.cached_tokens ?? usage.prompt_cache_hit_tokens ?? usage.cached_tokens) === 0
+}
+
 /** One resolution's frozen view: the profiles and the collection built from them. */
 interface PiAiSnapshot {
   /** The resolved profiles this collection was built from, used as its identity. */
@@ -401,13 +415,22 @@ export class PiAiAdapter extends LlmAdapter {
     })
   }
 
-  stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return this.streamWithSnapshot(options, this.current())
+  /**
+   * Stream through the configured adapter, optionally binding a gateway's per-request transport.
+   * @param options - messages and generation settings for this call.
+   * @param transport - request-scoped SDK credential, HTTP transport, and payload hook.
+   * @returns the provider-neutral stream for this configuration generation.
+   */
+  stream(
+    options: GenerateOptions, transport?: Pick<SimpleStreamOptions, 'apiKey' | 'fetch' | 'onPayload'>,
+  ): AsyncIterable<StreamChunk> {
+    return this.streamWithSnapshot(options, this.current(), transport)
   }
 
   private async * streamWithSnapshot(
     options: GenerateOptions,
     snapshot: PiAiSnapshot,
+    transport?: Pick<SimpleStreamOptions, 'apiKey' | 'fetch' | 'onPayload'>,
   ): AsyncIterable<StreamChunk> {
     if (options.stop !== undefined) {
       throw new LlmError('llm-pi-ai does not support GenerateOptions.stop', 'UNSUPPORTED_OPTION')
@@ -433,7 +456,7 @@ export class PiAiAdapter extends LlmAdapter {
       model,
       options.reasoningEffort ?? profile.reasoning,
     )
-    const apiKey = await this.config.resolveApiKey(options.provider, profile)
+    const apiKey = transport?.apiKey ?? await this.config.resolveApiKey(options.provider, profile)
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -470,8 +493,15 @@ export class PiAiAdapter extends LlmAdapter {
       const { context, digest } = bindThinkingToPrefix(converted, model.api, prefixDigests, manualThinking, (count) => {
         this.config.onThinkingOmitted?.({ provider: options.provider, model: options.model, count })
       })
+      const cache = { missReported: false }
       const events = snapshot.models.streamSimple(model, context, {
         ...profileOptions(profile, reasoning, apiKey),
+        ...transport,
+        ...(model.api === 'openai-completions' && {
+          onProviderStreamEvent: (event: unknown) => {
+            cache.missReported = reportsOpenAiCacheMiss(event) ?? cache.missReported
+          },
+        }),
         ...options.temperature === undefined ? {} : { temperature: options.temperature },
         ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
         ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
@@ -486,6 +516,9 @@ export class PiAiAdapter extends LlmAdapter {
           if (result.done) {
             exhausted = true
             return
+          }
+          if (result.value.type === 'usage' && cache.missReported && result.value.usage.cacheReadTokens === undefined) {
+            result.value.usage.cacheReadTokens = 0
           }
           yield result.value
         }

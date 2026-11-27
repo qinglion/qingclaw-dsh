@@ -187,6 +187,73 @@ describe('SidebarRightController — opening', () => {
     expect(getPane(layout(), layout().activePaneId).activeTabId).toBe(tabOf('a.txt'))
   })
 
+  it('opens a docked workspace and reuses its companion pages on repeated opens', () => {
+    const { controller, instance, tabs, publish, layout, tabOf, room } = harness()
+    tabs.register({ id: 'test/files', kind: 'files', title: () => 'Files' })
+    tabs.register({ id: 'test/transcript', kind: 'transcript', title: () => 'Transcript' })
+    tabs.register({ id: 'test/evidence', kind: 'evidence', title: () => 'Evidence' })
+    publish()
+    room.allowed = false
+    controller.openTab('transcript')
+    const transcript = tabOf('Transcript')
+    controller.openTabWorkspace('files', ['transcript', 'evidence'], 'transcript')
+    const panes = dockPaneIds(layout()).map(id => getPane(layout(), id))
+    expect(layout().mode).toBe('push')
+    expect(panes.map(pane => pane.activeTabId)).toEqual([tabOf('Files'), transcript])
+    const evidence = tabOf('Evidence')
+    expect(panes[1]?.tabs).toEqual([transcript, evidence])
+    instance.actions.setMode(SESSION, 'fullscreen')
+    controller.openTabWorkspace('files', ['transcript', 'evidence'], 'evidence')
+    expect(layout().mode).toBe('push')
+    expect(dockPaneIds(layout())).toEqual(panes.map(pane => pane.id))
+    expect(controller.active()?.id).toBe(evidence)
+    expect(getPane(layout(), layout().activePaneId).tabs).toEqual([transcript, evidence])
+  })
+
+  it('moves a companion page out of the source pane when room becomes available', () => {
+    const { controller, tabs, publish, layout, tabOf, entries, room } = harness()
+    tabs.register({ id: 'test/notes', kind: 'notes', title: () => 'Notes' })
+    publish()
+    controller.openResource('dsh-resource://file/session/s-test/a.txt')
+    const source = findTabPane(layout(), tabOf('a.txt')).id
+    room.allowed = false
+    controller.openTab('notes', { paneId: source, beside: true })
+    const notes = tabOf('Notes')
+    expect(dockPaneIds(layout())).toEqual([source])
+    controller.focus(tabOf('a.txt'))
+
+    room.allowed = true
+    const before = entries()
+    controller.openTab('notes', { paneId: source, beside: true })
+    const companion = findTabPane(layout(), notes).id
+    expect(dockPaneIds(layout())).toEqual([source, companion])
+    expect(getPane(layout(), source).activeTabId).toBe(tabOf('a.txt'))
+    expect(entries()).toBe(before + 1)
+
+    controller.openTab('notes', { paneId: source, beside: true })
+    expect(getPane(layout(), companion).tabs).toEqual([notes])
+    controller.openResource('dsh-resource://file/session/s-test/b.txt', { paneId: companion, beside: true })
+    expect(getPane(layout(), source).activeTabId).toBe(tabOf('b.txt'))
+    expect(getPane(layout(), companion).activeTabId).toBe(notes)
+    controller.openResource('dsh-resource://file/session/s-test/a.txt', { paneId: companion, beside: true })
+    expect(getPane(layout(), source).activeTabId).toBe(tabOf('a.txt'))
+  })
+
+  it('creates a companion for new content without switching away from the source tab', () => {
+    const { controller, tabs, publish, layout, tabOf } = harness()
+    tabs.register({ id: 'test/notes', kind: 'notes', title: () => 'Notes' })
+    publish()
+    controller.openResource('dsh-resource://file/session/s-test/a.txt')
+    const file = tabOf('a.txt')
+    const source = findTabPane(layout(), file).id
+    controller.openTab('notes', { paneId: source, beside: true })
+    const notes = tabOf('Notes')
+    const companion = findTabPane(layout(), notes).id
+    expect(dockPaneIds(layout())).toEqual([source, companion])
+    expect(getPane(layout(), source).activeTabId).toBe(file)
+    expect(getPane(layout(), companion).tabs).toEqual([notes])
+  })
+
   it('takes the replaced tab\'s pane and slot, closes it, and records one entry', () => {
     const { controller, publish, layout, tabOf, entries } = harness()
     publish()

@@ -196,6 +196,32 @@ describe('LocaleRuntime', () => {
     expect(events).toHaveLength(1)
   })
 
+
+  it('overlays a distribution key over the owning namespace and restores it on disposal', () => {
+    const { svc } = make()
+    svc.register('owner', 'zh', { greeting: '你好', farewell: '再见' })
+    svc.register('owner', 'en', { greeting: 'Hello', farewell: 'Bye' })
+    const t = svc.bind('owner')
+    expect(t('greeting')).toBe('你好')
+    const before = svc.getLocale().revision
+    const dispose = svc.override('owner', { zh: { greeting: '您好' } })
+    expect(t('greeting')).toBe('您好')
+    // A key the overlay does not name keeps following the owning package.
+    expect(t('farewell')).toBe('再见')
+    // Mounted outlets re-read the snapshot, so the overlay must bump the revision.
+    expect(svc.getLocale().revision).toBeGreaterThan(before)
+    dispose()
+    expect(t('greeting')).toBe('你好')
+    const revision = svc.getLocale().revision
+    dispose()
+    expect(svc.getLocale().revision).toBe(revision)
+  })
+
+  it('rejects an override locale that is not a BCP 47 tag', () => {
+    const { svc } = make()
+    svc.register('owner', 'zh', { greeting: '你好' })
+    expect(() => { svc.override('owner', 'not a tag', { greeting: 'x' }) }).toThrow('BCP 47')
+  })
   it('throws on unknown locale ids', () => {
     const { svc } = make()
     expect(() => { svc.setLocale('fr') }).toThrow('not registered')

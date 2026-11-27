@@ -52,7 +52,8 @@ export function apply(ctx: Context): void {
   const page = globalThis as Partial<Record<typeof CONTACT_CONFIG_GLOBAL, unknown>>
   const config = ContactConfig(page[CONTACT_CONFIG_GLOBAL] ?? {})
   let snapshot: AccountSnapshot = {
-    view: undefined, details: undefined, avatar: undefined, failed: false, loginVisible: false, desktopOnboardingVisible: desktop,
+    view: undefined, details: undefined, avatar: undefined, failed: false, loginVisible: false,
+    desktopOnboardingVisible: desktop && config.desktopOnboarding,
   }
   // Desktop main opens the authorization page natively; a plain browser opens it in a tab it owns.
   const browser = new BrowserLogin(url => authorizeUrlWithTheme(url, ctx.theme.getTheme().active.colorScheme))
@@ -63,7 +64,12 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => { avatar.dispose() }, 'account: profile picture lifetime')
   /** @param locale - requested language. @returns client metadata with the current timezone. */
   const client = (locale: string) => accountClientMetadata(locale, process.env.DSH_CLIENT_VERSION)
-  ctx.provide('accountUi', { getSnapshot: () => snapshot, clientMetadata: client })
+  ctx.provide('accountUi', {
+    getSnapshot: () => snapshot,
+    clientMetadata: client,
+    // Read lazily: the shared host and its channel exist later in this apply.
+    openPlatformPage: (page, onClose) => platformPages.open(page, onClose),
+  })
   let revision = 0
   let refreshing: Promise<void> | undefined
   const refresh = (): Promise<void> => {
@@ -179,6 +185,8 @@ export function apply(ctx: Context): void {
       if (reason === 'returned' && page === 'top-up') void refreshAfterReturn(refreshing, reRead)
     })
   const operations: AccountSectionInjected = {
+    showContactItem: config.showContactItem,
+    allowApiKey: config.allowApiKey,
     avatarFailed: (value) => { avatar.failed(value) },
     subscribeSessionExpired: listener => ctx.remote.$on('deepseek-account/session-expired', listener),
     subscribeModelSignInRequired: listener => ctx.remote.$on('deepseek-account/model-sign-in-required', listener),
@@ -257,7 +265,8 @@ export function apply(ctx: Context): void {
       throw result.error
     },
   }
-  if (desktop) {
+  // A distribution that turns the introduction off owns its own cold start instead.
+  if (desktop && config.desktopOnboarding) {
     const controller = new DesktopOnboardingController(
       ctx.configForms.get<OnboardingSettings>(DESKTOP_ONBOARDING_NAMESPACE),
       ctx.configForms.get<{ transcriptView?: TranscriptViewMode | null; performanceUsage: 'compact' | 'detailed' }>('ui-chat'),
@@ -320,6 +329,8 @@ export function apply(ctx: Context): void {
     children: { 'settings.launcher.notifications': { kind: 'single', scope: 'root' } },
   }, AccountNotices)))
   ctx.remoteAccess.whenAccess('account/watch', () => ctx.slots.inject('settings.section', () => {
+    // A distribution that owns the account page turns this off, so one sidebar entry remains.
+    if (!config.section) return () => undefined
     let unregister: (() => void) | undefined
     const update = () => {
       if (snapshot.view?.status === 'credential-stored') {

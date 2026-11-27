@@ -29,10 +29,11 @@ export function DefaultConversationViews({
     // The Session input owns content before this persistence writer is attached.
   }, [inputActions])
 
-  if (session.blank && conversationPhase(session, conversation) === 'blank') return null
   const viewId = view ?? active?.id
+  const blank = session.blank && conversationPhase(session, conversation) === 'blank'
+  if (blank && !tabs.some(tab => tab.id === viewId && tab.supportsBlankSession)) return null
   return (
-    <div className={css.viewArea}>
+    <div className={css.viewArea} data-blank-session-view={blank || undefined}>
       {viewId !== undefined && renderSlot('conversation.view', {
         inspectCall,
         viewRequest,

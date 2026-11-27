@@ -16,6 +16,17 @@ import type {} from '@deepseek-ai/dsh-schedule/client'
 import type { TypertForwardableEventEntry } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-web/types'
 
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * A lapsed user tried to enable a QingClaw workbench; the browser offers the upgrade prompt.
+     * @mode emit
+     * @param request - the workbench package and its display title.
+     */
+    'qingclaw-entitlement/upgrade-required'(request: { readonly packageName: string; readonly title: string }): void
+  }
+}
+
 /**
  * Host events this application forwards without renaming. The explicit mode is
  * both the Host dispatch strategy and the legal key set of `ctx.remote.$on`.
@@ -48,6 +59,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   { event: 'llm/models-updated', mode: 'emit' },
   { event: 'permission-presets/catalog-changed', mode: 'emit' },
   { event: 'plugin-manager/changed', mode: 'emit' },
+  { event: 'qingclaw-entitlement/upgrade-required', mode: 'emit' },
   { event: 'plugin-manager/install-log', mode: 'emit' },
   { event: 'plugin-manager/install-state', mode: 'emit' },
   { event: 'plugin-manager/update-state', mode: 'emit' },

@@ -1405,6 +1405,54 @@ it('rejects callbacks with missing state and callbacks arriving during exchange'
   expect((await callback).status).toBe(302)
 })
 
+it('settles a valid browser access_denied callback as a cancelled sign-in', async () => {
+  const f = await fixture()
+  await f.account.startSignIn(clientMetadata(), f.callbackOrigin, 'desktop')
+  await f.wait('waiting-browser')
+  const { redirect_uri: redirectUri, state } = f.init()
+  if (redirectUri === undefined || state === undefined) throw new Error('missing authorization callback')
+  const callback = new URL(redirectUri)
+  callback.searchParams.set('error', 'access_denied')
+  callback.searchParams.set('state', state)
+
+  const response = await fetch(callback, { redirect: 'manual' })
+
+  expect(response.status).toBe(204)
+  expect(response.headers.get('cache-control')).toBe('no-store')
+  expect(await f.account.getState()).toMatchObject({
+    status: 'signed-out',
+    attempt: { phase: 'cancelled' },
+  })
+  expect(f.count()).toBe(0)
+  await f.cancellationReceived.promise
+  expect(f.cancellations).toHaveLength(1)
+  expect(f.cancellations[0]).toMatchObject({ authorize_id: 'test' })
+})
+
+it('rejects forged or ambiguous OAuth error callbacks without consuming the attempt', async () => {
+  const f = await fixture()
+  await f.account.startSignIn(clientMetadata(), f.callbackOrigin, 'desktop')
+  const waiting = await f.wait('waiting-browser')
+  const callback = f.init().redirect_uri
+  const state = f.init().state
+  const invalid = [
+    `${callback}?error=access_denied&state=wrong`,
+    `${callback}?error=server_error&state=${state}`,
+    `${callback}?error=access_denied&code=test&state=${state}`,
+    `${callback}?error=access_denied&error=access_denied&state=${state}`,
+    `${callback}?error=access_denied&state=${state}&state=${state}`,
+  ]
+
+  for (const url of invalid) expect((await fetch(url)).status).toBe(400)
+
+  expect(await f.account.getState()).toMatchObject({
+    status: 'signed-out',
+    attempt: { id: waiting.attempt?.id, phase: 'waiting-browser' },
+  })
+  expect(f.count()).toBe(0)
+  await f.account.cancelSignIn(waiting.attempt!.id)
+})
+
 it.each(['initializing', 'waiting-browser'])('expires the attempt while %s', async (phase) => {
   const f = await fixture()
   const timeout = vi.spyOn(globalThis, 'setTimeout')
@@ -1633,6 +1681,30 @@ it.each([null, '', 'stable-user'])('exports the stable profile ID for native sto
   await storeAccount(f)
   await f.account.getProfile(clientMetadata())
   expect(await f.account.getPlatformSession()).toMatchObject({ userId: id || null, token: 'test-platform-grant' })
+})
+
+it('refreshes the same account from current after usage changes and preserves identity when a quota read fails', async () => {
+  const source = { email: 'test@example.invalid', quota_remaining: 56_173 }
+  const f = await fixture(source)
+  await storeAccount(f)
+  const read = () => f.account.getProfile(clientMetadata())
+  const watch = new AbortController()
+  const frames = f.account.watchState(watch.signal)[Symbol.asyncIterator]()
+  try {
+    await frames.next()
+    expect(await read()).toMatchObject({ value: { quotaRemaining: 56_173 } })
+    f.failProfile(true)
+    await f.account.refreshUsage('not-this-account')
+    expect(await read()).toMatchObject({ value: { quotaRemaining: 56_173 } })
+    const update = frames.next()
+    await f.account.refreshUsage('test-platform-grant')
+    expect(await update).toMatchObject({ value: { type: 'snapshot', state: { status: 'credential-stored' } } })
+    expect(await read()).toEqual({ status: 'failed' })
+    expect(await f.account.getPlatformSession()).toMatchObject({ userId: 'test-user' })
+    f.failProfile(false)
+    source.quota_remaining = 0
+    expect(await read()).toMatchObject({ value: { quotaRemaining: 0 } })
+  } finally { watch.abort() }
 })
 
 it('publishes a snapshot while the profile read is still pending', async () => {

@@ -86,6 +86,7 @@ export const catalogModelFields = {
   imageTargetBytes: z.number().step(1).min(1).max(MAX_IMAGE_BYTES),
   systemPromptUpdate: z.const('in-history'),
   toolUpdate: z.union(['in-history', 'addition-only'] as const),
+  rate: z.number().min(0),
 }
 
 const catalogModel: z<DeepSeekCatalogModel> = z.object({
@@ -200,6 +201,9 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
     if (toolUpdate !== undefined && toolUpdate !== 'in-history' && toolUpdate !== 'addition-only') {
       throw new Error(`llm-deepseek: catalog model "${model.id}" toolUpdate must be "in-history" or "addition-only" when present`)
     }
+    if (model.rate !== undefined && (!Number.isFinite(model.rate) || model.rate < 0)) {
+      throw new Error(`llm-deepseek: catalog model "${model.id}" rate must be a non-negative finite number`)
+    }
     if (seen.has(model.id)) throw new Error(`llm-deepseek: duplicate catalog model "${model.id}"`)
     seen.add(model.id)
     return {
@@ -210,6 +214,7 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
       ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
       ...model.systemPromptUpdate === undefined ? {} : { systemPromptUpdate: model.systemPromptUpdate },
       ...model.toolUpdate === undefined ? {} : { toolUpdate: model.toolUpdate },
+      ...model.rate === undefined ? {} : { rate: model.rate },
       inputModalities: [...inputModalities],
       ...hasImage
         ? {

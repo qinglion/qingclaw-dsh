@@ -115,6 +115,7 @@ interface WorkspaceNavigation {
   openWorkspace(
     workspaceId: Parameters<ConversationShellInjected['openWorkspace']>[0],
     beforeOpen: (sessionId: SessionId) => void,
+    options?: { readonly sourceSessionId?: SessionId },
   ): Promise<void>
 }
 
@@ -212,6 +213,7 @@ export function apply(ctx: Context, config: SyncedConfig<ConversationConfig>): v
       tabs.push({
         id: entry.options.id,
         label: resolveSlotLabel(entry.options.label) ?? entry.options.id,
+        ...(entry.options.supportsBlankSession ? { supportsBlankSession: true } : {}),
       })
     }
     return tabs
@@ -331,7 +333,9 @@ export function apply(ctx: Context, config: SyncedConfig<ConversationConfig>): v
   })
 
   const shellInjected: ConversationShellInjected = {
-    openWorkspace: (workspaceId, adopt) => workspaceNavigation.openWorkspace(workspaceId, adopt),
+    openWorkspace: (workspaceId, adopt, sourceSessionId) => workspaceNavigation.openWorkspace(
+      workspaceId, adopt, sourceSessionId === undefined ? {} : { sourceSessionId },
+    ),
   }
 
   const registerConversationRoot = () => slots.register({

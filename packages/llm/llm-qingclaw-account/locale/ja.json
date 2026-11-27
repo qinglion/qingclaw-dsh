@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "QingClaw アカウントモデル",
+    "description": "ログイン済みの QingClaw アカウントと短期モデルゲートウェイ認証情報を使用します。"
+  }
+}

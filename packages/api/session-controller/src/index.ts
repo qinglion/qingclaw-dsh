@@ -282,7 +282,7 @@ export class SessionController extends TypertRemoteService {
   }
 
   /**
-   * Select one Session-local model after explicitly resuming the Session; save the default in the background.
+   * Select one Session-local model after explicitly resuming the Session; save it as the remembered default in the background.
    * @param request - Session identity and requested model selection.
    * @returns the normalized selection installed for the Session, without waiting for default persistence.
    */
@@ -292,13 +292,15 @@ export class SessionController extends TypertRemoteService {
   }
 
   /**
-   * Select the first available account model after login when no provider API key is configured.
+   * Select the first available account model after login when no provider API key is
+   * configured and no user-saved selection exists; a remembered choice survives login.
    * @returns after saving the first available model or retaining the existing default.
    */
   @Remote
   async initializeDefaultModel(): Promise<void> {
     const provider = 'deepseek-account'
     if (await hasProviderApiKey(this.ctx)) return
+    if (this.ctx.agentDefaultModel.isUserSelected()) return
     const catalog = await buildModelCatalog(this.ctx)
     const model = catalog.groups.find(group => group.id === provider)?.models[0]
     if (model === undefined) throw new RemoteError('session/provider-models-unavailable',

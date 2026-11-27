@@ -48,6 +48,8 @@ Web bundle 中唯一的 `ui-session-status` 行同时加载两个面：宿主阅
 
 宿主面通过 `sessionStatus` Remote 命名空间提供 `mark` 和 `follow`；失败使用 `session-status/not-found` 和 `session-status/unavailable`。前端保存的阅读记录副本是私有的：除 `ctx.uiSession.sessionStatus` 外，没有其他前端服务暴露这些记录。
 
+工作区归档快照就绪后，桌面应用图标的角标统计会话列表中有未读提醒的会话。归档会话后，角标不再计入该会话。取消归档时，如果提醒仍未读，角标会重新计入该会话。
+
 -----
 
 <a id="understand-the-implementation"></a>

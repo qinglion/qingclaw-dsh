@@ -16,7 +16,7 @@ import type { ChatViewSlotProps, PerformanceUsageInjected } from '../contract/sl
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { formatTokensPerSecond } from './message-chrome.ts'
 import { assistantStepReading } from '../contract/turn-metrics.ts'
-import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
+import { formatCacheHitPercent, formatCacheReadCount, formatExactTokens, formatTokens } from './token-format.ts'
 import { useStatDialog } from './stat-dialog.ts'
 import css from './StatsPills.module.css'
 import dialogCss from './stat-dialog.module.css'
@@ -103,9 +103,10 @@ export function formatDuration(ms: number, t: ChatViewSlotProps['t']): string {
  * @param usage - the session's token-usage projection value.
  * @returns integer text when integer rounding stays below 100, otherwise the
  * minimum decimal precision that still rounds below 100; a full hit returns
- * 100, and no billed input returns null.
+ * 100. Unknown cache coverage or no billed input returns null.
  */
 export function cacheHitPercent(usage: TokenUsageProjection): string | null {
+  if (usage.unreportedCacheReadAttempts !== undefined) return null
   const denominator = billedInputTokens(usage)
   return formatCacheHitPercent(usage.cacheReadTokens, denominator)
 }
@@ -307,7 +308,9 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
     return cacheHitText === null ? null : <PlainPill stat="usage" icon={icon} {...reading(cacheHitText, null)} />
   }
   // Same aggregate as the Turn pill's totalTokens: every prompt-side billing bucket plus output.
-  const total = billedInputTokens(usage) + usage.outputTokens
+  const input = billedInputTokens(usage)
+  const cacheReadReported = usage.unreportedCacheReadAttempts === undefined
+  const total = input + usage.outputTokens
   const totalText = t('message.turnUsage.count', { count: formatTokens(total, t) })
   return (
     <DialogPill
@@ -319,7 +322,7 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
     >
       {/* jscpd:ignore-start -- the session-total bucket rows deliberately mirror
           TurnUsagePanel's per-turn dl: same skin, different data contract (the
-          buckets are always present here; per-turn fields are optional). A
+          session view tracks cache coverage across attempts). A
           session that never wrote cache drops the row, as the per-turn panel
           drops its absent fields. */}
       <dl className={dialogCss.details} data-session-stats-usage>
@@ -329,10 +332,10 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
             <dd>{`${cacheHit}%`}</dd>
           </>
         )}
-        <dt>{t('message.turnUsage.input')}</dt>
-        <dd>{exactCount(usage.uncachedInputTokens, t)}</dd>
+        <dt>{t(cacheReadReported ? 'message.turnUsage.input' : 'message.turnUsage.totalInput')}</dt>
+        <dd>{exactCount(cacheReadReported ? usage.uncachedInputTokens : input, t)}</dd>
         <dt>{t('message.turnUsage.cacheRead')}</dt>
-        <dd>{exactCount(usage.cacheReadTokens, t)}</dd>
+        <dd>{formatCacheReadCount(usage.cacheReadTokens, cacheReadReported, t)}</dd>
         {usage.cacheWriteTokens !== 0 && (
           <>
             <dt>{t('message.turnUsage.cacheWrite')}</dt>

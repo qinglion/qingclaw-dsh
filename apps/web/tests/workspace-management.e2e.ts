@@ -1079,8 +1079,17 @@ describe('web e2e: New Session after an outdated blank cache', () => {
       const previous = (await selected.innerText()).split('\n')[0]!
       const before = await captureStableAria(page, '[role="tree"]', scaffold.workspaceCwd)
 
+      const workspaceRow = page.getByRole('treeitem', { name: /^New session regression/ })
+      await workspaceRow.hover()
+      const newInWorkspace = page.getByRole('button', { name: 'New session in New session regression', exact: true })
+      expect(await newInWorkspace.getAttribute('aria-keyshortcuts')).toBeNull()
+      await newInWorkspace.hover()
+      const tooltip = page.getByRole('tooltip').filter({ hasText: 'New session' })
+      await tooltip.waitFor()
+      const rowTooltip = await tooltip.ariaSnapshot()
+
       const creation = page.waitForResponse('**/api/session/create')
-      await page.getByRole('button', { name: 'New session', exact: true }).last().click()
+      await newInWorkspace.click()
       const created = await creation
       // New Session names the blank startup created, not the recorded conversation, and the Host reuses it.
       expect(created.request().postDataJSON()).toHaveProperty('payload.args.request.sessionId', startupBlank)
@@ -1090,9 +1099,10 @@ describe('web e2e: New Session after an outdated blank cache', () => {
       expect(workspace.sessionIds).toHaveLength(2)
       expect(workspace.sessionIds).toContain(id)
       await page.getByRole('treeitem').filter({ hasText: previous }).waitFor()
+      await page.mouse.move(0, 0)
       const after = await captureStableAria(page, '[role="tree"]', scaffold.workspaceCwd)
       await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'new-session.expected.md'),
-        `Before New Session\n${before}\nAfter New Session\n${after}`, MODE)
+        `Before New Session\n${before}\nWorkspace row tooltip\n${rowTooltip}\nAfter New Session\n${after}`, MODE)
       expect(tripwire.pageErrors).toEqual([])
       expect(tripwire.warnings).toEqual([])
     } finally {

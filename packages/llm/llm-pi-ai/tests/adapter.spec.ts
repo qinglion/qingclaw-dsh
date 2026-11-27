@@ -130,6 +130,30 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.paths).toEqual(['/chat/completions'])
   })
 
+  it.each([
+    ['OpenAI miss', { prompt_tokens_details: { cached_tokens: 0 } }, 0],
+    ['DeepSeek miss', { prompt_cache_hit_tokens: 0 }, 0],
+    ['Kimi miss', { cached_tokens: 0 }, 0],
+    ['OpenAI hit', { prompt_tokens_details: { cached_tokens: 2 } }, 2],
+    ['unreported', {}, undefined],
+  ] as const)('preserves cache telemetry for %s', async (_name, cache, expected) => {
+    const usage = { prompt_tokens: 3, completion_tokens: 1, ...cache }
+    const server = await mockServer([{ events: [
+      ...textEvents.slice(0, 2),
+      JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: null }),
+      JSON.stringify({ choices: [], usage }),
+      '[DONE]',
+    ] }])
+    const ctx = await harness(server.url)
+    const result = await assemble(ctx, { model: 'deepseek-flash', messages: [] })
+    expect(result.usage).toEqual({
+      inputTokens: 3 - (expected ?? 0),
+      outputTokens: 1,
+      totalTokens: 4,
+      ...(expected === undefined ? {} : { cacheReadTokens: expected }),
+    })
+  })
+
   it('keeps prepared model metadata and dispatch on one profile snapshot', async () => {
     const first = await mockServer([{ events: textEvents }])
     const second = await mockServer([])

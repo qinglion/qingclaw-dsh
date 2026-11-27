@@ -65,6 +65,7 @@ function listed(base: DeepSeekCatalogModel, entry: ListingEntry, facts: ListedFa
   }
   return layered(inherited, {
     ...entry.name === undefined ? {} : { name: entry.name },
+    ...entry.rate === undefined ? {} : { rate: entry.rate },
     ...facts.contextWindow === undefined ? {} : { contextWindow: facts.contextWindow },
     ...facts.maxOutputTokens === undefined ? {} : { maxTokens: Math.min(routeMaxTokens, facts.maxOutputTokens) },
     ...facts.systemPromptUpdate === 'in-history' ? { systemPromptUpdate: 'in-history' as const } : {},

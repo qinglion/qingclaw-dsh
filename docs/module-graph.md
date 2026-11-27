@@ -151,6 +151,7 @@ flowchart TD
     pkg_acp_app["acp-app"]
     pkg_base["base"]
     pkg_headless["headless"]
+    pkg_qingclaw_bundle["qingclaw-bundle"]
     pkg_sdk_app["sdk-app"]
     pkg_sdk_minimal["sdk-minimal"]
     pkg_web_app["web-app"]
@@ -176,6 +177,7 @@ flowchart TD
     pkg_client_ui_approval["client-ui-approval"]
     pkg_client_ui_attachment["client-ui-attachment"]
     pkg_client_ui_brand_official["client-ui-brand-official"]
+    pkg_client_ui_brand_qingclaw["client-ui-brand-qingclaw"]
     pkg_client_ui_chat["client-ui-chat"]
     pkg_client_ui_commands["client-ui-commands"]
     pkg_client_ui_connector_account["client-ui-connector-account"]
@@ -1164,6 +1166,9 @@ flowchart TD
   pkg_api_settings_controller --> pkg_session
   pkg_api_settings_controller --> pkg_settings
   pkg_api_settings_controller --> pkg_typert_protocol
+  pkg_qingclaw_bundle --> pkg_agent
+  pkg_qingclaw_bundle --> pkg_agent_preset_registry
+  pkg_qingclaw_bundle --> pkg_tools
   pkg_web_app --> pkg_shell_env
   pkg_cua --> pkg_agent
   pkg_cua --> pkg_attachment
@@ -1696,6 +1701,7 @@ flowchart TD
 | [`client-ui-approval`](../packages/client/ui-approval) | `client` | — |
 | [`client-ui-attachment`](../packages/client/ui-attachment) | `client` | — |
 | [`client-ui-brand-official`](../packages/client/ui-brand-official) | `client` | — |
+| [`client-ui-brand-qingclaw`](../packages/client/ui-brand-qingclaw) | `client` | — |
 | [`client-ui-chat`](../packages/client/ui-chat) | `client` | — |
 | [`client-ui-commands`](../packages/client/ui-commands) | `client` | — |
 | [`client-ui-connector-account`](../packages/client/ui-connector-account) | `client` | — |
@@ -1975,6 +1981,7 @@ flowchart TD
 | [`token-meter`](../packages/llm/token-meter) | `llm` | [`compaction`](../packages/compaction/compaction), [`compaction-image-offload`](../packages/compaction/compaction-image-offload), [`llm`](../packages/llm/llm), [`llm-retry`](../packages/llm/llm-retry), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection) |
 | [`session-query`](../packages/session-query/session-query) | `session-query` | [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-title`](../packages/session/session-title), [`tool-todo`](../packages/todo/tool-todo) |
 | [`api-settings-controller`](../packages/api/settings-controller) | `api` | [`agent-preset-registry`](../packages/preset/agent-preset-registry), [`credentials`](../packages/credentials/credentials), [`native-command`](../packages/util/native-command), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
+| [`qingclaw-bundle`](../packages/bundle/qingclaw) | `bundle` | [`agent`](../packages/core/agent), [`agent-preset-registry`](../packages/preset/agent-preset-registry), [`tools`](../packages/core/tools) |
 | [`web-app`](../packages/bundle/web-app) | `bundle` | [`shell-env`](../packages/shell/shell-env) |
 | [`cua`](../packages/experimental/cua) | `experimental` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`error`](../packages/util/error), [`ptc-runtime-node`](../packages/ptc-runtime/ptc-runtime-node), [`scope`](../packages/core/scope), [`tool-executor-ptc`](../packages/core/tool-executor-ptc), [`tools`](../packages/core/tools), [`user-questions`](../packages/interaction/user-questions) |
 | [`deepseek-chat-import`](../packages/experimental/deepseek-chat-import) | `experimental` | [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`tool-web`](../packages/web/tool-web) |

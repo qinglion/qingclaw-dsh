@@ -16,6 +16,8 @@ import type { FileDragHandle } from '@deepseek-ai/dsh-util-file-drag'
 function createProductApi(): DshDesktopProductApi {
   return {
     protocolVersion: 1,
+    mobilePairing: { open: () => ipcRenderer.invoke(DESKTOP_IPC.mobilePairingOpen) as Promise<void> },
+    capturePageRegion: region => ipcRenderer.invoke(DESKTOP_IPC.capturePageRegion, region) as Promise<Uint8Array<ArrayBuffer>>,
     fileActions: {
       save: request => ipcRenderer.invoke(DESKTOP_IPC.fileSave, request) as Promise<FileSaveResult>,
       readClipboardImage: url => ipcRenderer.invoke(DESKTOP_IPC.clipboardImageRead, url) as
@@ -34,6 +36,9 @@ function createProductApi(): DshDesktopProductApi {
       }) },
     },
     deviceInfo: () => ipcRenderer.invoke(DESKTOP_IPC.deviceInfo) as Promise<string>,
+    attention: {
+      update: (count) => { ipcRenderer.send(DESKTOP_IPC.attentionBadge, count) },
+    },
     keyboard: {
       closeWindow: revision => ipcRenderer.invoke(DESKTOP_IPC.shortcutsCloseWindow, revision) as Promise<void>,
       subscribe: (listener) => {

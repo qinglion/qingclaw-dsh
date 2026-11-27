@@ -54,6 +54,8 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
   '@deepseek-ai/dsh-atomic-write': ['withFileLock', 'writeFileAtomic'],
   '@deepseek-ai/dsh-deque': ['Deque'],
+  // Joins paths under the resolved Harness home; it holds no state and creates nothing.
+  '@deepseek-ai/dsh-home-paths': ['dshPath'],
   // Builds a dispatcher from the resolved proxy policy; the caller owns and closes it.
   '@deepseek-ai/dsh-http-proxy': ['createRouteDispatcher'],
   // The Liveshare wire codec and identity helpers are stateless functions over caller-owned values.
@@ -67,6 +69,8 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
   // Messages and assembled blocks are plain data. Each caller owns its assembler.
   '@deepseek-ai/dsh-llm': ['BlockAssembler', 'callConfigEquals', 'createUserMessage'],
   '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],
+  // A fixed ordering constant; the candidate type a bundled skill builds carries no runtime identity.
+  '@deepseek-ai/dsh-skill': ['BUNDLED_SKILL_RANK'],
   '@deepseek-ai/dsh-storage-domain': ['defineDomain'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
   // Both operate only on the caller's subprocess service and handle; the module memoizes only the binary path.

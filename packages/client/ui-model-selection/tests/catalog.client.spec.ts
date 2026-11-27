@@ -70,6 +70,28 @@ describe('ModelCatalogDirectory', () => {
     })
   })
 
+  it('re-reads an aging Host catalog when a menu asks for a refresh', async () => {
+    vi.useFakeTimers()
+    try {
+      const models = vi.fn()
+        .mockResolvedValueOnce({ ok: true, value: catalog('first') })
+        .mockResolvedValueOnce({ ok: true, value: catalog('second') })
+      const subject = directory(models)
+
+      await subject.load()
+      // Reopening keeps the shared catalog, including while it is still fresh.
+      await expect(subject.load()).resolves.toEqual(catalog('first'))
+      await expect(subject.load(true)).resolves.toEqual(catalog('first'))
+      expect(models).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(31_000)
+      await expect(subject.load(true)).resolves.toEqual(catalog('second'))
+      expect(models).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('contains refresh failures while retaining old data and clears it on a failed Host reset', async () => {
     const models = vi.fn()
       .mockResolvedValueOnce({ ok: true, value: catalog('old') })

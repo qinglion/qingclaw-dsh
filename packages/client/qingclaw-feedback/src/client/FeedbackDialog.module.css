@@ -1,0 +1,4 @@
+/* A QR code stays square and readable at its own size, not the card width. */
+.body { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.qrCode { box-sizing: border-box; width: 200px; height: 200px; border-radius: var(--dsw-radius-md); }
+.hint { margin: 0; max-width: 100%; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-secondary); text-align: center; }

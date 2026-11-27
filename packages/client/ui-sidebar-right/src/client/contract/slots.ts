@@ -133,6 +133,8 @@ export interface SidebarRightTabPlacement {
   readonly paneId?: PaneId
   /** Prefer a new pane for new content; use the target pane when splitting is unavailable. */
   readonly preferNewPane?: boolean
+  /** Open in the other docked pane, creating it if there is room; otherwise use the target pane. */
+  readonly beside?: boolean
   /** Resource tabs reveal existing content by default; `false` permits duplicates. Pages always deduplicate within the target pane. */
   readonly revealIfOpened?: boolean
   /**
@@ -141,7 +143,7 @@ export interface SidebarRightTabPlacement {
    * and the new tab keeps the panel's pane id, rectangle, and stacking order,
    * takes focus, and leaves the column as it is. Content already open is
    * revealed as any open reveals it, and this tab stays open. Where new
-   * content lands, it takes precedence over `paneId` and `preferNewPane`.
+   * content lands, it takes precedence over `paneId`, `preferNewPane`, and `beside`.
    */
   readonly replaceTab?: boolean
 }

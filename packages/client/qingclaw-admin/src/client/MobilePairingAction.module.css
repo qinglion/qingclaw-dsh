@@ -1,0 +1,8 @@
+.control { position: relative; display: inline-flex; flex-shrink: 0; }
+.button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .button:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+}
+.button:focus-visible { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 1px; }
+.button:disabled { opacity: .6; }
+.failure { position: absolute; bottom: calc(100% + 4px); inset-inline-end: 0; width: 10rem; padding: 6px 8px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 12px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm); }

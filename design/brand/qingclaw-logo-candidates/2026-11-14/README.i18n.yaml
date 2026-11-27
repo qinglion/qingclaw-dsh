@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write design/brand/qingclaw-logo-candidates/2026-11-14/README.md
+/qingclaw-ip-logo-candidates-2026-11-14:
+  en: 649d0199508b21ae
+  zh: 9c2ec1e0ca88dddf
+/qingclaw-ip-logo-candidates-2026-11-14/shared-brief:
+  en: 84d4b21b47c9e739
+  zh: 25cfcf5dfac82903
+/qingclaw-ip-logo-candidates-2026-11-14/candidates:
+  en: 79daee419076ccff
+  zh: 53c41eefed1eaf31
+/qingclaw-ip-logo-candidates-2026-11-14/generation-record:
+  en: 401e4cdbcbdab7f8
+  zh: 151b29d348d6ae6c

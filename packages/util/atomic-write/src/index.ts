@@ -12,7 +12,7 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 import { HarnessError } from '@deepseek-ai/dsh-error'
@@ -60,6 +60,18 @@ export interface WriteFileAtomicOptions {
    * default — pass `0o700` when the tree holds user-private data.
    */
   dirMode?: number
+  /** Flush file contents before rename and the containing directory afterward on POSIX. */
+  durable?: boolean
+}
+
+async function syncDirectory(path: string): Promise<void> {
+  if (process.platform === 'win32') return
+  const handle = await open(path, 'r')
+  try {
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
 }
 
 /**
@@ -73,7 +85,8 @@ export interface WriteFileAtomicOptions {
  * one filesystem. Windows replacement retries transient `EACCES`, `EBUSY`,
  * and `EPERM` failures for a bounded interval while the complete temp file
  * remains the rename source. On any remaining failure the temp file is
- * removed and the failure rethrown. Crash durability (fsync) is out of scope.
+ * removed and the failure rethrown. With durability enabled, a directory
+ * sync failure after the rename can leave the replacement visible.
  * @param filename - final path receiving the content.
  * @param content - complete next file content.
  * @param options - permission bits for the replacement inode.
@@ -87,12 +100,13 @@ export async function writeFileAtomic(filename: string, content: string | Uint8A
   // and parent directory and preserves owner-only permissions on Windows.
   const temp = `${filename}.${randomBytes(6).toString('hex')}.tmp`
   try {
-    await writeFile(temp, content, { mode: options.mode, flag: 'wx' })
+    await writeFile(temp, content, { mode: options.mode, flag: 'wx', flush: options.durable === true })
     await renameAtomicTemp(temp, filename)
   } catch (error) {
     await rm(temp, { force: true })
     throw error
   }
+  if (options.durable === true) await syncDirectory(dirname(filename))
 }
 
 /** Whether an exclusive create found an existing lock. */

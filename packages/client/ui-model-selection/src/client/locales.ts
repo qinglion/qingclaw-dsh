@@ -10,6 +10,8 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'rate.value': '{value}x',
+  'rate.aria': '成本倍率 {value}',
   'provider.account': 'DeepSeek 账号',
   'command.label': '模型',
   'command.description': '选择本会话使用的模型',
@@ -40,6 +42,8 @@ export type ModelKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'rate.value': '{value}x',
+  'rate.aria': 'Cost multiple {value}',
   'provider.account': 'DeepSeek Account',
   'command.label': 'Model',
   'command.description': 'Select the model for this conversation',
@@ -67,6 +71,8 @@ export const en = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
+  'rate.value': '{value}x',
+  'rate.aria': 'コスト倍率 {value}',
   'provider.account': 'DeepSeek アカウント',
   'command.label': 'モデル',
   'command.description': 'この会話で使用するモデルを選択',
@@ -94,6 +100,8 @@ export const ja = {
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
+  'rate.value': '{value}x',
+  'rate.aria': 'Multiplicador de coste {value}',
   'provider.account': 'Cuenta DeepSeek',
   'command.label': 'modelo',
   'command.description': 'Selecciona el modelo para esta conversación',
@@ -121,6 +129,8 @@ export const es = {
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
+  'rate.value': '{value}x',
+  'rate.aria': 'Multiplicateur de coût {value}',
   'provider.account': 'Compte DeepSeek',
   'command.label': 'Modèle',
   'command.description': 'Sélectionnez le modèle pour cette conversation',
@@ -148,6 +158,8 @@ export const fr = {
 
 /** German dictionary, checked against the English keys. */
 export const de = {
+  'rate.value': '{value}x',
+  'rate.aria': 'Kostenfaktor {value}',
   'provider.account': 'DeepSeek-Konto',
   'command.label': 'Modell',
   'command.description': 'Wählen Sie das Modell für dieses Gespräch aus',
@@ -175,6 +187,8 @@ export const de = {
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
+  'rate.value': '{value}x',
+  'rate.aria': 'Кратность стоимости {value}',
   'provider.account': 'DeepSeek Аккаунт',
   'command.label': 'Модель',
   'command.description': 'Выберите модель для этого разговора',
@@ -202,6 +216,8 @@ export const ru = {
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
+  'rate.value': '{value}x',
+  'rate.aria': 'Multiplicador de custo {value}',
   'provider.account': 'DeepSeek Conta',
   'command.label': 'Modelo',
   'command.description': 'Selecione o modelo para esta conversa',

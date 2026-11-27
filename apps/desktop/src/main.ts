@@ -7,6 +7,7 @@ import { DesktopUpdateSettings } from './update-settings.ts'
 import { isDesktopUpdateChannel } from './settings-file.ts'
 import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-product-analytics/types'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
+import { readFileSync } from 'node:fs'
 import { access, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -30,12 +31,15 @@ import { resolveDesktopPaths } from './paths.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
 import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
+import { SYSTEM_THEME_REQUEST, withSystemTheme } from './platform-theme.ts'
 import { installDesktopFileDrag } from './file-drag.ts'
 import { installDesktopDirectoryPicker } from './directory-picker.ts'
+import { installQingclawExtras } from './ipc-extras.ts'
 import { installMicrophonePermissions } from './microphone-permissions.ts'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
 import { readDeviceInfo } from './device-info.ts'
+import { createPhoneAccount } from './mobile/create-phone-account.ts'
 import { desktopUpdateReadyConfirmation, formatDesktopMessage, resolveDesktopLocale, resolveDesktopStartupLocale } from './locale.ts'
 import type { DesktopMessages } from './locale.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
@@ -65,12 +69,15 @@ import { readDesktopSettings } from './settings.ts'
 import { readDesktopLocaleCache, writeDesktopLocaleCache } from './locale-cache.ts'
 import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
+import { DesktopAppBadge } from './app-badge.ts'
 import { DesktopBrowserGuests } from './browser-guests.ts'
 import { installDesktopShortcuts } from './keyboard.ts'
 import { DesktopUpdateOverlays } from './update-overlay.ts'
 import { DesktopQuitConfirmation } from './quit-confirmation.ts'
 import { DesktopTray } from './tray.ts'
 import { DesktopBackgroundNotice } from './background-notice.ts'
+import { QINGCLAW_DESKTOP_DISTRIBUTION } from './distribution.ts'
+import { qingclawDesktopDeployment } from './deployment.ts'
 
 let focusPrimaryWindow = (): void => {}
 let stopForRecovery = async (): Promise<void> => { await stopOperationReports() }
@@ -248,20 +255,26 @@ function chromeFallbackFill(): string {
 }
 
 /**
- * Add the effective Desktop palette to a Platform authorization URL so the
- * login page opens in the application's theme. `system` resolves through
- * `nativeTheme.shouldUseDarkColors`, which follows the theme source the
- * application preload publishes.
+ * Ask the Platform authorization page to follow the appearance of the browser
+ * opening it, so a palette the visitor stored there cannot override it.
  * @param authorizeUrl - validated Platform authorization URL.
- * @returns the authorization URL carrying `theme=light` or `theme=dark`.
+ * @returns the authorization URL carrying `theme=system`.
  */
 function platformLoginUrl(authorizeUrl: string): string {
   const url = new URL(authorizeUrl)
-  url.searchParams.set('theme', nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
+  url.searchParams.set('theme', SYSTEM_THEME_REQUEST)
   return url.href
 }
 
-function createWindow(preload: string, show = false, primary = false): BrowserWindow {
+/**
+ * Create an application window.
+ * @param preload - bundled application preload path.
+ * @param show - whether to show the window immediately.
+ * @param primary - whether this is the primary product window.
+ * @param platformOrigin - Platform origin whose pages follow the Desktop palette.
+ * @returns the created window.
+ */
+function createWindow(preload: string, show = false, primary = false, platformOrigin?: string): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -296,7 +309,9 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     },
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
+    if (['http:', 'https:'].includes(new URL(url).protocol)) {
+      void shell.openExternal(withSystemTheme(url, platformOrigin))
+    }
     return { action: 'deny' }
   })
   if (process.platform === 'darwin' || process.platform === 'win32') {
@@ -372,7 +387,9 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     if (destination.protocol !== `${SCHEME}:`
       && !(destination.protocol === 'http:' && destination.origin === current.origin)) {
       event.preventDefault()
-      if (['http:', 'https:'].includes(destination.protocol)) void shell.openExternal(url)
+      if (['http:', 'https:'].includes(destination.protocol)) {
+        void shell.openExternal(withSystemTheme(url, platformOrigin))
+      }
     }
   })
   return window
@@ -380,6 +397,8 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
 
 async function main(): Promise<void> {
   const desktopSettings = await readDesktopSettings(app.getPath('userData'))
+  const manifest: unknown = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
+  const sealedDeployment = app.isPackaged ? qingclawDesktopDeployment(manifest) : undefined
   void pruneCrashReports(app.getPath('logs'))
   const journalDirectory = process.env.DSH_DESKTOP_UPDATE_JOURNAL_DIR
   const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
@@ -402,7 +421,9 @@ async function main(): Promise<void> {
     return result.environment
   })
   let hostEnvironment: NodeJS.ProcessEnv = process.env
-  const prepareHostEnvironment = async (): Promise<void> => { hostEnvironment = await loginShell }
+  const prepareHostEnvironment = async (): Promise<void> => {
+    hostEnvironment = { ...await loginShell, ...(sealedDeployment?.environment ?? {}) }
+  }
   let quitting = false
   let startup: Promise<void> | undefined
   let workspaceRecovery: Promise<void> | undefined
@@ -490,6 +511,7 @@ async function main(): Promise<void> {
   let hostUrl: string | undefined
   let hostCookie: string | undefined
   const browserGuests = new DesktopBrowserGuests(() => hostUrl)
+  const appBadge = new DesktopAppBadge()
   let injections: readonly unknown[] = []
   let welcomeBackend: DesktopWelcomeBackend | undefined
   let reportedLaunch = false
@@ -529,14 +551,32 @@ async function main(): Promise<void> {
     return next.promise
   }
   const platformView = new DesktopPlatformView(join(app.getAppPath(), 'lib', 'preload-platform-account.cjs'),
-    () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US', process.platform === 'win32' ? 'win32' : 'darwin',
+    () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US',
+    process.platform === 'win32' ? 'win32' : 'darwin',
     owner => isMandatory() || updateOverlays.input(owner).blocked)
+  const resolvePlatformOrigin = (): string => sealedDeployment?.platformOrigin ?? hostEnvironment.QINGCLAW_PLATFORM_ORIGIN
+    ?? QINGCLAW_DESKTOP_DISTRIBUTION.services.platformOrigins.test
+  const phoneAccount = createPhoneAccount({
+    platformOrigin: resolvePlatformOrigin,
+    pairingPath: join(app.getPath('userData'), 'desktop', 'mobile-pairing.json'),
+    designCss: () => readFileSync(join(app.getAppPath(), 'lib/welcome/design-platform.css'), 'utf8'),
+    harnessUrl: () => {
+      if (!hostUrl || !hostCookie || backend.state.phase !== 'ready') return undefined
+      const url = new URL(hostUrl)
+      return ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname) ? url.origin : undefined
+    },
+    harnessCookie: () => backend.state.phase === 'ready' ? hostCookie : undefined,
+    locale: () => locale.id.startsWith('zh') ? 'zh' : 'en',
+  })
   const backend = new DesktopBackendController((onFailure) => {
     const hostInspectPort = developmentHostInspectPort(development)
     const host = new DesktopHostProcess(resources.node, resources.dsh, activeProject,
       hostInspectPort, { ...hostEnvironment, DSH_CLIENT_VERSION: desktopClientVersion() }, onFailure,
       primaryRuntime,
-      resources, (next) => { platformView.setSession(next) }, (record) => {
+      resources, (next) => {
+        platformView.setSession(next)
+        phoneAccount.setSession(next)
+      }, (record) => {
         operationJournal ??= new OperationJournal(join(app.getPath('userData'), 'plugin-operations'), {
           segmentBytes: 256 * 1024, recordBytes: 4096, queuedBytes: 64 * 1024,
         })
@@ -571,6 +611,7 @@ async function main(): Promise<void> {
           }
           if (state.status === 'credential-stored' && attempt?.phase === 'succeeded' && welcomeWindow !== undefined) void enterWorkspace({ activate: false }).catch(() => undefined)
           if (previousAccountStatus === 'credential-stored' && state.status === 'signed-out') {
+            phoneAccount.setSession(null)
             void readWelcomeState().then(async (value) => {
               if (needsWelcome(value) && !quitting) {
                 if (enteredWorkspace) {
@@ -587,6 +628,7 @@ async function main(): Promise<void> {
         }, () => {
           // The stream reconnects; a transport failure does not change account state.
         }, () => {
+          phoneAccount.setSession(null)
           void readWelcomeState().then(async (value) => {
             if (!needsWelcome(value) || quitting) return
             pendingWelcomeNotice = 'session-expired'
@@ -700,7 +742,6 @@ async function main(): Promise<void> {
     return startup
   }
 
-  const manifest: unknown = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
   const packagedChannel = desktopUpdateChannel(manifest)
   const channelSettings = new DesktopUpdateSettings(app.getPath('userData'), packagedChannel)
   const initialChannel = await channelSettings.load()
@@ -868,6 +909,13 @@ async function main(): Promise<void> {
       || !event.senderFrame.url.startsWith('dsh-app://app/')) throw new Error('Rejected Platform command')
     return owner
   }
+  const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
+    : join(process.resourcesPath, 'icon.png')
+  ipcMain.handle(DESKTOP_IPC.mobilePairingOpen, async (event) => {
+    const owner = assertMainApplication(event)
+    if (backend.state.phase !== 'ready' || !hostCookie || !hostUrl || shuttingDown) throw new Error('Desktop Host unavailable')
+    await phoneAccount.open(owner, locale.id.startsWith('zh') ? '连接手机' : 'Connect phone')
+  })
   installFileActions(assertMainApplication, () => hostUrl)
   ipcMain.on(PLATFORM_IPC.bootstrap, (event) => {
     try { event.returnValue = platformView.bootstrap(event) }
@@ -891,6 +939,8 @@ async function main(): Promise<void> {
     if (source !== 'light' && source !== 'dark' && source !== 'system') return
     nativeTheme.themeSource = source
   })
+  // The distribution's own channels: page capture and the completion badge.
+  installQingclawExtras({ mainWindow: () => mainWindow, assertProductSender, badge: appBadge })
   ipcMain.handle(DESKTOP_IPC.localeBootstrap, async (event) => {
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame
       || new URL(event.senderFrame.url).origin !== new URL(applicationUrl).origin) {
@@ -1161,10 +1211,8 @@ async function main(): Promise<void> {
     updates.dispose()
   })
 
-  const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
-    : join(process.resourcesPath, 'icon.png')
   app.setAboutPanelOptions({
-    applicationName: 'DeepSeek Harness',
+    applicationName: QINGCLAW_DESKTOP_DISTRIBUTION.productName,
     applicationVersion: app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',
@@ -1329,7 +1377,7 @@ async function main(): Promise<void> {
     }
   }
   const createMainWindow = (): BrowserWindow => {
-    const window = createWindow(appPreload, false, true)
+    const window = createWindow(appPreload, false, true, resolvePlatformOrigin())
     mainWindow = window
     browserGuests.bind(window, (guest, name) => shortcuts.attachGuest(window, guest, name))
     shortcuts.attach(window)
@@ -1355,7 +1403,12 @@ async function main(): Promise<void> {
       window.on('focus', () => { sessionEnding = false })
       window.on('show', () => { sessionEnding = false })
     }
-    window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
+    window.on('closed', () => {
+      if (mainWindow !== window) return
+      mainWindow = undefined
+      // The page that reported reminders is gone with its window.
+      appBadge.clear()
+    })
     window.webContents.on('console-message', (details) => {
       if (details.level !== 'error') return
       rendererConsole.push(`${details.sourceId}:${String(details.lineNumber)} ${details.message}`)
@@ -1496,10 +1549,13 @@ async function main(): Promise<void> {
     window.focus()
   }
 
-  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient('dsh')
+  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') {
+    app.setAsDefaultProtocolClient(QINGCLAW_DESKTOP_DISTRIBUTION.protocol)
+  }
   app.on('open-url', (event, url) => {
     event.preventDefault()
-    if (url === 'dsh://open' || url === 'dsh://open/') focusPrimaryWindow()
+    const open = `${QINGCLAW_DESKTOP_DISTRIBUTION.protocol}://open`
+    if (url === open || url === `${open}/`) focusPrimaryWindow()
   })
 
   app.on('activate', (_event, hasVisibleWindows) => {
@@ -1522,7 +1578,11 @@ async function main(): Promise<void> {
     updateSchedule.dispose()
     updateDialog.dispose()
     mandatoryUI?.dispose()
-    void Promise.all([stopOperationReports(), Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
+    void Promise.all([
+      // A restart keeps the room so an already paired phone reconnects without scanning again.
+      phoneAccount.close({ preserveRoom: true }),
+      stopOperationReports(),
+      Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
       backend.close().then(async () => { await operationJournal?.drain(500) }, async (error: unknown) => {
         await operationJournal?.drain(500)
         throw error
@@ -1541,6 +1601,7 @@ async function main(): Promise<void> {
       tray?.dispose()
       updateDialog.dispose()
       mandatoryUI?.dispose()
+      void phoneAccount.close({ preserveRoom: true }).catch(() => undefined)
       // Installation preparation already awaited Platform storage cleanup.
       void platformView.dispose().catch((error: unknown) => { console.error(error) })
       return

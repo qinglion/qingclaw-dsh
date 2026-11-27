@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-24-qingclaw-private-registry-reads.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-24-qingclaw-private-registry-reads.md
+/agent-note-read-the-qingclaw-private-registry-with-the-signed-in-account:
+  en: 1583cd94b4d5b522
+  zh: 2c5ba5c3748b9519
+/agent-note-read-the-qingclaw-private-registry-with-the-signed-in-account/problem:
+  en: c8c82b7808c7526d
+  zh: 8d62d97f7d7bc7ad
+/agent-note-read-the-qingclaw-private-registry-with-the-signed-in-account/decision:
+  en: cbd004de0bf7c9cf
+  zh: d29c28f69e4d4c67
+/agent-note-read-the-qingclaw-private-registry-with-the-signed-in-account/decision/ownership:
+  en: 88487f56549193ed
+  zh: ca5c442df445efcc
+/agent-note-read-the-qingclaw-private-registry-with-the-signed-in-account/alternatives-considered:
+  en: caa6f61803f48460
+  zh: ec993dc477acc43e
+/agent-note-read-the-qingclaw-private-registry-with-the-signed-in-account/testing:
+  en: 15e6af8456768157
+  zh: 708055b5684219c5
+/agent-note-read-the-qingclaw-private-registry-with-the-signed-in-account/consequences:
+  en: f818171caa81f344
+  zh: 8af7a9bccace0a13

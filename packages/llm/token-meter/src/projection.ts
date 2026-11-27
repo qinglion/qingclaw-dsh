@@ -13,10 +13,13 @@ import type { SessionProjectionSummaryExcluded } from '@deepseek-ai/dsh-session-
  * included in `outputTokens` and are not accumulated again.
  */
 export interface TokenUsageProjection {
+  /** Input outside reported cache buckets. Incomplete coverage can include an unknown cached portion. */
   uncachedInputTokens: number
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
+  /** Prompt-bearing attempts without a reported cache-read count. An incomplete breakdown cannot yield a hit rate. */
+  unreportedCacheReadAttempts?: number | undefined
 }
 
 /**

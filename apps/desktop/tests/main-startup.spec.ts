@@ -3187,7 +3187,9 @@ it.each(['failed', 'expired'] as const)('focuses DSH once when browser authoriza
   expect(window.focus).toHaveBeenCalledTimes(1)
 })
 
-it.each([['light', false], ['dark', true]] as const)('opens Platform authorization in the effective %s palette', async (theme, shouldUseDarkColors) => {
+// The authorization page follows the appearance of the browser opening it, so the
+// palette Desktop itself renders with never reaches the URL.
+it.each([['light', false], ['dark', true]] as const)('opens Platform authorization asking for the system palette while Desktop is %s', async (theme, shouldUseDarkColors) => {
   await import('../src/main.ts')
   await harness.preparing.promise
   harness.prepared.resolve()
@@ -3198,11 +3200,11 @@ it.each([['light', false], ['dark', true]] as const)('opens Platform authorizati
   const state: AccountView = {
     status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
     attempt: { id: 'test-theme-attempt' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser',
-      authorizeUrl: 'https://platform.deepseek.com/dsh/authorize?state=state-1' },
+      authorizeUrl: `https://platform.deepseek.com/dsh/authorize?state=state-${theme}` },
   }
   harness.publishAccount(state)
   harness.publishAccount(state)
-  expect(harness.openExternal).toHaveBeenCalledExactlyOnceWith(`https://platform.deepseek.com/dsh/authorize?state=state-1&theme=${theme}`)
+  expect(harness.openExternal).toHaveBeenCalledExactlyOnceWith(`https://platform.deepseek.com/dsh/authorize?state=state-${theme}&theme=system`)
 })
 
 it('disables native product events for a disabled Desktop launch', async () => {

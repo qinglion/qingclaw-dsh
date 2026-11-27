@@ -11,6 +11,9 @@ export interface ModelCatalogState {
   error: string | null
 }
 
+/** Age a loaded catalog must reach before a menu open re-reads it. */
+const MIN_REFRESH_AGE_MS = 30_000
+
 /** Loads at most one model catalog for the current Host generation. */
 export class ModelCatalogDirectory {
   /** Current shared catalog value and load lifecycle. */
@@ -32,6 +35,8 @@ export class ModelCatalogDirectory {
   }
 
   private generation = 0
+  /** Publish time of the loaded catalog; a menu open re-reads only an older one. */
+  private loadedAt = 0
   private inflight: Promise<ModelCatalog> | undefined
 
   /**
@@ -42,12 +47,18 @@ export class ModelCatalogDirectory {
 
   /**
    * Return the current generation's catalog, sharing its one in-flight load.
+   * @param refresh - re-read the Host catalog even when a value is loaded; the retained value stays visible while the new one loads.
    * @returns the loaded global catalog.
    */
-  load(): Promise<ModelCatalog> {
-    const state = this.store.getSnapshot()
-    if (state.status === 'ready' && state.value !== null) return Promise.resolve(state.value)
+  load(refresh = false): Promise<ModelCatalog> {
     if (this.inflight !== undefined) return this.inflight
+    const state = this.store.getSnapshot()
+    if (state.status === 'ready' && state.value !== null) {
+      // Rapid reopening keeps the shared catalog; an older one is re-read so a
+      // Host-side catalog change reaches the menu without restarting the app.
+      if (!refresh || Date.now() - this.loadedAt < MIN_REFRESH_AGE_MS) return Promise.resolve(state.value)
+      this.invalidate()
+    }
     const generation = this.generation
     this.store.update((draft) => {
       draft.status = 'loading'
@@ -63,6 +74,7 @@ export class ModelCatalogDirectory {
             this.reasoning.set(JSON.stringify([group.id, model.id]), model.reasoning)
           }
         }
+        this.loadedAt = Date.now()
         this.store.set({ value: response.value, status: 'ready', error: null })
       }
       return response.value

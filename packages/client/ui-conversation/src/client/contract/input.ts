@@ -194,6 +194,14 @@ export interface SessionInput extends InputTarget {
   /** Replace the whole draft with plain text, removing inline reference chips. */
   setDraft(text: string): void
   /** Append ordered browser-owned attachment ids; busy admission phases refuse. */
+  /**
+   * Append text and attachments to the editable composer draft.
+   * @param text - plain text to append.
+   * @param ids - browser-owned attachment ids in source order.
+   * @returns whether the draft accepted the content.
+   */
+  stageDraft(text: string, ids: readonly DraftAttachmentId[]): boolean
+
   addAttachments(ids: readonly DraftAttachmentId[]): boolean
   /**
    * Insert file references after the retained selection in one undo step without replacing text.

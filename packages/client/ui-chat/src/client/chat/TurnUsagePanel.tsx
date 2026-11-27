@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { IconDatabaseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TurnTokenUsage } from '../contract/chat-nodes.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
-import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
+import { formatCacheHitPercent, formatCacheReadCount, formatExactTokens, formatTokens } from './token-format.ts'
 import { useStatDialog } from './stat-dialog.ts'
 import css from './TurnUsagePanel.module.css'
 import dialogCss from './stat-dialog.module.css'
@@ -34,6 +34,8 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
   const cacheHit = usage.cacheReadTokens === undefined
     ? null
     : formatCacheHitPercent(usage.cacheReadTokens, usage.totalTokens - usage.outputTokens, 1)
+  const cacheReadReported = usage.cacheReadTokens !== undefined
+  const input = cacheReadReported ? usage.uncachedInputTokens : usage.totalTokens - usage.outputTokens
   const total = formatCompactCount(usage.totalTokens, t)
   const routes = usage.routes?.map(route => `${route.provider}/${route.model}`).join(', ') ?? ''
 
@@ -78,14 +80,10 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
                 <dd>{`${cacheHit}%`}</dd>
               </>
             )}
-            <dt>{t('message.turnUsage.input')}</dt>
-            <dd>{formatExactCount(usage.uncachedInputTokens, t)}</dd>
-            {usage.cacheReadTokens !== undefined && (
-              <>
-                <dt>{t('message.turnUsage.cacheRead')}</dt>
-                <dd>{formatExactCount(usage.cacheReadTokens, t)}</dd>
-              </>
-            )}
+            <dt>{t(cacheReadReported ? 'message.turnUsage.input' : 'message.turnUsage.totalInput')}</dt>
+            <dd>{formatExactCount(input, t)}</dd>
+            <dt>{t('message.turnUsage.cacheRead')}</dt>
+            <dd>{formatCacheReadCount(usage.cacheReadTokens ?? usage.partialCacheReadTokens, cacheReadReported, t)}</dd>
             {usage.cacheWriteTokens !== undefined && (
               <>
                 <dt>{t('message.turnUsage.cacheWrite')}</dt>

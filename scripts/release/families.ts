@@ -104,6 +104,13 @@ export abstract class ReleaseFamily {
   /** Repository-relative glob patterns selecting this family's manifests. */
   abstract readonly patterns: readonly string[]
 
+  /**
+   * Package scopes accepted as release members. A family packs only packages it
+   * owns, so a manifest outside these scopes fails discovery instead of
+   * entering a publication or a Desktop runtime closure.
+   */
+  protected readonly packageScopes: readonly string[] = ['@deepseek-ai/']
+
   /** Git tag prefix this family publishes from. */
   abstract readonly tagPrefix: string
 
@@ -132,7 +139,9 @@ export abstract class ReleaseFamily {
       const name = requireString(manifest, 'name', normalized)
       const version = requireString(manifest, 'version', normalized)
       if (name === WORKSPACE_ROOT_PACKAGE) throw new Error(`${normalized} selected the workspace root`)
-      if (!name.startsWith('@deepseek-ai/')) throw new Error(`${normalized} must name an @deepseek-ai package`)
+      if (!this.packageScopes.some(scope => name.startsWith(scope))) {
+        throw new Error(`${normalized} must name a package under ${this.packageScopes.join(' or ')}`)
+      }
       if (seen.has(name)) throw new Error(`${name} appears twice in release family ${this.id}`)
       seen.add(name)
       members.push({
@@ -351,6 +360,12 @@ class DshFamily extends ReleaseFamily {
     'apps/*/package.json',
   ] as const
   readonly tagPrefix = 'dsh-v'
+
+  /**
+   * The QingClaw distribution ships its own `@qinglion` packages in the same
+   * runtime closure, so they share the dsh version and release tag.
+   */
+  protected override readonly packageScopes = ['@deepseek-ai/', '@qinglion/']
 
   /** Require current artifacts from a complete official client build. */
   override verifyBuildArtifacts(root: string): void {

@@ -57,6 +57,33 @@ export interface AccountProfile {
   readonly contact: string | null
   /** Profile image URL supplied by Platform, absent when no picture is configured. */
   readonly avatarUrl?: string | null
+  /** Product role returned by QingClaw's control plane. */
+  readonly role?: 'user' | 'creator' | 'admin' | null
+  /** Server-authoritative QingClaw product capabilities. */
+  readonly capabilities?: {
+    readonly publishPlugins: boolean
+    readonly managePluginMarket: boolean
+    readonly manageUsers: boolean
+  }
+  /** QingClaw model entitlement plan, when the deployment supplies one. */
+  readonly plan?: string | null
+  /** ISO timestamp when the current subscription ends. */
+  readonly subscriptionEndsAt?: string | null
+  /** Remaining usable QingClaw credits across trial, plan grants, and top-ups. */
+  readonly quotaRemaining?: number | null
+  /**
+   * Credits granted since the last recharge; the quota ring denominator.
+   * A recharge adds its credits to the remaining balance and resets this total.
+   */
+  readonly quotaTotal?: number | null
+  /** Non-expiring purchased quota. */
+  readonly topupTokens?: number | null
+  /** Non-expiring trial quota. */
+  readonly trialTokens?: number | null
+  /** Whether the paid subscription is currently active. */
+  readonly subscriptionActive?: boolean | null
+  /** ISO timestamp when the current quota window resets. */
+  readonly quotaResetAt?: string | null
 }
 /** Platform recharge or bonus wallet balance; decimal strings retain server precision. */
 export interface AccountWallet {

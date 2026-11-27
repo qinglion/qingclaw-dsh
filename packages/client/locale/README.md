@@ -39,6 +39,10 @@ Native shells may provide `__DSH_LOCALE__` with an asynchronous `read()` and an 
 
 Call `ctx.locale.register(ns, { zh, en, ja })` with a namespace merged into `LocaleNamespaceMap`; the compiler checks every key against the namespace's typed key union and requires both baseline locales (`zh` and `en`). Additional locale ids are optional, and their dictionaries are checked against the same namespace keys. Consumers translate through `ctx.locale.bind(ns)` or the framework-injected `t` seat. A dictionary registered after the UI is already mounted is picked up without a remount. Preserve named placeholders, slash commands, and API field names verbatim in translations; `pnpm run check:i18n` checks first-party dictionaries and rejects zero-width spaces (U+200B) and byte-order marks (U+FEFF) in locale resources.
 
+### Overriding a distribution's copy
+
+Call `ctx.locale.override(ns, { zh, en })` to replace individual keys of a namespace another package owns, such as a product term a deployment renames. The overlay answers before the owner's dictionary for the same namespace, locale, and key, while every key it does not name keeps following the owner; the disposer restores the owner's keys and a redeploy replaces an earlier overlay. Use it for deployment wording, not for a package's own copy: the owner still declares the namespace and its complete dictionaries.
+
 ### Resolving package text
 
 Use `ctx.locale.resolveText(text)` for [`LocalizedText`](../../util/package-manifest/README.md), such as installed plugin titles and descriptions. Literal strings are returned unchanged. Translation maps use lowercase language ids, require an `en` fallback, and follow the active language's declared fallback chain. They do not consult or register namespace dictionaries.

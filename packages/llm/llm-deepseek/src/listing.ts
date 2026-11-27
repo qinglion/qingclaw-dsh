@@ -61,6 +61,8 @@ export interface ListingEntry {
   readonly id: string
   /** Display name, when the entry declares a non-empty one. */
   readonly name?: string
+  /** Whether the catalog owner marks this as the default model. */
+  readonly default?: boolean
   /** Requirement declared under `client_requirements[APP_IDENTITY.product]`. */
   readonly requirement: ClientRequirement
   /** Declared capabilities. */
@@ -70,6 +72,11 @@ export interface ListingEntry {
    * entry declares none, and never a reason to hide the entry.
    */
   readonly badge?: ListedBadge
+  /**
+   * Relative request cost declared as `rate`, with the catalog owner's baseline
+   * at one; absent when the entry declares none or an unreadable one.
+   */
+  readonly rate?: number
 }
 
 /** A decoded listing with at least one entry. */
@@ -92,6 +99,18 @@ function knownModalities(value: unknown): ModelModality[] | undefined {
   const listed: readonly unknown[] = value
   return LISTED_MODALITIES.filter(modality => listed.includes(modality))
     .toSorted((left, right) => listed.indexOf(left) - listed.indexOf(right))
+}
+
+/**
+ * Decode a declared relative request cost: a non-negative finite number, or
+ * `undefined` when the entry declares none. Unreadable values are dropped
+ * rather than failing the listing, which stays display metadata.
+ * @param value - raw `rate` member of a listing entry or catalog record.
+ * @returns the multiple, or `undefined` when absent or unreadable.
+ * @internal
+ */
+export function listedRate(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
 }
 
 /** A declared capacity: `undefined` when absent, `false` when not a positive safe integer. */
@@ -216,12 +235,14 @@ export function parseModelListing(body: unknown): ModelListing {
     if (entry === undefined || typeof id !== 'string' || id.length === 0 || seen.has(id)) continue
     seen.add(id)
     const badge = badgeOf(entry)
+    const rate = listedRate(entry.rate)
     entries.push({
       id,
       ...typeof entry.name === 'string' && entry.name.length > 0 ? { name: entry.name } : {},
       requirement: requirementOf(entry),
       capabilities: capabilitiesOf(entry),
       ...badge === undefined ? {} : { badge },
+      ...rate === undefined ? {} : { rate },
     })
   }
   if (entries.length === 0) throw new LlmError('DeepSeek model listing contains no model entry', 'INVALID_RESPONSE')

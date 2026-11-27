@@ -390,6 +390,33 @@ describe('Web session model selection', () => {
     await ctx.fiber.dispose()
   })
 
+  it('keeps a user-saved default through account login initialization', async () => {
+    const { configurationFixture } = await import('../../../settings/settings/tests/configuration-fixture.ts')
+    const configured = await configurationFixture({ hmr: false })
+    const { ctx } = await harness(undefined, configured.ctx)
+    ctx.provide('credentials', { describe: vi.fn(async () => ({ configured: false, writable: true })) } as never)
+    await ctx.agentDefaultModel.saveSelection({ provider: 'deepseek-account', model: 'remembered' }, { userSelected: true })
+    const controller = await createSessionTestController(ctx, {
+      defaultModelSelection: () => ctx.agentDefaultModel.currentSelection(), cwd: '/tmp',
+    })
+    await controller.initializeDefaultModel()
+    expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'deepseek-account', model: 'remembered' })
+    await ctx.fiber.dispose()
+  })
+
+  it('saves an explicit Web selection as the remembered default', async () => {
+    const { configurationFixture } = await import('../../../settings/settings/tests/configuration-fixture.ts')
+    const configured = await configurationFixture({ hmr: false })
+    const { ctx, sessionId } = await harness(undefined, configured.ctx)
+    const remote = await createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ctx.agentDefaultModel.currentSelection(), cwd: '/tmp',
+    })
+    expectValue(await remote.selectModel(request({ sessionId, provider: 'deepseek-official', model: 'deepseek-chat' })))
+    await vi.waitFor(() => { expect(ctx.agentDefaultModel.isUserSelected()).toBe(true) })
+    expect(ctx.agentDefaultModel.currentSelection()).toMatchObject({ provider: 'deepseek-official', model: 'deepseek-chat' })
+    await ctx.fiber.dispose()
+  })
+
   it('groups successful providers and leaves an unlisted current selection out of the catalog', async () => {
     const { ctx, sessionId } = await harness({
       provider: 'deepseek-official',
@@ -434,6 +461,7 @@ describe('Web session model selection', () => {
     ctx.llm.registerAdapter(['plain'], new CatalogAdapter('Plain', [
       { provider: 'plain', id: 'plain-model', name: 'Plain Model' },
       { provider: 'plain', id: 'badged-model', name: 'Badged Model', badge: { text: { en: 'New', zh: '新' }, tone: 'info' } },
+      { provider: 'plain', id: 'rated-model', name: 'Rated Model', rate: 4.0909 },
     ]))
     ctx.llm.registerAdapter(['described-reasoning'], new CatalogAdapter('Described Reasoning', [
       { provider: 'described-reasoning', id: 'reasoning-model', name: 'Reasoning Model' },
@@ -456,6 +484,7 @@ describe('Web session model selection', () => {
       { id: 'plain', name: 'Plain', models: [
         { id: 'plain-model', name: 'Plain Model' },
         { id: 'badged-model', name: 'Badged Model', badge: { text: { en: 'New', zh: '新' }, tone: 'info' } },
+        { id: 'rated-model', name: 'Rated Model', rate: 4.0909 },
       ] },
       {
         id: 'described-reasoning',

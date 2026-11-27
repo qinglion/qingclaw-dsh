@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from 'vitest'
 import { parseInstallSpec } from '../src/install-spec.ts'
-import { attributeFailure, normalizeRegistry, OFFICIAL_NPM_REGISTRY, registryPlan, REGISTRY_URL } from '../src/registry.ts'
+import {
+  attributeFailure, normalizeRegistry, OFFICIAL_NPM_REGISTRY, registryAuthEnvironment, registryPlan, REGISTRY_URL,
+} from '../src/registry.ts'
 
 const MIRROR = 'https://registry.npmmirror.com/'
 const CORP = 'https://npm.corp.example/'
@@ -20,6 +22,20 @@ describe('normalizeRegistry', () => {
       expect(REGISTRY_URL.test(url), url).toBe(false)
     }
     expect(REGISTRY_URL.test(MIRROR)).toBe(true)
+  })
+})
+
+describe('registryAuthEnvironment', () => {
+  it('scopes a token to the registry host pnpm reads it from, and adds nothing without one', () => {
+    expect(registryAuthEnvironment('https://npm.qingclaw.com/', 'bearer')).toEqual({
+      'npm_config_//npm.qingclaw.com/:_authToken': 'bearer',
+    })
+    expect(registryAuthEnvironment('http://npm.corp.example:4873/', 'bearer')).toEqual({
+      'npm_config_//npm.corp.example:4873/:_authToken': 'bearer',
+    })
+    expect(registryAuthEnvironment('https://npm.qingclaw.com/', undefined)).toEqual({})
+    // pnpm's own registry has no host to scope the token to, so the token is never sent anywhere.
+    expect(registryAuthEnvironment(null, 'bearer')).toEqual({})
   })
 })
 

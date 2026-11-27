@@ -45,6 +45,13 @@ describe('whole-session totals', () => {
     expect(totals.wall).toBe(600_000)
   })
 
+  it('omits partial cache figures while preserving the total input and output', () => {
+    const totals = totalsFromProjections(STATS, { ...USAGE, unreportedCacheReadAttempts: 1 })!
+    expect(totals).toMatchObject({
+      context: 10_000_000, output: 500_000, cacheRead: null, cacheContext: null, cacheHit: null,
+    })
+  })
+
   it('leaves step-derived cells blank for a session without closed steps', () => {
     const empty = totalsFromProjections({ ...STATS, turns: 0, steps: 0, ttftSteps: 0 }, {
       ...USAGE, uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0,

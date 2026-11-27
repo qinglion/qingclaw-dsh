@@ -11,7 +11,11 @@ import type { WelcomeSaveResult, WelcomeNotice } from '../src/welcome-api.ts'
 const html = readFileSync(join(import.meta.dirname, '../renderer/welcome.html'), 'utf8')
 afterEach(cleanup)
 
-function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotice | undefined>>().mockResolvedValue(undefined)) {
+function mount(
+  language = 'zh-CN',
+  takeNotice = vi.fn<() => Promise<WelcomeNotice | undefined>>().mockResolvedValue(undefined),
+  allowApiKeyLogin = true,
+) {
   cleanup()
   const stopAccount = vi.fn()
   const api = {
@@ -26,7 +30,7 @@ function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotic
     saveApiKey: vi.fn<(value: string) => Promise<WelcomeSaveResult>>().mockResolvedValue({ ok: true }),
     skip: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   }
-  const mounted = render(<Welcome api={api} />)
+  const mounted = render(<Welcome api={api} allowApiKeyLogin={allowApiKeyLogin} />)
   const input = document.querySelector('input')!
   const button = (id: string) => document.querySelector<HTMLButtonElement>(id)!
   const enterKey = (value: string) => {
@@ -48,6 +52,13 @@ function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotic
 }
 
 describe('desktop welcome presentation', () => {
+  it('hides API-key login when the distribution disables it', () => {
+    const view = mount('zh-CN', undefined, false)
+
+    expect(view.button('#api-key').hidden).toBe(true)
+    expect(view.document.querySelector('#sign-in')).not.toBeNull()
+  })
+
   it.each(['zh-CN', 'en'])('renders the %s entry and API-key step', async (language) => {
     const view = mount(language)
     expect(view.document.documentElement.lang).toBe(language)

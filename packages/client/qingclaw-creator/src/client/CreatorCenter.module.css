@@ -1,0 +1,47 @@
+.page { height: 100%; min-width: 0; overflow: auto; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
+.content { max-width: 960px; margin: 0 auto; padding: 32px clamp(20px, 4vw, 52px) 56px; }
+:global([data-platform='darwin']) .content { padding-top: calc(32px + var(--dsh-frame-top-clearance, 0px)); }
+.header, .actions, .tabs, .row, .sectionHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.header, .row, .sectionHead { justify-content: space-between; }
+.header { margin-bottom: 24px; }
+.page h1, .page h2, .page p { margin: 0; }
+.page h1 { font-size: 26px; font-weight: 500; }
+.page h2 { font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.tabs { padding-bottom: 12px; margin-bottom: 22px; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.list { list-style: none; padding: 0; margin: 0; }
+.row { padding-block: 14px; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.muted, .date { color: var(--dsw-alias-label-secondary); font-size: 13px; overflow-wrap: anywhere; }
+.body { display: grid; gap: 16px; }
+.package { background: none; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; padding: 4px 0; overflow-wrap: anywhere; }
+@media (hover: hover) and (pointer: fine) {
+  .package:hover { text-decoration: underline; }
+}
+.body code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-2);
+  /* Scrollbars inside a notice sit on the elevated surface, so they follow it. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.noticeError {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 9%, var(--dsw-alias-bg-base));
+}
+.noticeSuccess {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, var(--dsw-alias-bg-base));
+}
+.noticeIcon { flex: none; margin-top: 1px; color: var(--dsw-alias-state-error-primary); }
+.noticeSuccess .noticeIcon { color: var(--dsw-alias-state-success-primary); }
+.noticeBody { display: grid; gap: 2px; min-width: 0; }
+.noticeTitle { font-weight: 500; color: var(--dsw-alias-label-primary); }
+.noticeText { color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }

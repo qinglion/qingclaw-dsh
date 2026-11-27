@@ -96,8 +96,11 @@ export interface ModelSelectInjected {
   available: boolean
   /** The session's shared directory store (same instance the /model popup reads). */
   directory: SnapshotStore<ModelDirectoryState>
-  /** Ensure the shared advisory catalog is loaded (errors land on the store). */
-  load: () => void
+  /**
+   * Ensure the shared advisory catalog is loaded (errors land on the store).
+   * @param refresh - re-read the Host catalog, used by each menu open so a catalog that changed on the Host reaches the open menu.
+   */
+  load: (refresh?: boolean) => void
   /**
    * Choose a catalog badge's provider-authored text for the active locale.
    * @param text - the badge's literal text or translations.

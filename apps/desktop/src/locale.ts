@@ -1,4 +1,5 @@
 /** Typed shell copy for every shipped language owned by the Electron shell. */
+import { brandDictionaries } from './locale-brand.ts'
 
 export const en = {
   cliCommandMenu: 'Manage dsh Command…',
@@ -1553,7 +1554,7 @@ export const pt = {
   mandatoryNotification: 'Retorne ao aplicativo para confirmar a instalação e reinicie.',
 } satisfies DesktopMessages
 
-const dictionaries = { en, zh, ja, es, fr, de, ru, pt }
+const dictionaries = brandDictionaries({ en, zh, ja, es, fr, de, ru, pt })
 
 /** Locale payload exposed to the Desktop-owned renderer. */
 export interface DesktopLocale {
@@ -1568,7 +1569,8 @@ export function resolveDesktopLocale(locale: string): DesktopLocale {
     const id = primary as keyof typeof dictionaries
     return { id: id === 'zh' ? 'zh-CN' : id, messages: dictionaries[id] }
   }
-  return { id: 'en', messages: en }
+  // Unsupported languages fall back to the shipped English copy, not the upstream text.
+  return { id: 'en', messages: dictionaries.en }
 }
 
 /**

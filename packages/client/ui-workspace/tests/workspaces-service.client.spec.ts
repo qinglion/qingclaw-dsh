@@ -325,6 +325,228 @@ function lastOpening(open: MockInstance<UiWorkspaceService['openWorkspace']>): P
 }
 
 describe('UiWorkspaceService', () => {
+  describe('Workspace selection from a blank Hero', () => {
+    function pickerBench(follow = true, prepareWorkspaceSelection?: Parameters<UiWorkspaceService['registerSessionMode']>[0]['prepareWorkspaceSelection']) {
+      const source = summary('drawing-source', { blank: true, cwd: '/w/a', projectionValues: { agentPreset: 'ptc' } })
+      const b = bench({
+        workspaces: workspaceState([workspace('a', [source.id]), workspace('b')]),
+        sessions: sessionState([source], 'pending'),
+      })
+      const disposeMode = b.uiWorkspace.registerSessionMode({
+        matches: id => id === source.id,
+        createId: () => sid('drawing-target'),
+        followWorkspaceSelection: follow,
+        ...prepareWorkspaceSelection === undefined ? {} : { prepareWorkspaceSelection },
+      })
+      b.uiWorkspace.openSession(source.id)
+      return { ...b, source, disposeMode }
+    }
+
+    it('carries an opted-in conversation type and selected preset to the chosen Workspace', async () => {
+      const b = pickerBench()
+      const adopt = vi.fn()
+      await b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('b'), sessionId: sid('drawing-target'), agentPreset: 'ptc' })
+      expect(adopt).toHaveBeenCalledExactlyOnceWith(sid('drawing-target'))
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('drawing-target'), { source: 'mainView', facets: { conversation: true } })
+    })
+
+    it('reuses the typed blank when its selected Workspace is unchanged', async () => {
+      const b = pickerBench()
+      await b.uiWorkspace.openWorkspace(wid('a'), undefined, { sourceSessionId: b.source.id })
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('a'), sessionId: b.source.id, agentPreset: 'ptc' })
+    })
+
+    it('retains both bindings through asynchronous preparation and native draft adoption', async () => {
+      const entered = Promise.withResolvers<undefined>()
+      const prepared = Promise.withResolvers<undefined>()
+      const prepare = vi.fn(async () => { entered.resolve(undefined); await prepared.promise })
+      const b = pickerBench(true, prepare)
+      const adopt = vi.fn(() => {
+        expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
+        expect(b.sessions.retained[1]!.release).not.toHaveBeenCalled()
+        expect(b.sessions.retained[2]!.release).not.toHaveBeenCalled()
+      })
+      const opening = b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })
+      try {
+        await entered.promise
+        expect(prepare).toHaveBeenCalledExactlyOnceWith(b.source.id, sid('drawing-target'), expect.any(AbortSignal))
+        expect(adopt).not.toHaveBeenCalled()
+        expect(b.sessions.retain).toHaveBeenCalledWith(sid('drawing-target'), { source: 'workspaceOperation', facets: { conversation: true } })
+        prepared.resolve(undefined)
+        await opening
+        expect(adopt).toHaveBeenCalledExactlyOnceWith(sid('drawing-target'))
+        expect(b.sessions.retained[1]!.release).toHaveBeenCalledOnce()
+        expect(b.sessions.retained[2]!.release).toHaveBeenCalledOnce()
+        expect(b.sessions.retained.at(-1)!.release).not.toHaveBeenCalled()
+        expect(b.workspaces.archiveCalls).toEqual([])
+      } finally { prepared.resolve(undefined); await opening }
+    })
+
+    it('does not prepare a copy when the selected Workspace is unchanged or New Session starts another drawing', async () => {
+      const prepare = vi.fn(async () => {})
+      const b = pickerBench(true, prepare)
+      await b.uiWorkspace.openWorkspace(wid('a'), undefined, { sourceSessionId: b.source.id })
+      b.uiWorkspace.startSession()
+      await vi.waitFor(() => { expect(b.sessions.create).toHaveBeenCalledWith({ workspaceId: wid('a'), sessionId: sid('drawing-target') }) })
+      expect(prepare).not.toHaveBeenCalled()
+    })
+
+    it('reports failed preparation and leaves the source and its draft selected', async () => {
+      const b = pickerBench(true, async () => { throw new Error('copy failed') })
+      const adopt = vi.fn()
+      await expect(b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })).rejects.toThrow('copy failed')
+      expect(adopt).not.toHaveBeenCalled()
+      expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
+      expect(b.sessions.retained[1]!.release).toHaveBeenCalledOnce()
+      expect(b.sessions.retained[2]!.release).toHaveBeenCalledOnce()
+      expect(b.notify).toHaveBeenCalledExactlyOnceWith({ kind: 'createFailed', message: 'copy failed' })
+      expect(b.workspaces.archiveCalls).toEqual([sid('drawing-target')])
+    })
+
+    it.each(['started', 'another-session', 'panel', 'mode-disposal', 'owner-disposal'] as const)(
+      'cancels preparation after %s and keeps bindings alive until the handler settles', async (reason) => {
+        const entered = Promise.withResolvers<AbortSignal>()
+        const prepared = Promise.withResolvers<undefined>()
+        const b = pickerBench(true, async (_source, _target, signal) => { entered.resolve(signal); await prepared.promise })
+        const adopt = vi.fn()
+        const opening = b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })
+        let disposal: Promise<void> | undefined
+        let disposed = false
+        try {
+          const signal = await entered.promise
+          if (reason === 'started') b.sessions.list.update(state => ({ ...state, byId: { ...state.byId, [b.source.id]: { ...b.source, blank: false } } }))
+          else if (reason === 'another-session') b.uiWorkspace.openSession(sid('other'))
+          else if (reason === 'panel') b.layout.selectPanel('other' as MainPanelId)
+          else if (reason === 'mode-disposal') disposal = b.disposeMode()
+          else disposal = b.ctx.fiber.dispose()
+          void disposal?.then(() => { disposed = true })
+          await vi.waitFor(() => { expect(signal.aborted).toBe(true) })
+          expect(disposed).toBe(false)
+          expect(adopt).not.toHaveBeenCalled()
+          expect(b.sessions.retained[1]!.release).not.toHaveBeenCalled()
+          expect(b.sessions.retained[2]!.release).not.toHaveBeenCalled()
+          prepared.resolve(undefined)
+          await opening
+          await disposal
+          expect(adopt).not.toHaveBeenCalled()
+          expect(b.sessions.retained[1]!.release).toHaveBeenCalledOnce()
+          expect(b.sessions.retained[2]!.release).toHaveBeenCalledOnce()
+          expect(b.notify).not.toHaveBeenCalled()
+          expect(b.workspaces.archiveCalls).toEqual([sid('drawing-target')])
+        } finally { prepared.resolve(undefined); await opening; await disposal }
+      },
+    )
+
+    it('awaits recoverable target archival before releasing cancelled preparation bindings', async () => {
+      const entered = Promise.withResolvers<undefined>()
+      const prepared = Promise.withResolvers<undefined>()
+      const archiving = Promise.withResolvers<undefined>()
+      const archived = Promise.withResolvers<undefined>()
+      const b = pickerBench(true, async () => { entered.resolve(undefined); await prepared.promise })
+      const onArchive = b.workspaces.onArchive
+      b.workspaces.onArchive = async (id) => { archiving.resolve(undefined); await archived.promise; await onArchive(id) }
+      const adopt = vi.fn()
+      const opening = b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })
+      let disposal: Promise<void> | undefined
+      let disposed = false
+      try {
+        await entered.promise
+        disposal = b.disposeMode().then(() => { disposed = true })
+        prepared.resolve(undefined)
+        await archiving.promise
+        expect(disposed).toBe(false)
+        expect(b.sessions.retained[1]!.release).not.toHaveBeenCalled()
+        expect(b.sessions.retained[2]!.release).not.toHaveBeenCalled()
+        expect(adopt).not.toHaveBeenCalled()
+        archived.resolve(undefined)
+        await opening
+        await disposal
+        expect(b.workspaces.list.getSnapshot().archivedSessionIds).toContain(sid('drawing-target'))
+        expect(b.sessions.retained[1]!.release).toHaveBeenCalledOnce()
+        expect(b.sessions.retained[2]!.release).toHaveBeenCalledOnce()
+      } finally { prepared.resolve(undefined); archived.resolve(undefined); await opening; await disposal }
+    })
+
+    it('archives the prepared target when native draft adoption fails', async () => {
+      const b = pickerBench(true, async () => {})
+      await expect(b.uiWorkspace.openWorkspace(wid('b'), () => { throw new Error('draft adoption failed') },
+        { sourceSessionId: b.source.id })).rejects.toThrow('draft adoption failed')
+      expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
+      expect(b.workspaces.archiveCalls).toEqual([sid('drawing-target')])
+      expect(b.sessions.retained.slice(1).every(row => row.release.mock.calls.length === 1)).toBe(true)
+    })
+
+    it('archives a prepared target when native draft adoption synchronously navigates elsewhere', async () => {
+      const b = pickerBench(true, async () => {})
+      const adopt = vi.fn(() => { b.uiWorkspace.openSession(sid('chosen-elsewhere')) })
+      await b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })
+      expect(adopt).toHaveBeenCalledExactlyOnceWith(sid('drawing-target'))
+      expect(b.workspaces.archiveCalls).toEqual([sid('drawing-target')])
+      expect(b.sessions.retained.filter(row => row.reference.sessionId === sid('drawing-target'))
+        .every(row => row.release.mock.calls.length === 1)).toBe(true)
+      expect(b.sessions.retained.at(-1)!.reference.sessionId).toBe(sid('chosen-elsewhere'))
+      expect(b.sessions.retained.at(-1)!.release).not.toHaveBeenCalled()
+      expect(b.notify).not.toHaveBeenCalled()
+    })
+
+    it('reports refused target archival without discarding the source', async () => {
+      const b = pickerBench(true, async () => { throw new Error('copy failed') })
+      b.workspaces.onArchive = async () => { throw new Error('target archival failed') }
+      await expect(b.uiWorkspace.openWorkspace(wid('b'), undefined, { sourceSessionId: b.source.id })).rejects.toThrow('target archival failed')
+      expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
+      expect(b.notify).toHaveBeenCalledExactlyOnceWith({ kind: 'createFailed', message: 'target archival failed' })
+    })
+
+    it('honors an explicit preset instead of the source preset', async () => {
+      const b = pickerBench()
+      await b.uiWorkspace.openWorkspace(wid('b'), undefined, { sourceSessionId: b.source.id, agentPreset: 'standard' })
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('b'), sessionId: sid('drawing-target'), agentPreset: 'standard' })
+    })
+
+    it('keeps Workspace-owned modes on ordinary blank creation when they do not opt in', async () => {
+      const b = pickerBench(false)
+      await b.uiWorkspace.openWorkspace(wid('b'), undefined, { sourceSessionId: b.source.id })
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('b'), agentPreset: 'ptc' })
+    })
+
+    it('keeps sidebar navigation independent of the visible conversation type and preset', async () => {
+      const b = pickerBench()
+      await b.uiWorkspace.openWorkspace(wid('b'))
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('b') })
+    })
+
+    it.each(['started', 'another-session', 'panel'] as const)('ignores a pick whose source is already %s', async (reason) => {
+      const b = pickerBench()
+      if (reason === 'started') b.sessions.list.update(state => ({ ...state, byId: { ...state.byId, [b.source.id]: { ...b.source, blank: false } } }))
+      else if (reason === 'another-session') b.uiWorkspace.openSession(sid('other'))
+      else vi.spyOn(b.layout.panelInfo, 'getSnapshot').mockReturnValue({ activePanelId: 'other' as MainPanelId })
+      const adopt = vi.fn()
+      await b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })
+      expect(b.sessions.create).not.toHaveBeenCalled()
+      expect(adopt).not.toHaveBeenCalled()
+    })
+
+    it.each(['started', 'another-session', 'panel', 'mode-disposal', 'owner-disposal'] as const)(
+      'keeps the pending target hidden after %s supersedes its source', async (reason) => {
+        const b = pickerBench()
+        const created = Promise.withResolvers<SessionId>()
+        b.sessions.create.mockReturnValueOnce(created.promise)
+        const adopt = vi.fn()
+        const opening = b.uiWorkspace.openWorkspace(wid('b'), adopt, { sourceSessionId: b.source.id })
+        if (reason === 'started') b.sessions.list.update(state => ({ ...state, byId: { ...state.byId, [b.source.id]: { ...b.source, blank: false } } }))
+        else if (reason === 'another-session') b.uiWorkspace.openSession(sid('other'))
+        else if (reason === 'panel') b.layout.selectPanel('other' as MainPanelId)
+        else if (reason === 'mode-disposal') await b.disposeMode()
+        else await b.ctx.fiber.dispose()
+        created.resolve(sid('drawing-target'))
+        await opening
+        expect(adopt).not.toHaveBeenCalled()
+        expect(b.sessions.retained.some(item => item.reference.sessionId === sid('drawing-target'))).toBe(false)
+      },
+    )
+  })
+
   it('prepares and selects the default Workspace after both startup baselines', async () => {
     const b = bench({ configureWorkspaces: (workspaces) => {
       workspaces.initializeDefault.mockImplementation(async () => {
@@ -902,6 +1124,64 @@ describe('UiWorkspaceService', () => {
     b.uiWorkspace.startSession()
 
     expect(b.selectPanel).toHaveBeenCalledWith(null)
+  })
+
+  it('opens a matching mode from an explicit Workspace on a panel or another Workspace', async () => {
+    const source = workspace('source', [sid('source-review')])
+    const target = workspace('target')
+    const b = bench({ workspaces: workspaceState([source, target]) })
+    const matchesWorkspace = vi.fn(async (item: WorkspaceView) => item === target)
+    b.uiWorkspace.registerSessionMode({
+      matches: id => id === sid('source-review'),
+      createId: () => sid('target-review'),
+      matchesWorkspace,
+    })
+    b.uiWorkspace.openSession(sid('source-review'))
+    b.layout.selectPanel('review-panel' as MainPanelId)
+
+    b.uiWorkspace.startSession(wid('target'))
+
+    await vi.waitFor(() => {
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('target'), sessionId: sid('target-review') })
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('target-review'), { source: 'mainView', facets: { conversation: true } })
+    })
+    expect(matchesWorkspace).toHaveBeenCalledExactlyOnceWith(target, expect.any(AbortSignal))
+  })
+
+  it('keeps an explicit Workspace without a matching mode on the ordinary creation path', async () => {
+    const target = workspace('target')
+    const b = bench({ workspaces: workspaceState([target]) })
+    b.uiWorkspace.registerSessionMode({
+      matches: () => false,
+      createId: () => sid('review'),
+      matchesWorkspace: async () => false,
+    })
+
+    b.uiWorkspace.startSession(wid('target'))
+
+    await vi.waitFor(() => {
+      expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: wid('target') })
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('created-target'), { source: 'mainView', facets: { conversation: true } })
+    })
+  })
+
+  it('skips creation when navigation supersedes a pending Workspace mode check', async () => {
+    const match = Promise.withResolvers<boolean>()
+    const b = bench({ workspaces: workspaceState([workspace('a')]) })
+    const createId = vi.fn(() => sid('review'))
+    b.uiWorkspace.registerSessionMode({
+      matches: () => false,
+      createId,
+      matchesWorkspace: () => match.promise,
+    })
+    b.uiWorkspace.startSession(wid('a'))
+    b.layout.selectPanel('other-panel' as MainPanelId)
+    match.resolve(true)
+    await match.promise
+    await Promise.resolve()
+
+    expect(createId).not.toHaveBeenCalled()
+    expect(b.sessions.create).not.toHaveBeenCalled()
   })
 
   describe('startSession draft initialization', () => {

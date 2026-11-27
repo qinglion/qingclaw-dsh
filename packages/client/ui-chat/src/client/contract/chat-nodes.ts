@@ -82,6 +82,8 @@ export interface TurnTokenUsage {
   readonly totalTokens: number
   /** Present only when every attempt reported the bucket. */
   readonly cacheReadTokens?: number
+  /** Known cache hits when only some requests supplied a breakdown. */
+  readonly partialCacheReadTokens?: number
   /** Present only when every attempt reported the bucket. */
   readonly cacheWriteTokens?: number
   /** Output subset, present only when every attempt reported it. */

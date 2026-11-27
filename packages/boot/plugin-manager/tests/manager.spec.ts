@@ -1251,6 +1251,30 @@ it('streams pnpm output, reports the installation phases, and names the installe
   expect(changes).toEqual([{ reason: 'install' }, { reason: 'remove' }])
 })
 
+it('authorizes a private registry install through the environment, never the command line or the install log', async () => {
+  const { ctx, manager, dir, bundle } = await fixture()
+  const chunks: PluginInstallLogChunk[] = []
+  ctx.on('plugin-manager/install-log', (chunk) => { chunks.push(chunk) })
+  const install = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async (_context, args) => {
+    const name = String(args[1])
+    bundle(name, [{ id: name, name: './plugin.mjs', config: { service: name } }])
+    const manifest = readProfileManifest('test', dir)
+    manifest.dependencies = { ...manifest.dependencies, [name]: '1.0.0' }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    return { exitCode: 0, output: 'installed', truncated: false, logPath: join(dir, 'pnpm.log') }
+  })
+  onTestFinished(() => { install.mockRestore() })
+  const archive = 'https://npm.qingclaw.com/@qinglion/desk/-/desk-1.0.0.tgz'
+  expect(await manager.installBundle(archive, { registry: 'https://npm.qingclaw.com/', authToken: 'registry-bearer' }))
+    .toMatchObject({ application: 'applied', changed: true })
+  const [, args, options] = install.mock.calls[0] ?? []
+  expect(args).toEqual(['add', archive, '--registry=https://npm.qingclaw.com/'])
+  expect(options?.env).toMatchObject({ 'npm_config_//npm.qingclaw.com/:_authToken': 'registry-bearer' })
+  // The token never reaches a command line or an install-log chunk.
+  expect(args?.join(' ')).not.toContain('registry-bearer')
+  expect(JSON.stringify(chunks)).not.toContain('registry-bearer')
+})
+
 it('stops a run on request, restores the files, and answers not-running or too-late otherwise', async () => {
   const { ctx, manager, dir, bundle } = await fixture()
   const phases: PluginInstallProgress[] = []

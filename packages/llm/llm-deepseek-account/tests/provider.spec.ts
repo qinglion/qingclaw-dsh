@@ -147,7 +147,7 @@ it('falls back to the bundled catalog when the listing fails', async () => {
   await ctx.plugin(DeepSeekAuth)
   await ctx.plugin(Account, { baseURL: server.baseURL })
   expect((await ctx.llm.listModels('deepseek-account')).map(row => row.id)).toEqual(['deepseek-flash', 'deepseek-v4-pro'])
-  expect(warn).toHaveBeenCalledExactlyOnceWith('[llm-deepseek-account]', expect.stringContaining('using the bundled catalog') as string)
+  expect(warn).toHaveBeenCalledExactlyOnceWith('[llm-deepseek-account]', expect.stringContaining('no listing is available yet') as string)
   await expect(ctx.llm.resolveModelInfo('deepseek-account', 'deepseek-flash')).resolves.toMatchObject({ context: { contextWindow: 1_048_576 } })
 })
 

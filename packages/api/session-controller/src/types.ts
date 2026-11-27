@@ -107,6 +107,11 @@ export interface ModelCatalogModel {
   readonly reasoning?: ModelReasoning
   /** Provider-authored label shown beside the name; display data only. */
   readonly badge?: LlmModelBadge
+  /**
+   * Relative request cost the catalog advertises, with its baseline at one;
+   * display data only, and absent when the catalog prices no multiple.
+   */
+  readonly rate?: number
 }
 
 /** One provider and its successfully loaded model catalog. */

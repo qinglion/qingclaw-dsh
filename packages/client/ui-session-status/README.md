@@ -48,6 +48,8 @@ Each `SessionStatus` has four fields:
 
 The Host face serves the `sessionStatus` Remote namespace with `mark` and `follow`; its failures use `session-status/not-found` and `session-status/unavailable`. The Client keeps its copy of the reading records private: no Client service other than `ctx.uiSession.sessionStatus` exposes them.
 
+The Desktop icon badge counts listed Sessions with unread reminders once the Workspace archive snapshot is ready. Archiving a Session removes it from the count. Restoring it counts it again if its reminder is still unread.
+
 -----
 
 <a id="understand-the-implementation"></a>

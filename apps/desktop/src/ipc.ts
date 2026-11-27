@@ -1,4 +1,5 @@
 import type { DesktopFileActions } from '@deepseek-ai/dsh-client-ui-file-actions/types'
+import type { DesktopAttentionBridge } from '@deepseek-ai/dsh-client-ui-session-status/types'
 /** Typed preload operations exposed only by the Electron shell. */
 
 export type { DesktopChannelState, DesktopChannelChangeResult } from '@deepseek-ai/dsh-client-ui-settings-general/types'
@@ -27,17 +28,20 @@ export const DESKTOP_IPC = {
   browserRelease: 'dsh-desktop:browser-release',
   browserOpenRequested: 'dsh-desktop:browser-open-requested',
   directoryPick: 'dsh-desktop:directory-pick',
+  capturePageRegion: 'dsh-desktop:capture-page-region',
   fileDragPrepare: 'dsh-desktop:file-drag-prepare',
   fileDragCancel: 'dsh-desktop:file-drag-cancel',
   fileDragStart: 'dsh-desktop:file-drag-start',
   fileDragRelease: 'dsh-desktop:file-drag-release',
   deviceInfo: 'dsh-desktop:device-info',
+  attentionBadge: 'dsh-desktop:attention-badge',
   localeBootstrap: 'dsh-desktop:locale-bootstrap',
   localeChanged: 'dsh-desktop:locale-changed',
   updatesChannelGet: 'dsh-desktop:updates-channel-get',
   updatesChannelSet: 'dsh-desktop:updates-channel-set',
   updatesChannelChanged: 'dsh-desktop:updates-channel-changed',
   updatesStatus: 'dsh-desktop:updates-status',
+  mobilePairingOpen: 'qingclaw-desktop:mobile-pairing-open',
   updatesOpen: 'dsh-desktop:updates-open',
   updatesPresentation: 'dsh-desktop:updates-presentation',
   nativeThemeSet: 'dsh-desktop:native-theme-set',
@@ -89,14 +93,29 @@ export interface DesktopUpdatePresentation {
   readonly configurationError?: DesktopChannelState['error']
 }
 
+/** A rectangle in viewport CSS pixels, before page zoom is applied. */
+export interface DesktopCaptureRegion {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
+/** Capture the application's composited pixels as PNG. */
+export type CapturePageRegion = (region: DesktopCaptureRegion) => Promise<Uint8Array<ArrayBuffer>>
+
 /** Product documents cannot supply update versions, package URLs, or installation authorization. */
 export interface DshDesktopProductApi {
+  readonly mobilePairing: { open(): Promise<void> }
+  readonly capturePageRegion: CapturePageRegion
   readonly fileActions: DesktopFileActions
   readonly protocolVersion: 1
   readonly browser: DesktopBrowserBridge
   readonly fileDrag: DesktopFileDrag
   readonly keyboard: DesktopKeyboardApi
   readonly shortcuts: DesktopShortcutsApi
+  /** Application icon badge for unread turn completions. */
+  readonly attention: DesktopAttentionBridge
   /**
    * Local machine description for the feedback questionnaire.
    * @returns `name=value` fields separated by `; `, with no hostname, user name, or serial number.

@@ -50,5 +50,11 @@ worktrees/
 .typert-*/
 native/system/test/bin/
 
+# Scratch design work and generated preview media stay local; committed
+# brand assets remain tracked and new ones need an explicit force add.
+design/
+output/
+tmp-motion/
+
 # Generated company-signed CUA release record.
 /packages/experimental/cua-macos/cua-helper.json

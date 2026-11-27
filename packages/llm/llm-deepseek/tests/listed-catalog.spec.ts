@@ -57,6 +57,13 @@ describe('with a listing', () => {
     expect(catalog.offered[0]?.description).toContain('agentic coding')
   })
 
+  it('carries a listed cost multiple onto the offered model only', () => {
+    const catalog = resolve([{ ...FLASH, rate: 2 }, PRO])
+    expect(catalog.offered[0]?.rate).toBe(2)
+    expect(catalog.offered[1]).not.toHaveProperty('rate')
+    expect(catalog.badges.size).toBe(0)
+  })
+
   it('keeps this build\'s values for fields a listing omits', () => {
     const [pro] = resolve([{ id: 'deepseek-v4-pro', api_capabilities: { anthropic_messages: {} } }]).offered
     expect(pro).toMatchObject({ name: 'DeepSeek-V4-Pro', contextWindow: 1_048_576, inputModalities: ['text'] })

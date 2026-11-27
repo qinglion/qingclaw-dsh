@@ -1,20 +1,16 @@
 /**
- * Render the install icons of the Web application from the official
- * application tile.
+ * Render the QingClaw Web application install icons from its favicon artwork.
  *
- * This script rasterizes the official application tile
- * (`apps/desktop/resources/icon.svg`) into the committed PNGs under `public/`.
- * The bare favicon has no background, and its edge-to-edge fins can be cropped
- * by a launcher mask. The tile's drop shadow belongs to a desktop window, so
- * every install variant crops it. The generic 192px and 512px icons have
- * transparent rounded corners matching the macOS tile. Safari prefers the
- * linked Apple touch icon, which stays square for system masking. The maskable
- * variant scales the whale inside the platform's safe zone while retaining
- * the tile's own gradient to the edges, so no platform mask meets a seam.
+ * A browser installs a Web App only with a raster 192px and a 512px icon, masks
+ * the icon it puts on the home screen, and has no manifest support for iOS,
+ * which reads `apple-touch-icon` instead. This script rasterizes the committed
+ * QingClaw favicon into the PNGs under `public/`. The maskable variant scales
+ * only the two-tone artwork into the platform safe zone while the white tile
+ * continues to fill the complete icon.
  *
  * The committed PNGs are the output; rerun
  * `pnpm --filter @deepseek-ai/dsh-web-frontend run render:app-icons` after the
- * tile artwork changes.
+ * favicon artwork changes.
  * @module render-app-icons
  */
 
@@ -23,23 +19,17 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 
-/** Vector source owned by the desktop application; 1104 units square with the tile inset. */
-export const TILE_SOURCE = fileURLToPath(new URL('../../desktop/resources/icon.svg', import.meta.url))
+/** Vector source shared by the browser favicon and installed Web application. */
+export const TILE_SOURCE = fileURLToPath(new URL('../public/favicon.svg', import.meta.url))
 
 /** Directory the generated PNGs are committed to. */
 export const ICON_OUTPUT_DIRECTORY = fileURLToPath(new URL('../public/', import.meta.url))
 
-/** Tile edge in source units; every render density is expressed against it. */
-const TILE_EDGE = 1024
-
-/** Corner radius in source units, matching `apps/desktop/resources/icon-macos.svg`. */
-const TILE_CORNER_RADIUS = 230
-
-/** Tile inset in the source canvas: the drop shadow occupies the surrounding band. */
-const TILE_INSET = { x: 40, y: 32 } as const
+/** Tile edge in favicon source units; every render density is expressed against it. */
+const TILE_EDGE = 100
 
 /** Tile centre in source units, the fixed point of the maskable scale. */
-const TILE_CENTER = { x: TILE_INSET.x + TILE_EDGE / 2, y: TILE_INSET.y + TILE_EDGE / 2 } as const
+const TILE_CENTER = TILE_EDGE / 2
 
 /** Density at which the source's own 1:1 scale renders. */
 const SOURCE_DENSITY = 72
@@ -48,27 +38,23 @@ const SOURCE_DENSITY = 72
 const RENDER_SCALE = 4
 
 /**
- * Fraction of a maskable icon the artwork keeps: the platform may crop the
- * border outside it. The tile's own ink reaches 0.461 of its edge from the
- * centre, so 0.868 is the largest scale a circular mask still shows whole;
- * `pwa-manifest.e2e.ts` checks the committed artwork against that circle.
+ * Fraction of a maskable icon retained by the artwork. The outer square's
+ * stroked corners extend beyond the platform's guaranteed circle at full size;
+ * this scale moves those corners inside it with an antialiasing margin.
  */
-export const MASKABLE_ARTWORK_SCALE = 0.82
+export const MASKABLE_ARTWORK_SCALE = 0.86
 
 /** Radius a platform mask is guaranteed to show, as a fraction of the icon edge. */
 export const MASKABLE_SAFE_RADIUS_RATIO = 0.4
 
-/** Root element of the source document, rewritten to crop the canvas to the tile. */
+/** Root element required by the icon source. */
 const SOURCE_ROOT = /^<svg[^>]*>/u
 
-/** Source definitions element, including attributes preserved during clip insertion. */
-const SOURCE_DEFINITIONS = /<defs(?:\s[^>]*)?>/u
+/** The opaque tile background, which remains unscaled for every variant. */
+const TILE_BACKGROUND = '<rect width="100" height="100" fill="#FFFFFF"/>'
 
-/** The tile group's drop shadow; stripped because a launcher icon has no window around it. */
-const TILE_SHADOW_GROUP = '<g filter="url(#filter0_d_1637_371)">'
-
-/** The whale group inside the tile; the only element a maskable icon scales. */
-const TILE_ARTWORK_GROUP = '<g filter="url(#filter1_ddi_1637_371)">'
+/** The QingClaw foreground group; the maskable variant scales only this group. */
+const TILE_ARTWORK_GROUP = '<g id="qingclaw-app-artwork">'
 
 /** One committed install icon: the manifest or link member it serves and its edge in pixels. */
 export interface AppIconVariant {
@@ -76,78 +62,57 @@ export interface AppIconVariant {
   readonly file: string
   /** Square edge in pixels. */
   readonly size: number
-  /** Target rendering; `tile` is an opaque square for system masking. */
-  readonly kind: 'rounded' | 'tile' | 'maskable'
+  /** Which rendering the platform receives. */
+  readonly kind: 'tile' | 'maskable'
 }
 
 /**
  * Install icons the Web application ships. Chrome requires the 192px and 512px
- * raster pair to offer installation. Platforms that apply their own masks
- * receive a separate opaque maskable icon; Safari prefers the linked Apple touch icon.
+ * raster pair to offer installation, prefers a maskable icon for the home
+ * screen, and iOS reads the touch icon alone.
  */
 export const APP_ICON_VARIANTS: readonly AppIconVariant[] = [
-  { file: 'icon-192.png', size: 192, kind: 'rounded' },
-  { file: 'icon-512.png', size: 512, kind: 'rounded' },
+  { file: 'icon-192.png', size: 192, kind: 'tile' },
+  { file: 'icon-512.png', size: 512, kind: 'tile' },
   { file: 'icon-maskable-512.png', size: 512, kind: 'maskable' },
   { file: 'apple-touch-icon.png', size: 180, kind: 'tile' },
 ]
 
-/** The cropped 1:1 root every variant shares, at the tile's own square extent. */
-function croppedRoot(): string {
-  return `<svg width="${String(TILE_EDGE)}" height="${String(TILE_EDGE)}"`
-    + ` viewBox="${String(TILE_INSET.x)} ${String(TILE_INSET.y)} ${String(TILE_EDGE)} ${String(TILE_EDGE)}"`
-    + ' fill="none" xmlns="http://www.w3.org/2000/svg">'
-}
-
 /** A scale about the tile centre, so a masked crop stays symmetric. */
 function aboutCenter(scale: number): string {
-  return `translate(${String(TILE_CENTER.x)} ${String(TILE_CENTER.y)}) scale(${String(scale)})`
-    + ` translate(${String(-TILE_CENTER.x)} ${String(-TILE_CENTER.y)})`
+  return `translate(${String(TILE_CENTER)} ${String(TILE_CENTER)}) scale(${String(scale)})`
+    + ` translate(${String(-TILE_CENTER)} ${String(-TILE_CENTER)})`
 }
 
-/** Replace the source root so the icon canvas is exactly the tile. */
-function reparent(source: string, tileGroup = '<g>'): string {
+/** Validate and normalize the committed favicon source. */
+function normalizedSource(source: string): string {
   const trimmed = source.trim()
   const root = SOURCE_ROOT.exec(trimmed)
   if (root === null) throw new Error('app icons: the tile source has no root element')
-  if (!trimmed.includes(TILE_SHADOW_GROUP)) throw new Error('app icons: the tile source has no shadowed tile group')
+  if (!root[0].includes('viewBox="0 0 100 100"')) throw new Error('app icons: the tile source must use the 100-unit square view box')
+  if (!trimmed.includes(TILE_BACKGROUND)) throw new Error('app icons: the tile source has no opaque background')
   if (!trimmed.includes(TILE_ARTWORK_GROUP)) throw new Error('app icons: the tile source has no artwork group')
-  if (!SOURCE_DEFINITIONS.test(trimmed)) throw new Error('app icons: the tile source has no definitions element')
-  return `${croppedRoot()}${trimmed.slice(root[0].length).replace(TILE_SHADOW_GROUP, tileGroup)}`
+  return trimmed
 }
 
 /**
- * Rewrite the tile source so the icon canvas is exactly the tile.
- * @param source - complete `icon.svg` document.
- * @returns an SVG document whose 1024-unit square is the tile without its shadow.
+ * Validate the favicon source used for ordinary install icons.
+ * @param source - complete QingClaw favicon document.
+ * @returns the normalized 100-unit-square SVG document.
  */
 export function tileDocument(source: string): string {
-  return reparent(source)
+  return normalizedSource(source)
 }
 
 /**
- * Round the generic install tile for launchers that display it without a mask.
- * @param source - complete `icon.svg` document.
- * @returns an SVG document with transparent rounded corners and unscaled artwork.
- */
-export function roundedDocument(source: string): string {
-  return reparent(source, '<g clip-path="url(#install-tile-clip)">')
-    .replace(SOURCE_DEFINITIONS, '$&<clipPath id="install-tile-clip"><rect'
-      + ` x="${String(TILE_INSET.x)}" y="${String(TILE_INSET.y)}"`
-      + ` width="${String(TILE_EDGE)}" height="${String(TILE_EDGE)}"`
-      + ` rx="${String(TILE_CORNER_RADIUS)}"/></clipPath>`)
-}
-
-/**
- * Rewrite the tile source into a maskable icon. The tile keeps its own gradient
- * and extent, so the icon's border is the real tile rather than an extension;
- * only the whale scales into the safe zone a platform mask may crop.
- * @param source - complete `icon.svg` document.
+ * Rewrite the tile source into a maskable icon. The white background retains
+ * the complete extent while only the QingClaw foreground enters the safe zone.
+ * @param source - complete QingClaw favicon document.
  * @returns an SVG document whose artwork survives a circular mask whole.
  */
 export function maskableDocument(source: string): string {
-  const relocated = reparent(source)
-  return relocated.replace(
+  const normalized = normalizedSource(source)
+  return normalized.replace(
     TILE_ARTWORK_GROUP,
     `${TILE_ARTWORK_GROUP.slice(0, -1)} transform="${aboutCenter(MASKABLE_ARTWORK_SCALE)}">`,
   )
@@ -155,7 +120,7 @@ export function maskableDocument(source: string): string {
 
 /**
  * Rasterize one rewritten document at a square edge.
- * @param document - output of {@link tileDocument}, {@link roundedDocument} or {@link maskableDocument}.
+ * @param document - output of {@link tileDocument} or {@link maskableDocument}.
  * @param size - square edge in pixels.
  * @returns the PNG bytes.
  */
@@ -175,7 +140,6 @@ async function renderPng(document: string, size: number): Promise<Buffer> {
 
 function documentForVariant(source: string, kind: AppIconVariant['kind']): string {
   switch (kind) {
-    case 'rounded': return roundedDocument(source)
     case 'tile': return tileDocument(source)
     case 'maskable': return maskableDocument(source)
     default: return assertNever(kind)
@@ -184,7 +148,7 @@ function documentForVariant(source: string, kind: AppIconVariant['kind']): strin
 
 /**
  * Render every install icon from the tile source.
- * @param source - complete `icon.svg` document.
+ * @param source - complete QingClaw favicon document.
  * @returns one PNG per {@link APP_ICON_VARIANTS} entry, in declaration order.
  */
 export async function renderAppIcons(source: string): Promise<readonly { variant: AppIconVariant; png: Buffer }[]> {

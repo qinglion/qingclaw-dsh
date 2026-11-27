@@ -390,6 +390,12 @@ export const IconFolderCloseRegular = productIcon('folder-close', 'regular')
 /** Medium IconFolderClose artwork with a 1.3px stroke. */
 export const IconFolderCloseMedium = productIcon('folder-close', 'medium')
 
+/** One-pixel outline of an open inbox tray. */
+export const IconInboxOutlineRegular = productIcon('inbox-outline', 'regular')
+
+/** 1.3-pixel outline of an open inbox tray. */
+export const IconInboxOutlineMedium = productIcon('inbox-outline', 'medium')
+
 /** Regular one-pixel IconTreeCorner artwork. */
 export const IconTreeCornerRegular = productIcon('tree-corner', 'regular')
 
