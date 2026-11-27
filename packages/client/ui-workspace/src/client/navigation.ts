@@ -46,19 +46,43 @@ interface WorkspaceSessionMode {
   readonly createId: () => SessionId
   /** Identify a target Workspace for an explicit plain New Session action. */
   readonly matchesWorkspace?: (workspace: WorkspaceView, signal: AbortSignal) => boolean | Promise<boolean>
+  /** Keep this conversation type when its blank Hero selects a Workspace. */
+  readonly followWorkspaceSelection?: boolean
+  /**
+   * Prepare mode-owned draft data before a different Workspace's blank replaces the source.
+   * Both Session bindings remain retained until the returned promise settles; rejection keeps the source visible.
+   * @param sourceSessionId - visible blank being replaced.
+   * @param targetSessionId - newly created blank in the selected Workspace.
+   * @param signal - cancelled by later navigation, mode removal, or owner disposal.
+   * @returns completion of all admitted preparation, including cancellation cleanup.
+   */
+  readonly prepareWorkspaceSelection?: (sourceSessionId: SessionId, targetSessionId: SessionId, signal: AbortSignal) => Promise<void>
+}
+
+interface WorkspaceSelectionPreparation {
+  readonly abort: AbortController
+  readonly task: Promise<void>
+}
+
+/** Creation choices for a Workspace opened from navigation or a blank Hero. */
+export interface WorkspaceOpenOptions extends Pick<StartSessionOptions, 'agentPreset'> {
+  /** Visible blank whose preset and opted-in mode follow the selection; stale sources do not navigate. */
+  readonly sourceSessionId?: SessionId
 }
 
 /** Workspace archive and directory operations consumed by Client UI domains. */
 export interface UiWorkspace {
+  /** Native Hero selection retains Session bindings and awaits registered draft preparation. */
+  readonly supportsWorkspaceSelectionPreparation: true
   /**
    * Carry a visible conversation's mode into plain New Session in the same Workspace.
    * For an explicit target, the first Workspace matcher supplies a mode when there is
    * no visible mode to inherit. A failed match check reports a creation failure.
    * Registered mode Sessions are excluded from ordinary blank reuse.
    * @param mode - identity matcher and allocator for the dedicated workflow.
-   * @returns disposer for the caller's registration.
+   * @returns disposer that removes the mode immediately and awaits its cancelled preparation work.
    */
-  registerSessionMode(mode: WorkspaceSessionMode): () => void
+  registerSessionMode(mode: WorkspaceSessionMode): () => Promise<void>
   /**
    * Select a Session and show its Conversation as one UI navigation action.
    * @param target - known Session identity or durable direct-parent subagent address to display.
@@ -69,7 +93,7 @@ export interface UiWorkspace {
    * @param workspaceId - target Workspace.
    * @param beforeOpen - optional synchronous preparation for the selected Session,
    * skipped after supersession; a throw aborts the open and releases the retained reference.
-   * @param options - choices for the Session the connection creates or reuses.
+   * @param options - creation choices and the optional blank Hero that owns the selection.
    * @returns completion; a superseded request may create a Session but does not open it.
    * @throws on failure; a refused creation is also shown through the Workspace
    * notice unless a later navigation or disposal superseded the request.
@@ -77,7 +101,7 @@ export interface UiWorkspace {
   openWorkspace(
     workspaceId: WorkspaceId,
     beforeOpen?: (sessionId: SessionId) => void,
-    options?: Pick<StartSessionOptions, 'agentPreset'>,
+    options?: WorkspaceOpenOptions,
   ): Promise<void>
   /**
    * Fork a Session without changing the current selection.
@@ -185,7 +209,9 @@ export class DirectoryBrowseError extends Error {
 
 /** Implements Workspace archive and directory UI operations. */
 class UiWorkspaceService extends Service implements UiWorkspace {
+  readonly supportsWorkspaceSelectionPreparation = true
   private readonly sessionModes = new Set<WorkspaceSessionMode>()
+  private readonly preparations = new Map<WorkspaceSessionMode, Set<WorkspaceSelectionPreparation>>()
   /** The latest in-flight connection per Workspace; a request joins it only when both name the same preset. */
   private readonly connecting = new Map<WorkspaceId, {
     readonly agentPreset: string | undefined
@@ -223,9 +249,10 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     ctx.effect(() => {
       const stop = this.watchNavigation()
       const stopRecentViews = this.recentViews.start()
-      return () => {
+      return async () => {
         stop()
         this.lifetime.abort()
+        await Promise.allSettled(Array.from(this.preparations.values()).flatMap(rows => Array.from(rows, row => row.task)))
         const reference = this.mainReference
         this.mainReference = undefined
         reference?.release()
@@ -238,9 +265,17 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     return this.connectBlank(workspaceId, options)
   }
 
-  registerSessionMode(mode: WorkspaceSessionMode): () => void {
+  registerSessionMode(mode: WorkspaceSessionMode): () => Promise<void> {
     this.sessionModes.add(mode)
-    return () => { this.sessionModes.delete(mode) }
+    let disposal: Promise<void> | undefined
+    return () => {
+      if (disposal !== undefined) return disposal
+      this.sessionModes.delete(mode)
+      const pending = Array.from(this.preparations.get(mode) ?? [])
+      for (const preparation of pending) preparation.abort.abort()
+      disposal = Promise.allSettled(pending.map(preparation => preparation.task)).then(() => {})
+      return disposal
+    }
   }
 
   /**
@@ -332,9 +367,21 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   openWorkspace(
     workspaceId: WorkspaceId,
     beforeOpen?: (sessionId: SessionId) => void,
-    options: Pick<StartSessionOptions, 'agentPreset'> = {},
+    options: WorkspaceOpenOptions = {},
   ): Promise<void> {
-    return this.openWorkspaceSession(workspaceId, beforeOpen, options)
+    const { sourceSessionId, ...requested } = options
+    if (sourceSessionId !== undefined && !this.isCurrentBlank(sourceSessionId)) return Promise.resolve()
+    const source = sourceSessionId === undefined ? undefined : this.sessions.list.getSnapshot().byId[sourceSessionId]
+    const preset = source?.projectionValues?.agentPreset
+    const reuse = requested.agentPreset === undefined && typeof preset === 'string' ? { agentPreset: preset } : requested
+    const mode = sourceSessionId === undefined ? undefined : Array.from(this.sessionModes)
+      .find(candidate => candidate.followWorkspaceSelection === true && candidate.matches(sourceSessionId))
+    return this.openWorkspaceSession(workspaceId, beforeOpen, reuse, mode, sourceSessionId)
+  }
+
+  private isCurrentBlank(sessionId: SessionId): boolean {
+    return this.mainReference?.sessionId === sessionId && this.sessions.list.getSnapshot().byId[sessionId]?.blank === true
+      && this.ctx.layout.panelInfo.getSnapshot().activePanelId === null
   }
 
   private async openWorkspaceSession(
@@ -342,6 +389,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     beforeOpen: ((sessionId: SessionId) => void) | undefined,
     reuse: Pick<StartSessionOptions, 'agentPreset'>,
     selection?: WorkspaceSessionMode | 'target-workspace',
+    sourceSessionId?: SessionId,
   ): Promise<void> {
     const navigation = AbortSignal.any([this.ctx.layout.beginNavigation(), this.lifetime.signal])
     let mode: WorkspaceSessionMode | undefined
@@ -353,17 +401,77 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       } else {
         mode = selection
       }
+      const sameWorkspace = sourceSessionId !== undefined && this.workspaces.list.getSnapshot().items
+        .some(item => item.workspaceId === workspaceId && item.sessionIds.includes(sourceSessionId))
       sessionId = mode === undefined
         ? await this.connectBlank(workspaceId, reuse)
-        : await this.createNamed({ workspaceId, sessionId: mode.createId() })
+        : await this.createNamed({ workspaceId, sessionId: sameWorkspace ? sourceSessionId : mode.createId(), ...reuse })
+      if (mode?.prepareWorkspaceSelection !== undefined && sourceSessionId !== undefined && sourceSessionId !== sessionId
+        && !navigation.aborted && this.sessionModes.has(mode) && this.isCurrentBlank(sourceSessionId)) {
+        await this.prepareWorkspaceSelection(mode, sourceSessionId, sessionId, navigation, beforeOpen)
+        return
+      }
     } catch (error: unknown) {
       // Reported here, not in connectWorkspace: startup restoration calls that
       // directly and stays console-only.
       if (!navigation.aborted) this.notify({ kind: 'createFailed', message: creationFailureMessage(error) })
       throw error
     }
-    if (navigation.aborted || (mode !== undefined && !this.sessionModes.has(mode))) return
+    if (navigation.aborted || (mode !== undefined && !this.sessionModes.has(mode))
+      || (sourceSessionId !== undefined && !this.isCurrentBlank(sourceSessionId))) return
     this.replaceMain(sessionId, navigation, 'reveal', beforeOpen)
+  }
+
+  private async prepareWorkspaceSelection(
+    mode: WorkspaceSessionMode,
+    sourceSessionId: SessionId,
+    targetSessionId: SessionId,
+    navigation: AbortSignal,
+    beforeOpen: ((sessionId: SessionId) => void) | undefined,
+  ): Promise<void> {
+    const prepare = mode.prepareWorkspaceSelection
+    if (prepare === undefined) return
+    const abort = new AbortController()
+    const signal = AbortSignal.any([navigation, abort.signal])
+    const stop = this.sessions.list.subscribe(() => { if (!this.isCurrentBlank(sourceSessionId)) abort.abort() })
+    const archival = { failed: false }
+    const task = (async () => {
+      let source: SessionReference | undefined
+      let target: SessionReference | undefined
+      let adopted = false
+      try {
+        source = this.sessions.retain(sourceSessionId, { source: 'workspaceOperation', facets: { conversation: true } })
+        target = this.sessions.retain(targetSessionId, { source: 'workspaceOperation', facets: { conversation: true } })
+        await Promise.all([source.ready, target.ready])
+        if (signal.aborted || !this.isCurrentBlank(sourceSessionId)) return
+        await prepare(sourceSessionId, targetSessionId, signal)
+        signal.throwIfAborted()
+        if (this.sessionModes.has(mode) && this.isCurrentBlank(sourceSessionId)) {
+          this.replaceMain(targetSessionId, navigation, 'reveal', beforeOpen)
+          adopted = this.mainReference?.sessionId === targetSessionId
+        }
+      } finally {
+        try {
+          if (!adopted && this.mainReference?.sessionId !== targetSessionId) {
+            try { await this.workspaces.archiveSession(targetSessionId) }
+            catch (error: unknown) { archival.failed = true; throw error }
+          }
+        } finally {
+          stop()
+          target?.release()
+          source?.release()
+        }
+      }
+    })()
+    const rows = this.preparations.get(mode) ?? new Set<WorkspaceSelectionPreparation>()
+    this.preparations.set(mode, rows)
+    const preparation = { abort, task }
+    rows.add(preparation)
+    try { await task } catch (error: unknown) { if (!signal.aborted || archival.failed) throw error }
+    finally {
+      rows.delete(preparation)
+      if (rows.size === 0) this.preparations.delete(mode)
+    }
   }
 
   private async modeForWorkspace(workspaceId: WorkspaceId, navigation: AbortSignal): Promise<WorkspaceSessionMode | undefined> {

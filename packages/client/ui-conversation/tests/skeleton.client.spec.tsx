@@ -32,7 +32,7 @@ import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
   ComposerBarOwnerProps, ConversationContentInputProps, ConversationContentProps,
-  WorkspaceSelectedHandler, WorkspaceSessionAdopter,
+  ConversationShellInjected, WorkspaceSessionAdopter,
   ConversationHeaderLineageOwnerProps, ConversationSessionHeaderSlotProps, ConversationSessionSlotProps, ConversationSlotProps,
   ConversationViewActionsOwnerProps, ConversationViewsProps, HeroFrameOwnerProps,
 } from '../src/client/contract/slots.ts'
@@ -130,7 +130,7 @@ function sessionSnapshotOf(overrides: Partial<SessionSnapshot> = {}): SessionSna
 function mount(
   snapshot: SessionSnapshot,
   workspaceRows: WorkspaceView[] = [{ ...workspace('one'), sessionIds: [SID] }],
-  retargetWorkspace = vi.fn<WorkspaceSelectedHandler>(async () => {}),
+  retargetWorkspace = vi.fn<ConversationShellInjected['openWorkspace']>(async () => {}),
   options: {
     /** Explicit undefined exercises the shell before a Session is selected. */
     sessionId?: SessionId | undefined
@@ -628,7 +628,7 @@ describe('ConversationRoot resident composer', () => {
     const owner = b.pickerOwner() as { open: boolean; onPick(id: WorkspaceId): void }
     expect(owner.open).toBe(true)
     act(() => { owner.onPick(wid('second')) })
-    expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('second'), b.moveDraft)
+    expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('second'), b.moveDraft, SID)
     expect(b.view.getByText('Selected Folder')).toBeTruthy()
   })
 
@@ -909,7 +909,7 @@ describe('ConversationRoot resident composer', () => {
   })
 
   it('rolls the pending workspace label back when switching fails', async () => {
-    const selectWorkspace = vi.fn<WorkspaceSelectedHandler>(async () => { throw new Error('connect failed') })
+    const selectWorkspace = vi.fn<ConversationShellInjected['openWorkspace']>(async () => { throw new Error('connect failed') })
     const b = mount(
       sessionSnapshotOf({ blank: true }),
       [
@@ -921,7 +921,7 @@ describe('ConversationRoot resident composer', () => {
     fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
     const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
     await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
-    expect(selectWorkspace).toHaveBeenCalledWith(wid('second'), b.moveDraft)
+    expect(selectWorkspace).toHaveBeenCalledWith(wid('second'), b.moveDraft, SID)
     expect(b.view.queryByText('Selected Folder')).toBeNull()
     expect(b.view.getByText('one')).toBeTruthy()
   })

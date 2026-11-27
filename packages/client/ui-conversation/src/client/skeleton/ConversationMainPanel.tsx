@@ -41,7 +41,7 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
         variant: 'main',
         phase,
         hero,
-        onWorkspaceSelected: openWorkspace,
+        onWorkspaceSelected: (workspaceId, adopt) => openWorkspace(workspaceId, adopt, sessionId),
       }, {
         slots: CONTENT_SLOTS,
       })}

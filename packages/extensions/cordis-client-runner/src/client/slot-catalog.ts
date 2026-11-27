@@ -4263,7 +4263,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.launcher.notifications\', () => ctx.slots.register(\n      { name: \'settings.launcher.notifications\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:47',
+    source: 'packages/client/ui-settings-account/src/client/account-ui.ts:60',
   },
   {
     key: 'settings.models.footer',
@@ -4470,7 +4470,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'sidebar.settings\' (client-ui-settings-general), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-settings-account AccountColdStart id \'account-sign-in\'',
+      '@qinglion/dsh-client-ui-qingclaw-account AccountOnboardingPrompt id \'qingclaw-account-sign-in\'',
       'client-ui-settings-models WelcomeNotice id \'welcome-notice\'',
       'client-ui-settings-models DeepSeekOnboardingDialog id \'deepseek-official\'',
     ],
@@ -4610,6 +4610,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'factory \'settings.section.view\' (client-ui-settings-general), so it exists while that definition is registered',
     occupants: [
+      '@qinglion/dsh-client-ui-qingclaw-account AccountSettingsSection id \'account\'',
       'client-remote-connection RemoteConnectionSettings id \'remote-connection\'',
       'client-ui-agent-preset AgentPresetSection id \'agent-presets\'',
       'client-ui-plugin-manager PluginsSettingsLink',
@@ -4815,6 +4816,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'root\' (client-ui-layout), so it exists while that entry is mounted',
     occupants: [
+      '@qinglion/dsh-qingclaw-entitlement UpgradeDialog id \'qingclaw-entitlement.upgrade\'',
       '@qinglion/dsh-client-ui-qingclaw-feedback FeedbackDialogEntry id \'qingclaw-feedback\'',
       '@qinglion/dsh-qingclaw-workbench WorkbenchNoticeToast id \'qingclaw-workbench-notice\'',
       'client-remote-connection LoginLinkToast id \'remote-connection-copy\'',

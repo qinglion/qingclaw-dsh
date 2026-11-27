@@ -92,11 +92,13 @@ async function bench(renderQuote = false) {
     opened(id)
   }
   const openSession = vi.fn((id: SessionId) => { replaceMain(id) })
+  const openWorkspace = vi.fn(async (_workspaceId: WorkspaceId, beforeOpen: (id: SessionId) => void,
+    _options?: { readonly sourceSessionId?: SessionId }) => {
+    const id = await connectWorkspace()
+    replaceMain(id, beforeOpen)
+  })
   runtime.ctx.provide('uiWorkspace', {
-    openWorkspace: async (_workspaceId: WorkspaceId, beforeOpen: (id: SessionId) => void) => {
-      const id = await connectWorkspace()
-      replaceMain(id, beforeOpen)
-    },
+    openWorkspace,
     openSession,
   } as never)
   const sessionFake = sessionFakeFor()
@@ -144,7 +146,7 @@ async function bench(renderQuote = false) {
   /** Pick a Workspace as the main occurrence does: the shell opens it and adopts the draft of the Session shown. */
   const selectWorkspace = (id: SessionId | undefined, workspaceId: WorkspaceId): Promise<void> => {
     const shell = runtime.slots.spec('main.conversation') as { inject: ConversationShellInjected }
-    return shell.inject.openWorkspace(workspaceId, residentApi(id).moveDraft)
+    return shell.inject.openWorkspace(workspaceId, residentApi(id).moveDraft, id)
   }
   const headerApi = (id: SessionId) => {
     const entry = entryOf('conversation.session.header')
@@ -167,7 +169,7 @@ async function bench(renderQuote = false) {
     conversationApi(id).injected.hooks.conversationViews
   return {
     runtime, feature, slots: runtime.slots, entryOf, conversationApi, headerApi, residentApi, composerApi, selectWorkspace,
-    inputApi, viewSource, sessionFake, connectWorkspace, rootUpload, uploads, rootReference, references, opened,
+    inputApi, viewSource, sessionFake, connectWorkspace, openWorkspace, rootUpload, uploads, rootReference, references, opened,
   }
 }
 
@@ -681,6 +683,7 @@ describe('Conversation inject API', () => {
 
     b.connectWorkspace.mockResolvedValueOnce(ROOT)
     await b.selectWorkspace(ROOT, 'workspace-1' as WorkspaceId)
+    expect(b.openWorkspace).toHaveBeenLastCalledWith('workspace-1', expect.any(Function), { sourceSessionId: ROOT })
     expect(b.opened).toHaveBeenCalledWith(ROOT)
     expect(state.getSnapshot().draft).toBe('carry me')
 
@@ -749,6 +752,7 @@ describe('Conversation inject API', () => {
     const b = await bench()
     b.connectWorkspace.mockResolvedValueOnce(ROOT)
     await b.selectWorkspace(undefined, 'workspace-0' as WorkspaceId)
+    expect(b.openWorkspace).toHaveBeenLastCalledWith('workspace-0', expect.any(Function), {})
     expect(b.opened).toHaveBeenCalledWith(ROOT)
 
     const opens = b.opened.mock.calls.length

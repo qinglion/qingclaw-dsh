@@ -341,9 +341,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'target', description: 'known Session identity or durable direct-parent subagent address to display.' }],
       },
       {
-        signature: 'openWorkspace( workspaceId: WorkspaceId, beforeOpen?: (sessionId: SessionId) => void, options?: Pick<StartSessionOptions, \'agentPreset\'>, ): Promise<void>',
+        signature: 'openWorkspace( workspaceId: WorkspaceId, beforeOpen?: (sessionId: SessionId) => void, options?: WorkspaceOpenOptions, ): Promise<void>',
         description: 'Connect a Workspace and open its Session unless a later navigation supersedes it.',
-        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'beforeOpen', description: 'optional synchronous preparation for the selected Session, skipped after supersession; a throw aborts the open and releases the retained reference.' }, { name: 'options', description: 'choices for the Session the connection creates or reuses.' }],
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'beforeOpen', description: 'optional synchronous preparation for the selected Session, skipped after supersession; a throw aborts the open and releases the retained reference.' }, { name: 'options', description: 'creation choices and the optional blank Hero that owns the selection.' }],
         returns: 'completion; a superseded request may create a Session but does not open it.',
         throws: ['on failure; a refused creation is also shown through the Workspace notice unless a later navigation or disposal superseded the request.'],
       },
@@ -361,7 +361,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void',
-        description: 'Open the Workspace blank `connectWorkspace` resolves, so New Session returns to that blank\'s unsent draft. A creation the Host refuses is shown through the Workspace notice and leaves the selection as it was.',
+        description: 'Open the Workspace blank `connectWorkspace` resolves, or create a fresh Session in the registered mode chosen for a plain request by the visible conversation or explicit target. A refused creation is shown through the Workspace notice and preserves the selection.',
         parameters: [{ name: 'workspaceId', description: 'explicit target; absent inherits the current or most recent Workspace.' }, { name: 'options', description: 'initial content, the blank\'s preset, and `whenDraftExists`, which decides whether existing text or attachments are kept, replaced, or followed by the prompt.' }],
       },
       {
@@ -1049,7 +1049,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'StoredEntry',
-    declaration: 'export interface StoredEntry {\n    component: unknown;\n    options: {\n        key?: string;\n        id?: string;\n        order?: number;\n        label?: SlotLabel;\n        priority?: number;\n    };\n    select?: ((owner: never) => unknown) | undefined;\n    inject?: ((...args: never[]) => Record<string, unknown>) | undefined;\n    children?: Readonly<Record<string, SlotSpec<SlotEntryDef>>> | undefined;\n    store?: StoreDecl | undefined;\n    locale?: string | undefined;\n    registrant?: string | undefined;\n    module?: string | undefined;\n}',
+    declaration: 'export interface StoredEntry {\n    component: unknown;\n    options: {\n        key?: string;\n        id?: string;\n        order?: number;\n        label?: SlotLabel;\n        supportsBlankSession?: boolean;\n        priority?: number;\n    };\n    select?: ((owner: never) => unknown) | undefined;\n    inject?: ((...args: never[]) => Record<string, unknown>) | undefined;\n    children?: Readonly<Record<string, SlotSpec<SlotEntryDef>>> | undefined;\n    store?: StoreDecl | undefined;\n    locale?: string | undefined;\n    registrant?: string | undefined;\n    module?: string | undefined;\n}',
   },
   {
     name: 'StoredFactory',
@@ -1106,6 +1106,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'UseFactorySlot',
     declaration: 'export type UseFactorySlot<F extends keyof SlotFactoryMap & string> = <N extends FactoryLocalNameOf<F>>(name: N, fallback: FactoryLocalComponent<F, N>) => SlotComponent<FactoryLocalInputPropsOf<F, N>>;',
+  },
+  {
+    name: 'WorkspaceOpenOptions',
+    declaration: 'export interface WorkspaceOpenOptions extends Pick<StartSessionOptions, \'agentPreset\'> {\n    readonly sourceSessionId?: SessionId;\n}',
   },
   {
     name: 'WorkspaceView',

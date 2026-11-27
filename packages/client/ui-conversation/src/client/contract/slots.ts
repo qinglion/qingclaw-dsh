@@ -491,8 +491,14 @@ export type WorkspaceSelectedHandler = (workspaceId: WorkspaceId, adopt: Workspa
 
 /** Business callbacks injected into the main Conversation shell. */
 export interface ConversationShellInjected {
-  /** Open the Workspace's blank Session as the main Session. */
-  openWorkspace: WorkspaceSelectedHandler
+  /**
+   * Open a Workspace's blank as the main Session and synchronously adopt its draft.
+   * @param workspaceId - Workspace selected in the Hero.
+   * @param adopt - draft transfer before the target replaces the current Session.
+   * @param sourceSessionId - visible blank whose mode and preset may follow the selection.
+   * @returns completion; superseded or stale selections do not transfer the draft.
+   */
+  openWorkspace: (workspaceId: WorkspaceId, adopt: WorkspaceSessionAdopter, sourceSessionId?: SessionId) => Promise<void>
 }
 
 /** Business callbacks injected into the shared Conversation content. */
